@@ -1,8 +1,11 @@
-"""Package a prepared desktop release with its complete embedded Bot runtime."""
+"""Build the Windows desktop EXE with its Bot runtime embedded in the executable."""
 
 import argparse
+import hashlib
 import json
+import os
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -21,30 +24,22 @@ def main():
     parser.add_argument("--target", default="")
     parser.add_argument("--output", type=Path, default=ROOT / "output")
     args = parser.parse_args()
+    if platform.system() != "Windows":
+        raise RuntimeError("The single-file portable EXE is a Windows build")
+    if args.target and args.target != "x86_64-pc-windows-msvc":
+        raise ValueError("The portable EXE targets Windows x64")
     version = json.loads((ROOT / "backend/desktop/tauri.conf.json").read_text(encoding="utf-8"))["version"]
-    release = ROOT / "backend/desktop/target"
-    if args.target:
-        if "/" in args.target or "\\" in args.target or args.target in (".", ".."):
-            raise ValueError("Expected a Rust target triple")
-        release /= args.target
-    release /= "release"
-    args.output.mkdir(parents=True, exist_ok=True)
-
-    if platform.system() == "Darwin":
-        app = release / "bundle/macos/Boost.app"
-        if not (app / "Contents/MacOS/Boost").is_file():
-            raise FileNotFoundError(f"Desktop app is missing: {app}")
-        archive = args.output / f"Boost-{version}-macos-portable.zip"
-        subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(app), str(archive)], check=True)
-    elif platform.system() == "Windows":
-        executable = release / "Boost.exe"
-        bot = ROOT / "bot"
-        for required in (executable, bot / "bin/node.exe", *(bot / name for name in RUNTIME_PARTS)):
-            if not required.exists():
-                raise FileNotFoundError(f"Prepare the release runtime first: {required}")
-        archive = args.output / f"Boost-{version}-windows-portable.zip"
+    output = args.output.resolve()
+    bot = ROOT / "bot"
+    for required in (bot / "bin/node.exe", *(bot / name for name in RUNTIME_PARTS)):
+        if not required.exists():
+            raise FileNotFoundError(f"Prepare the Bot runtime first: {required}")
+    temporary_root = (ROOT / "tmp").resolve()
+    scratch = temporary_root / f"boost-portable-{os.getpid()}"
+    scratch.mkdir(parents=True)
+    try:
+        archive = scratch / "bot-runtime.zip"
         with ZipFile(archive, "w", compression=ZIP_DEFLATED, compresslevel=6, allowZip64=True) as package:
-            package.write(executable, "Boost-portable.exe")
             for name in RUNTIME_PARTS:
                 source = bot / name
                 files = sorted(source.rglob("*")) if source.is_dir() else [source]
@@ -56,13 +51,37 @@ def main():
                         part in ("__pycache__", ".cache", ".pytest_cache") for part in relative.parts
                     ):
                         continue
-                    package.write(file, "boost-bot/" + relative.as_posix())
-            required = {"Boost-portable.exe", "boost-bot/bin/node.exe", "boost-bot/dist/src/boost-host.js", "boost-bot/package.json"}
+                    package.write(file, relative.as_posix())
+            required = {"bin/node.exe", "dist/src/boost-host.js", "package.json"}
             if not required.issubset(package.namelist()):
-                raise RuntimeError("Portable archive is missing required runtime files")
-    else:
-        raise RuntimeError("Portable archives are provided for Windows and Apple Silicon macOS")
-    print(f"Portable release: {archive} ({archive.stat().st_size:,} bytes)")
+                raise RuntimeError("Embedded archive is missing required runtime files")
+        digest = hashlib.sha256()
+        with archive.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        env = {
+            **os.environ, "TEMP": str(scratch), "TMP": str(scratch), "TMPDIR": str(scratch),
+            "BOOST_EMBEDDED_BOT_ARCHIVE": str(archive), "BOOST_EMBEDDED_BOT_DIGEST": digest.hexdigest(),
+        }
+        command = ["cargo", "tauri", "build", "--features", "portable-runtime", "--no-bundle",
+                   "--config", json.dumps({"build": {"beforeBuildCommand": ""}})]
+        if args.target:
+            command.extend(["--target", args.target])
+        command.extend(["--", "--locked"])
+        subprocess.run(command, cwd=ROOT / "backend/desktop", env=env, check=True)
+        release = ROOT / "backend/desktop/target"
+        if args.target:
+            release /= args.target
+        executable = release / "release/Boost.exe"
+        output.mkdir(parents=True, exist_ok=True)
+        destination = output / f"Boost_{version}_x64.exe"
+        shutil.copyfile(executable, destination)
+        print(f"Portable desktop EXE: {destination} ({destination.stat().st_size:,} bytes)")
+    finally:
+        actual = scratch.resolve()
+        if actual.parent != temporary_root or actual.name != f"boost-portable-{os.getpid()}":
+            raise RuntimeError("Invalid portable build cleanup directory")
+        shutil.rmtree(actual)
 
 
 if __name__ == "__main__":

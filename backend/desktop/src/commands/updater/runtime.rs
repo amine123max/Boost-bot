@@ -127,7 +127,7 @@ pub(super) fn current_mode_and_marker() -> Result<(String, bool, PathBuf, PathBu
         .and_then(|v| v.to_str())
         .map(|v| v.to_ascii_lowercase().contains("-portable"))
         .unwrap_or(false);
-    let is_portable = by_marker || by_exe_name;
+    let is_portable = cfg!(feature = "portable-runtime") || by_marker || by_exe_name;
     let mode = if is_portable { "portable" } else { "installer" }.to_string();
     Ok((mode, is_portable, exe, marker))
 }

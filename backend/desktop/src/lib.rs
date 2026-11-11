@@ -4,6 +4,8 @@ use tauri::{Emitter, Manager};
 mod app_shell;
 mod app_storage;
 mod commands;
+#[cfg(any(feature = "portable-runtime", test))]
+mod embedded_bot;
 mod rpc_client;
 mod service_runtime;
 
@@ -47,6 +49,12 @@ pub fn run() {
         }))
         .setup(|app| {
             load_env_from_exe_dir();
+            #[cfg(feature = "portable-runtime")]
+            {
+                let runtime = embedded_bot::prepare(&app.path().app_cache_dir()?)?;
+                boost_service::configure_bot_runtime(runtime);
+            }
+            #[cfg(not(feature = "portable-runtime"))]
             if let Ok(resources) = app.path().resource_dir() {
                 boost_service::configure_bot_runtime(resources.join("boost-bot"));
             }

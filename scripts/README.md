@@ -9,7 +9,7 @@ Run from the repository root. These scripts use `frontend/`, `backend/desktop/`,
 | `dev-boost.mjs` | Matching source-built service, authenticated developer Web and Vite / 联合开发 |
 | `prepare-boost-bot.mjs` | Prepare locked Bot dependencies, shared UI, Node and tools / 准备 Bot |
 | `stage-boost-bot.mjs` | Stage a prepared Bot runtime into a service package / 打包 Bot 运行目录 |
-| `package-portable.py` | Package Windows or Apple Silicon macOS portable releases with Bot / 生成含 Bot 的免安装压缩包 |
+| `package-portable.py` | Build the Windows desktop portable EXE with embedded Bot / 生成内嵌 Bot 的桌面免安装 EXE |
 | `rebuild.ps1`, `rebuild-linux.sh`, `rebuild-macos.sh` | Native desktop rebuild helpers / 原生桌面重建 |
 | `check-repository.mjs` | Validate structure, package paths and documentation links / 校验结构与文档链接 |
 | `check-release-version.mjs` | Match source version fields to a release tag / 发布版本一致性 |

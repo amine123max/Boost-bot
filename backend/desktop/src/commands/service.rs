@@ -730,7 +730,7 @@ model_provider = "cm"
 review_model = "deepseek-v4-pro"
 # END BOOST CLI CONFIG
 
-[model_providers.Boost]
+[model_providers.boost]
 name = "Old"
 base_url = "http://old.example/v1"
 wire_api = "responses"
@@ -757,7 +757,7 @@ trust_level = "trusted"
         assert!(merged.contains("model = \"gpt-5.5\""));
         assert!(merged.contains("model_provider = \"openai\""));
         assert!(merged.contains("review_model = \"gpt-5.5\""));
-        assert!(merged.contains("[model_providers.Boost]"));
+        assert!(merged.contains("[model_providers.boost]"));
         assert!(merged.contains("name = \"Boost Local\""));
         assert!(merged.contains("base_url = \"http://localhost:48760/v1\""));
         assert!(merged.contains("wire_api = \"responses\""));
@@ -768,7 +768,7 @@ trust_level = "trusted"
         assert!(!merged.contains("deepseek-v4-pro"));
         assert!(!merged.contains("http://old.example/v1"));
         assert!(!merged.contains("old-token-command"));
-        assert_eq!(merged.matches("[model_providers.Boost]").count(), 1);
+        assert_eq!(merged.matches("[model_providers.boost]").count(), 1);
     }
 
     #[test]
@@ -800,7 +800,7 @@ model_provider = "openai"
         let content = fs::read_to_string(&config_path).expect("read config");
         assert!(content.contains("model = \"gpt-5.5\""));
         assert!(content.contains("model_provider = \"openai\""));
-        assert!(content.contains("[model_providers.Boost]"));
+        assert!(content.contains("[model_providers.boost]"));
         assert!(!root.join("auth.json").exists());
 
         let _ = fs::remove_dir_all(&root);

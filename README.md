@@ -32,8 +32,8 @@ The Release badge reads the latest published version directly from GitHub. Versi
 
 | Platform | Release format |
 | --- | --- |
-| Windows x64 | NSIS installer (`.exe`) / portable archive (`.zip`) |
-| macOS Apple Silicon | Disk image (`.dmg`) / portable app archive (`.zip`) |
+| Windows x64 | Desktop portable EXE (`Boost_0.5.0_x64.exe`) / NSIS installer (`-setup.exe`) |
+| macOS Apple Silicon | Disk image (`.dmg`) |
 
 These are the packaging targets defined by the release workflow. Download availability follows the published release.
 

@@ -71,6 +71,7 @@ pub(super) fn portable_asset_names_for_platform(latest_version: &str) -> Vec<Str
     let v = latest_version.trim().trim_start_matches(['v', 'V']);
     if cfg!(target_os = "windows") {
         vec![
+            format!("Boost_{v}_x64.exe"),
             "Boost-portable.exe".to_string(),
             format!("Boost-{v}-windows-portable.zip"),
             "Boost-windows-portable.zip".to_string(),
@@ -229,9 +230,14 @@ fn select_payload_asset(
     }
 
     if cfg!(target_os = "windows") {
+        let portable_names = portable_asset_names_for_platform(latest_version);
         if let Some(exe) = assets.iter().find(|asset| {
             let name = asset.name.to_ascii_lowercase();
-            name.ends_with(".exe") && !name.contains("portable")
+            name.ends_with(".exe")
+                && !name.contains("portable")
+                && !portable_names
+                    .iter()
+                    .any(|portable| portable.eq_ignore_ascii_case(&asset.name))
         }) {
             return Some(exe.clone());
         }
@@ -842,12 +848,41 @@ mod tests {
     fn portable_asset_names_include_current_workflow_artifact() {
         let names = portable_asset_names_for_platform("0.1.8");
         if cfg!(target_os = "windows") {
+            assert!(names.iter().any(|name| name == "Boost_0.1.8_x64.exe"));
             assert!(names.iter().any(|name| name == "Boost-portable.exe"));
         } else if cfg!(target_os = "linux") {
             assert!(names.iter().any(|name| name == "Boost-linux-portable.zip"));
         } else if cfg!(target_os = "macos") {
             assert!(names.iter().any(|name| name == "Boost-macos-portable.zip"));
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_updates_choose_the_asset_for_the_current_distribution() {
+        let assets: Vec<GitHubAsset> = ["Boost_0.5.0_x64.exe", "Boost_0.5.0_x64-setup.exe"]
+            .iter()
+            .map(|name| GitHubAsset {
+                name: (*name).to_string(),
+                browser_download_url: format!(
+                    "https://github.com/owner/Boost-bot/releases/download/v0.5.0/{name}"
+                ),
+                api_url: None,
+            })
+            .collect();
+        assert_eq!(
+            super::select_payload_asset("portable", "0.5.0", &assets)
+                .unwrap()
+                .name,
+            "Boost_0.5.0_x64.exe"
+        );
+        assert_eq!(
+            super::select_payload_asset("installer", "0.5.0", &assets)
+                .unwrap()
+                .name,
+            "Boost_0.5.0_x64-setup.exe"
+        );
+        assert!(super::select_payload_asset("installer", "0.5.0", &assets[..1]).is_none());
     }
 
     /// 函数 `sanitize_tag_replaces_unsafe_characters`

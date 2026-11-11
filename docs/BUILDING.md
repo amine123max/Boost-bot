@@ -74,13 +74,13 @@ The source-build files use the new `frontend/` and `backend/` paths. See [Docker
 
 ## Releases
 
-The [release workflow](../.github/workflows/release-all.yml) builds Windows x64 and Apple Silicon macOS desktop packages from a version tag. Both platforms include an installer and a portable ZIP with the embedded Bot runtime. Validate versions first:
+The [release workflow](../.github/workflows/release-all.yml) builds Windows x64 desktop portable EXE and NSIS installer, plus an Apple Silicon macOS DMG, from a version tag. Validate versions first:
 
 ```bash
 node scripts/check-release-version.mjs v0.5.0
 ```
 
-After building the desktop release on its target platform, create the portable ZIP in `output/` with `python scripts/package-portable.py` (use `python3` on macOS). Pass `--target <Rust-triple>` when the desktop was compiled with an explicit target. The Windows ZIP starts with `Boost-portable.exe`; the macOS ZIP contains `Boost.app`.
+After preparing the Bot runtime and frontend on Windows, run `python scripts/package-portable.py` to build `output/Boost_0.5.0_x64.exe`. Pass `--target x86_64-pc-windows-msvc` for an explicit Rust target. The portable Cargo feature embeds the complete Bot runtime inside the native desktop executable; first launch extracts it into the application's versioned runtime cache. No manual extraction or installation is required. Build the NSIS installer before this command, using the normal desktop feature set.
 
 Version fields must match across the root Cargo workspace, native desktop manifest/configuration and frontend package. Build jobs define intended targets; validate platform-specific artifacts before distributing them. Update behavior and release configuration are documented in [中文](zh-CN/release/自动更新与GitHub发布.md) and [English](en/report/app-updates-and-releases.md).
 

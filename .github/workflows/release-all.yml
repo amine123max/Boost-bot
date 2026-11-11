@@ -80,12 +80,8 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: npx --yes --package @tauri-apps/cli@2.11.3 tauri build --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}" --config "$TMPDIR/tauri-release.json"
       - name: Package portable desktop
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            python scripts/package-portable.py --target "${{ matrix.target }}" --output "$TMPDIR/portable"
-          else
-            python3 scripts/package-portable.py --target "${{ matrix.target }}" --output "$TMPDIR/portable"
-          fi
+        if: runner.os == 'Windows'
+        run: python scripts/package-portable.py --target "${{ matrix.target }}" --output "$TMPDIR/portable"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.target }}
@@ -93,7 +89,7 @@ jobs:
           path: |
             backend/desktop/target/${{ matrix.target }}/release/bundle/nsis/*.exe
             backend/desktop/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
-            tmp/boost-release/portable/*.zip
+            tmp/boost-release/portable/*.exe
 
   publish:
     needs: build
@@ -116,8 +112,8 @@ jobs:
           set -euo pipefail
           export TEMP="$GITHUB_WORKSPACE/tmp/boost-release"
           export TMP="$TEMP" TMPDIR="$TEMP"
-          mapfile -d '' assets < <(find tmp/boost-release/artifacts -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*-portable.zip' \) -print0)
-          test "${#assets[@]}" -eq 4
+          mapfile -d '' assets < <(find tmp/boost-release/artifacts -type f \( -name '*.exe' -o -name '*.dmg' \) -print0)
+          test "${#assets[@]}" -eq 3
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "Boost $RELEASE_TAG" --generate-notes
           fi
