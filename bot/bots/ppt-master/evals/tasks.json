@@ -1,0 +1,40 @@
+[
+  {
+    "id": "quick-topic",
+    "prompt": "快速做一份 3 页 16:9 的 PPT，主题是如何开好远程周会，不用确认。",
+    "contains": ["\"phase\":\"done\""],
+    "files": [
+      { "match": "^app/projects/.+/exports/[^/]+\\.pptx$", "minBytes": 5000, "zipHas": ["[Content_Types].xml", "ppt/presentation.xml", "ppt/slides/slide1.xml", "ppt/slides/slide3.xml"] }
+    ]
+  },
+  {
+    "id": "quick-from-file",
+    "prompt": "用这份材料快速生成 3 页 PPT，不用确认。",
+    "file": {
+      "name": "q3-review.md",
+      "text": "# 三季度复盘\n\n收入 1,280 万，同比增长 18%。\n新增客户 46 家，其中企业客户 12 家。\n主要问题：交付周期从 21 天延长到 28 天。\n四季度重点：把交付周期压回 21 天，新增 3 个行业方案。\n"
+    },
+    "contains": ["\"phase\":\"done\""],
+    "files": [
+      { "match": "^app/projects/.+/exports/[^/]+\\.pptx$", "minBytes": 5000, "zipHas": ["[Content_Types].xml", "ppt/slides/slide1.xml"] },
+      { "match": "^app/inbox/q3-review\\.md$" }
+    ]
+  },
+  {
+    "id": "default-stops-at-card",
+    "prompt": "根据这段内容做一份 6 页的融资路演 PPT：我们做面向中小企业的报销软件，付费客户 800 家，年收入 2,400 万，这轮融资 3,000 万。",
+    "contains": ["\"stage\":\"stage1\"", "spec_pending"],
+    "files": [
+      { "match": "^app/projects/.+/exports/[^/]+\\.pptx$", "absent": true },
+      { "match": "^app/projects/.+/svg_output/.+\\.svg$", "absent": true }
+    ]
+  },
+  {
+    "id": "create-template",
+    "prompt": "直接做一套简洁风格的季度复盘模板，不用问我细节。",
+    "contains": ["\"kind\":\"template\""],
+    "files": [
+      { "match": "^app/projects/.+/templates/.+" }
+    ]
+  }
+]

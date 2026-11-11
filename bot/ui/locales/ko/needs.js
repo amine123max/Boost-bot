@@ -1,0 +1,22 @@
+export default {
+  "title": "내 확인 필요",
+  "head": "{bot}: {what}",
+  "headSpaced": "{bot}: {what}",
+  "collapse": "접기",
+  "viewTask": "작업 보기",
+  "viewRule": "규칙 보기",
+  "openChat": "대화 열기",
+  "reply": "답장…",
+  "approveOnce": "한 번 허용",
+  "deny": "거부",
+  "stop": "중지",
+  "relogin": "다시 스캔",
+  "answerPlaceholder": "답변 입력",
+  "send": "보내기",
+  "none": "지금은 확인할 항목이 없습니다",
+  "dismiss": "다시 표시하지 않기",
+  "continue": "계속",
+  "raiseBudget": "예산 변경",
+  "toAct": "실행 모드로 전환",
+  "keepObserving": "관찰 계속"
+};

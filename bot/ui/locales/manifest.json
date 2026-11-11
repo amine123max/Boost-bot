@@ -1,0 +1,36 @@
+{
+  "source": "zh-CN",
+  "fallback": "en",
+  "locales": [
+    {
+      "code": "zh-CN",
+      "siteCode": "zh",
+      "name": "简体中文",
+      "ready": true
+    },
+    {
+      "code": "en",
+      "siteCode": "en",
+      "name": "English",
+      "ready": true
+    },
+    {
+      "code": "ja",
+      "siteCode": "ja",
+      "name": "日本語",
+      "ready": true
+    },
+    {
+      "code": "ko",
+      "siteCode": "ko",
+      "name": "한국어",
+      "ready": true
+    },
+    {
+      "code": "ru",
+      "siteCode": "ru",
+      "name": "Русский",
+      "ready": true
+    }
+  ]
+}

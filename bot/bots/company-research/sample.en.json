@@ -1,0 +1,161 @@
+{
+  "title": "Company research",
+  "runtime": {
+    "mode": "auto",
+    "track": "b"
+  },
+  "jobs": [
+    {
+      "id": "job-sample-sprucefield",
+      "company": "Sprucefield Robotics",
+      "companyUrl": "https://example.com/sprucefield/about",
+      "industry": "Warehouse robotics",
+      "hqLocation": "Suzhou",
+      "status": "completed",
+      "track": "b",
+      "currentStep": "editor",
+      "progress": 100,
+      "docCounts": {
+        "financial": 9,
+        "news": 7,
+        "industry": 8,
+        "company": 11
+      },
+      "nodes": {
+        "grounding": "done",
+        "financial_analyst": "done",
+        "news_scanner": "done",
+        "industry_analyst": "done",
+        "company_analyst": "done",
+        "collector": "done",
+        "curator": "done",
+        "enricher": "done",
+        "briefing": "done",
+        "editor": "done"
+      },
+      "curation": {
+        "total": 35,
+        "kept": 22,
+        "threshold": 0.4
+      },
+      "sample": true,
+      "updatedAt": "2026-11-03T02:10:00Z"
+    }
+  ],
+  "timeline": [
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:00:00Z",
+      "node": "grounding",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:01:00Z",
+      "node": "financial_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:02:00Z",
+      "node": "news_scanner",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:03:00Z",
+      "node": "industry_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:04:00Z",
+      "node": "company_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:05:00Z",
+      "node": "collector",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:06:00Z",
+      "node": "curator",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:07:00Z",
+      "node": "enricher",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:08:00Z",
+      "node": "briefing",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:09:00Z",
+      "node": "editor",
+      "status": "done"
+    }
+  ],
+  "selectedJobId": "job-sample-sprucefield",
+  "view": "report",
+  "reportPreview": "# Sprucefield Robotics diligence report\n\n> This is a sample for the view. The company, figures and sources are all fictional.\n\n## Summary\n\n- Sprucefield Robotics makes warehouse sorting robots, mainly for regional e-commerce and third-party logistics companies ([company overview](https://example.com/sprucefield/about)).\n- It closed a $60 million Series B in March 2026, led by Pinestone Capital ([funding announcement](https://example.org/news/sprucefield-series-b)).\n- Public sources have no audited revenue figure. The company says 2025 orders doubled year over year, which is **unverified**.\n\n## Company and business\n\nThe company was founded in 2019 and is based in Suzhou. It sells modular sorting robots and scheduling software ([company overview](https://example.com/sprucefield/about)). Robots are priced per unit, and software is an annual subscription ([product page](https://example.com/sprucefield/pricing)).\n\n## Industry and competition\n\nAn industry report estimates the global warehouse robotics market at about $9 billion in 2025, growing about 15% a year ([industry report](https://example.net/reports/warehouse-robotics-2026)). The main competitors are two larger public companies. Sprucefield competes on shorter deployment times ([industry report](https://example.net/reports/warehouse-robotics-2026)).\n\n## Financials\n\n| Item | Figure | Source |\n| --- | --- | --- |\n| Series B | $60 million (March 2026) | [funding announcement](https://example.org/news/sprucefield-series-b) |\n| Total funding | About $95 million | [funding database](https://example.org/data/sprucefield) |\n| 2025 revenue | Not disclosed | None |\n\n## Recent news\n\n- June 2026: signed a three-year partnership with a regional logistics company ([partnership news](https://example.org/news/sprucefield-partnership)).\n- August 2026: appointed a new chief financial officer ([executive news](https://example.org/news/sprucefield-cfo)).\n\n## Gaps and unverified items\n\n- No audited financial data was found.\n- The doubling of orders comes from the company itself, with no third-party source.\n\n## Sources\n\n1. [Company overview](https://example.com/sprucefield/about)\n2. [Product page](https://example.com/sprucefield/pricing)\n3. [Funding announcement](https://example.org/news/sprucefield-series-b)\n4. [Funding database](https://example.org/data/sprucefield)\n5. [Industry report](https://example.net/reports/warehouse-robotics-2026)\n6. [Partnership news](https://example.org/news/sprucefield-partnership)\n7. [Executive news](https://example.org/news/sprucefield-cfo)\n\n---\n\n**Disclaimer**: This report was compiled by AI from public sources for information and learning only. It is not investment, tax or legal advice. Sources may be outdated or wrong, so verify them before relying on them. The authors and Boost accept no liability for decisions based on this report.\n",
+  "sourcesPreview": [
+    {
+      "url": "https://example.com/sprucefield/about",
+      "title": "Company overview",
+      "score": 0.95,
+      "domain": "company",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-series-b",
+      "title": "Funding announcement",
+      "score": 0.92,
+      "domain": "financial",
+      "used": true
+    },
+    {
+      "url": "https://example.net/reports/warehouse-robotics-2026",
+      "title": "Industry report",
+      "score": 0.88,
+      "domain": "industry",
+      "used": true
+    },
+    {
+      "url": "https://example.org/data/sprucefield",
+      "title": "Funding database",
+      "score": 0.81,
+      "domain": "financial",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-partnership",
+      "title": "Partnership news",
+      "score": 0.77,
+      "domain": "news",
+      "used": true
+    },
+    {
+      "url": "https://example.com/sprucefield/pricing",
+      "title": "Product page",
+      "score": 0.74,
+      "domain": "company",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-cfo",
+      "title": "Executive news",
+      "score": 0.62,
+      "domain": "news",
+      "used": true
+    }
+  ]
+}

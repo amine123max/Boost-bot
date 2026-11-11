@@ -1,0 +1,85 @@
+{
+  "title": "Мастер PPT",
+  "runtime": {
+    "ready": true
+  },
+  "activeProjectId": "launch_20261021",
+  "job": {
+    "projectId": "launch_20261021",
+    "route": "generate",
+    "profile": "default",
+    "phase": "done",
+    "done": 8,
+    "total": 8,
+    "sample": true,
+    "message": "",
+    "warnings": []
+  },
+  "pendingSpec": null,
+  "projects": [
+    {
+      "id": "launch_20261021",
+      "name": "Запуск Lumen X1",
+      "kind": "generate",
+      "format": "ppt169",
+      "pages": 8,
+      "sample": true,
+      "updatedAt": "2026-10-21T01:40:00+00:00",
+      "previewsDraft": false,
+      "previews": [
+        {
+          "path": "sample/ru-1.svg",
+          "name": "01 Обложка"
+        },
+        {
+          "path": "sample/ru-2.svg",
+          "name": "02 Повестка"
+        },
+        {
+          "path": "sample/ru-3.svg",
+          "name": "03 Проблема"
+        },
+        {
+          "path": "sample/ru-4.svg",
+          "name": "04 Продукт"
+        },
+        {
+          "path": "sample/ru-5.svg",
+          "name": "05 Предзаказы"
+        },
+        {
+          "path": "sample/ru-6.svg",
+          "name": "06 План"
+        },
+        {
+          "path": "sample/ru-7.svg",
+          "name": "07 Цены"
+        },
+        {
+          "path": "sample/ru-8.svg",
+          "name": "08 Итог"
+        }
+      ],
+      "exports": [
+        {
+          "path": "app/projects/launch_20261021/exports/lumen_x1_launch_20261021_094012.pptx",
+          "name": "lumen_x1_launch_20261021_094012.pptx",
+          "size": 2841932,
+          "slides": 8,
+          "kind": "standard"
+        }
+      ]
+    },
+    {
+      "id": "brand_template_20261012",
+      "name": "Фирменный шаблон",
+      "kind": "template",
+      "pages": 0,
+      "sample": true,
+      "updatedAt": "2026-10-12T06:20:00+00:00",
+      "previewsDraft": false,
+      "previews": [],
+      "exports": []
+    }
+  ]
+}

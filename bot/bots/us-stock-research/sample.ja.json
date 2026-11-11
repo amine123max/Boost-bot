@@ -1,0 +1,75 @@
+{
+  "title": "米国株リサーチ",
+  "runs": [
+    {
+      "id": "sample-aapl",
+      "question": "Apple の過去 5 年の売上と粗利率の推移を調べてレポートにして",
+      "status": "done",
+      "updatedAt": "2026-11-03T10:30:00Z",
+      "plan": [
+        {
+          "text": "Apple の CIK を調べる",
+          "done": true
+        },
+        {
+          "text": "FY2021〜FY2025 の売上高と売上総利益を取得する",
+          "done": true
+        },
+        {
+          "text": "FY2025 の 10-K の粗利率に関する説明を読む",
+          "done": true
+        },
+        {
+          "text": "粗利率を計算し、元データと照合する",
+          "done": true
+        },
+        {
+          "text": "レポートを書く",
+          "done": true
+        }
+      ],
+      "limitations": [
+        "FY2023 は 53 週で、他の年は 52 週です",
+        "セグメント別の粗利率は FY2023〜FY2025 のみです"
+      ],
+      "preview": "# Apple の売上と粗利率（FY2021〜FY2025）\n\n## 結論\n\n5 会計年度で売上は 13.8% 増え、$365.817B から $416.161B になりました。粗利率は 41.78% から 46.91% へ 5.13 ポイント上昇しました。10-K のセグメントデータによると、FY2023 以降の上昇の大半は Services によるもので、その粗利率は 70.8% から 75.4% に上がりました。一方、Products は 36.5% から 36.8% にとどまります。\n\n## データ\n\n単位は 10 億米ドルです。粗利率は表の値から計算しています。\n\n| 会計年度 | 期末 | 売上高 | 売上総利益 | 粗利率 |\n| --- | --- | ---: | ---: | ---: |\n| FY2021 | 2021-09-25 | 365.817 | 152.836 | 41.78% |\n| FY2022 | 2022-09-24 | 394.328 | 170.782 | 43.31% |\n| FY2023 | 2023-09-30 | 383.285 | 169.148 | 44.13% |\n| FY2024 | 2024-09-28 | 391.035 | 180.683 | 46.21% |\n| FY2025 | 2025-09-27 | 416.161 | 195.201 | 46.91% |\n\nFY2025 の 10-K の Item 7 にあるセグメント別粗利率：\n\n| | FY2023 | FY2024 | FY2025 |\n| --- | ---: | ---: | ---: |\n| Products | 36.5% | 37.2% | 36.8% |\n| Services | 70.8% | 73.9% | 75.4% |\n\n## 分析\n\n- 売上は FY2023 に 2.8% 減少し、その後 2 年連続で増加しました。\n- FY2025 の 10-K は、Products の粗利率低下の主な要因を製品構成と関税コストとしています。\n- 同じ書類で Apple は、粗利率全般に変動と低下圧力が続くと見込んでいます。\n\n## 制限事項\n\n- FY2023 は 53 週で他の年は 52 週のため、前年比較にわずかに影響します。\n- セグメント別の粗利率は FY2023〜FY2025 のみで、それ以前は読んでいません。\n- このサンプルは 2026-11-03 に取得したもので、当時 EDGAR の最新の年次報告は FY2025 でした。\n\n## 出典\n\n- XBRL データ：accession 0000320193-23-000106、0000320193-24-000123、0000320193-25-000079\n- FY2025 の 10-K：https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm\n\n> このレポートは AI が公開データをもとに作成したもので、学習と情報提供のためのものです。投資、税務、法律に関する助言ではありません。データは不完全、誤り、または古い場合があり、過去の実績は将来の結果を保証しません。投資の前に資格を持つ専門家にご相談ください。損失の責任はご自身にあります。\n",
+      "calls": [
+        {
+          "ts": "2026-11-03T10:25:58Z",
+          "tool": "lookup",
+          "target": "AAPL",
+          "url": "https://www.sec.gov/files/company_tickers.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:25:59Z",
+          "tool": "concept",
+          "target": "0000320193 us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax annual",
+          "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:00Z",
+          "tool": "concept",
+          "target": "0000320193 us-gaap/GrossProfit annual",
+          "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/GrossProfit.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:01Z",
+          "tool": "filings",
+          "target": "0000320193 10-K 1",
+          "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:02Z",
+          "tool": "read",
+          "target": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+/* 提示胶囊（"已保存"）：.toasts > .toast [ok | err | warn] [leaving]。
+   改编自 yetone/magpie internal/gui/assets/app.css 的状态胶囊（MIT，© 2026 yetone）。 */
+.toasts {
+  position: fixed; z-index: var(--z-toast); left: var(--float-inset); bottom: var(--float-inset);
+  display: grid; gap: var(--space-1-5); justify-items: start; pointer-events: none;
+}
+.toast {
+  --toast-bg: var(--glass-pop);
+  --toast-fg: var(--fg);
+  pointer-events: auto; font-size: var(--fs-sm); line-height: 16px; font-weight: var(--fw-medium);
+  padding: var(--space-1) var(--space-3); border-radius: var(--r-full);
+  max-width: min(480px, calc(100vw - 2 * var(--float-inset)));
+  background: var(--toast-bg); color: var(--toast-fg); backdrop-filter: var(--glass-filter-sm);
+  box-shadow: var(--shadow-float);
+  display: flex; gap: var(--space-2); align-items: center;
+  animation: fade-in var(--dur-base) var(--ease-out);
+}
+/* "已保存"：普通的玻璃胶囊，前面一个绿点 */
+.toast.ok::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--green); }
+/* 出错 / 注意：只换底色，边仍是中性的玻璃细边（不要"淡红底 + 红边"两层都染色） */
+.toast.err { --toast-bg: color-mix(in srgb, var(--red-soft) 88%, transparent); --toast-fg: var(--red); }
+.toast.warn { --toast-bg: color-mix(in srgb, var(--amber-soft) 88%, transparent); --toast-fg: var(--amber); }
+.toast.leaving { animation: fade-out var(--dur-base) var(--ease-in) forwards; }
+.toast .icon-btn {
+  --ib-fg: currentColor; --ib-fg-hover: currentColor;
+  --ib-bg-hover: color-mix(in srgb, currentColor 12%, transparent); --ib-bg-press: color-mix(in srgb, currentColor 20%, transparent);
+}

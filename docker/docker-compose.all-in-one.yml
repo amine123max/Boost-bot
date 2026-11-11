@@ -1,0 +1,23 @@
+services:
+  boost:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.all-in-one
+    restart: unless-stopped
+    environment:
+      BOOST_SERVICE_ADDR: 0.0.0.0:48760
+      BOOST_WEB_ADDR: 0.0.0.0:12580
+      BOOST_WEB_NO_OPEN: "1"
+      BOOST_DB_PATH: /data/boost.db
+      BOOST_RPC_TOKEN_FILE: /data/boost.rpc-token
+      BOOST_GATEWAY_TRACE_STDOUT: "1"
+      BOOST_GATEWAY_ERROR_STDOUT: "1"
+      # Optional mitigation for same key/path/model head-of-line gate waits:
+      # BOOST_REQUEST_GATE_WAIT_TIMEOUT_MS: "5000"
+    volumes:
+      - boost-data:/data
+    ports:
+      - "12580:12580"
+
+volumes:
+  boost-data:

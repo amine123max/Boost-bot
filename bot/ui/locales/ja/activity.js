@@ -1,0 +1,23 @@
+export default {
+  "lessThanTenth": "0.1 秒未満",
+  "seconds": "{s} 秒",
+  "waitingModel": "{model} の応答を待機中",
+  "runningTool": "{tool} を実行中",
+  "subagent": "サブエージェントが処理中",
+  "compact": "コンテキストを圧縮中",
+  "job": "バックグラウンドでコマンドを実行中",
+  "stepLabel": "{status}：{title}",
+  "failed": "失敗",
+  "running": "処理中",
+  "done": "完了",
+  "expandDetail": "{label}、詳細を表示",
+  "collapseDetail": "{label}、詳細を非表示",
+  "tokens": "入力 {input} トークン · 出力 {output} トークン",
+  "input": "引数",
+  "reply": "返信",
+  "output": "出力",
+  "noSteps": "まだ処理の記録はありません",
+  "expand": "処理の記録を表示",
+  "collapse": "処理の記録を非表示",
+  "stepFor": "{step}、{d} 経過"
+};

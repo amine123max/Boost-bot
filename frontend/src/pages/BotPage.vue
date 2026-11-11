@@ -1,0 +1,120 @@
+<script setup lang="ts">
+import { onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import BoostBotAvatar from '@/components/BoostBotAvatar.vue';
+import { botClient } from '@/lib/api/bot-client';
+import { getAppErrorMessage } from '@/lib/api/transport';
+import { botAppearance, setBotAppearance } from '@/composables/useBotAppearance';
+import { consumeBotLaunch } from '@/composables/useBotLaunch';
+import { markStartupContentReady, startupContentReady } from '@/composables/useStartupReady';
+import { boost, initialize, saveSettings } from '@/composables/useBoost';
+const router = useRouter();
+const source = ref(''), error = ref(''), busy = ref(false), loaded = ref(false);
+const frame = ref<HTMLIFrameElement>();
+const surface = ref<HTMLElement>();
+const launch = consumeBotLaunch();
+const opening = { '--bot-origin-x': launch.x, '--bot-origin-y': launch.y };
+const revealing = ref(false), revealed = ref(false);
+let revealAnimation: Animation | undefined;
+let disposed = false;
+let readyTimeout: ReturnType<typeof setTimeout> | undefined;
+async function connect() {
+  if (busy.value) return;
+  busy.value = true; error.value = ''; loaded.value = false; revealed.value = false;
+  source.value = '';
+  try {
+    if (!boost.connected) {
+      await initialize();
+      if (!boost.connected) throw new Error(boost.error || 'Boost 服务尚未连接');
+    }
+    const launch = await botClient.open();
+    if (disposed) return;
+    const url = new URL(launch.url, location.href);
+    if (url.origin !== location.origin && !(url.protocol === 'http:' && url.hostname === '127.0.0.1')) throw new Error('Boost Bot 返回了无效地址');
+    url.searchParams.set('boostTheme', document.documentElement.dataset.theme || 'system');
+    source.value = url.href;
+    clearTimeout(readyTimeout);
+    readyTimeout = setTimeout(() => { if (!startupContentReady.value && !disposed) error.value = '智能体页面加载超时，请重试连接'; }, 30_000);
+  } catch (e) { if (!disposed) { error.value = getAppErrorMessage(e); markStartupContentReady(); } }
+  finally { busy.value = false; }
+}
+function sync() {
+  if (!source.value) return;
+  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: document.documentElement.dataset.theme }, new URL(source.value).origin);
+}
+function message(event: MessageEvent) {
+  if (!source.value || event.source !== frame.value?.contentWindow || event.origin !== new URL(source.value).origin) return;
+  if (event.data?.type === 'boost:bot:ready') { loaded.value = true; sync(); }
+  if (event.data?.type === 'boost:workspace:content-ready') void signalContentReady();
+  if (event.data?.type === 'boost:appearance:open') void router.push('/settings/?tab=bot');
+  if (event.data?.type === 'boost:appearance:changed') setBotAppearance(event.data.preferences);
+  if (event.data?.type === 'boost:bot:back') void back();
+  if (event.data?.type === 'boost:theme' && ['light', 'dark', 'system'].includes(event.data.mode)) {
+    const theme = event.data.mode === 'light' ? 'business' : event.data.mode === 'system' ? 'tech' : 'dark';
+    void saveSettings({ theme }).catch(e => { error.value = getAppErrorMessage(e); });
+  }
+}
+async function signalContentReady() {
+  if (disposed || startupContentReady.value) return;
+  await reveal();
+  if (disposed) return;
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  if (!disposed) {
+    clearTimeout(readyTimeout);
+    markStartupContentReady();
+  }
+}
+async function reveal() {
+  if (revealing.value || revealed.value || disposed) return;
+  await nextTick();
+  await Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1500))]);
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  const panel = surface.value;
+  if (!panel || disposed) return;
+  if (launch.origin === 'center') {
+    revealed.value = true;
+    return;
+  }
+  revealing.value = true;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const x = Number.parseFloat(launch.x), y = Number.parseFloat(launch.y);
+  const radius = Math.ceil(Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)));
+  const frames = reduced ? [{ opacity: .4 }, { opacity: 1 }] : [
+    { clipPath: `circle(22px at ${x}px ${y}px)`, opacity: .5 },
+    { clipPath: `circle(${radius}px at ${x}px ${y}px)`, opacity: 1 },
+  ];
+  try {
+    revealAnimation = panel.animate(frames, { duration: reduced ? 180 : 1050, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'both' });
+    await revealAnimation.finished;
+  } catch { /* Content remains accessible if the Web Animations API is unavailable. */ }
+  finally {
+    revealed.value = true; revealing.value = false;
+    revealAnimation?.cancel(); revealAnimation = undefined;
+  }
+}
+function back() { return router.push('/'); }
+watch(botAppearance, sync, { deep: true });
+watch(() => boost.settings?.theme, sync);
+watch(() => boost.ready, ready => { if (ready && !source.value) void connect(); }, { immediate: true });
+watch(() => boost.error, value => { if (!boost.connected && value) error.value = value; });
+onMounted(() => { window.addEventListener('message', message); });
+onBeforeUnmount(() => { disposed = true; revealAnimation?.cancel(); clearTimeout(readyTimeout); window.removeEventListener('message', message); });
+watch(error, value => { if (value) markStartupContentReady(); });
+</script>
+<template>
+  <section class="bot-workspace" :style="opening" aria-label="Boost 智能体工作台" data-bot-workspace :data-bot-origin="launch.origin" :data-bot-revealing="revealing">
+    <div ref="surface" class="bot-workspace-surface" :class="{ 'is-visible': revealing || revealed }" data-bot-surface>
+    <iframe v-if="source" ref="frame" :src="source" title="Boost Bot" class="bot-runtime-frame" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer" />
+    </div>
+    <div v-if="(!loaded || (!revealed && launch.origin === 'center')) && !error" class="bot-connecting" role="status" aria-label="正在打开 Boost 智能体"><span class="boost-loading-ring bot-startup-mark" aria-hidden="true" /></div>
+    <div v-if="error" class="bot-connecting" role="alert"><BoostBotAvatar :size="90" /><h2>智能体暂时无法启动</h2><p>{{ error }}</p><button class="primary" @click="connect">重试连接</button></div>
+  </section>
+</template>
+<style scoped>
+.bot-workspace { position: fixed; inset: 0; z-index: 40; background: var(--bg); }
+.bot-workspace-surface { position: absolute; inset: 0; display: flex; flex-direction: column; visibility: hidden; }
+.bot-workspace-surface.is-visible { visibility: visible; }
+.bot-runtime-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg); }
+.bot-connecting { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; background: var(--bg); padding: 32px; text-align: center; }
+.bot-connecting p { max-width: 560px; color: var(--muted); overflow-wrap: anywhere; }
+</style>

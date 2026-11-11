@@ -1,0 +1,21 @@
+# Operating manuals
+
+[English overview](../../README.md) · [中文首页](../../README.zh-CN.md) · [Documentation index](../README.md)
+
+- [ARCHITECTURE](ARCHITECTURE.md)
+- [Changelog](CHANGELOG.md)
+- [CONTRIBUTING](CONTRIBUTING.md)
+- [App Updates and GitHub Releases](report/app-updates-and-releases.md)
+- [Background task account filter table](report/background-task-account-skip-notes.md)
+- [Environment and Runtime Configuration](report/environment-and-runtime-config.md)
+- [FAQ and Account Routing Rules](report/faq-and-account-routing-rules.md)
+- [Current gateway and Codex parameter passing comparison table](report/gateway-vs-codex-headers-and-params.md)
+- [Current Differences from Official Codex](report/gateway-vs-codex-official-params.md)
+- [Minimal Troubleshooting Guide](report/minimal-troubleshooting-guide.md)
+- [Nginx Reverse Proxy Cache Hit Issue](report/nginx-reverse-proxy-cache-hit-issue.md)
+- [插件中心对接与接口清单](report/plugin-center-integration-and-interfaces.md)
+- [Minimum access instructions for plugin center](report/plugin-center-minimal-integration.md)
+- [Runtime and Deployment Guide](report/runtime-and-deployment-guide.md)
+- [System Internal Interface Inventory](report/system-internal-interface-inventory.md)
+- [SECURITY](SECURITY.md)
+- [TESTING](TESTING.md)

@@ -1,0 +1,103 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "ready": { "type": "boolean" },
+        "python": { "type": "string" },
+        "problem": { "enum": ["guard", "python_version", "not_installed", "no_python"] },
+        "extras": { "type": "object" }
+      },
+      "required": ["ready"]
+    },
+    "activeProjectId": { "type": ["string", "null"] },
+    "job": {
+      "type": ["object", "null"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "route": { "enum": ["generate", "create_template", "edit_native"] },
+        "profile": { "enum": ["default", "quick", "beautify"] },
+        "phase": { "enum": ["routed", "guard", "importing", "spec_pending", "authoring", "finalizing", "exporting", "done", "error", "cancelled"] },
+        "done": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "background": { "type": "boolean" },
+        "sample": { "type": "boolean" },
+        "message": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["projectId", "route", "phase"]
+    },
+    "pendingSpec": {
+      "type": ["object", "null"],
+      "properties": {
+        "stage": { "enum": ["stage1", "stage2", "plan"] },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "label": { "type": "string" }, "value": { "type": "string" } },
+            "required": ["label", "value"]
+          }
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "description": { "type": "string" },
+              "recommended": { "type": "boolean" }
+            },
+            "required": ["id", "label"]
+          }
+        }
+      },
+      "required": ["stage", "title", "summary"]
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["generate", "template", "edit_native"] },
+          "format": { "type": "string" },
+          "pages": { "type": "integer", "minimum": 0 },
+          "updatedAt": { "type": "string" },
+          "sample": { "type": "boolean" },
+          "previewsDraft": { "type": "boolean" },
+          "previews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "path": { "type": "string" }, "name": { "type": "string" }, "mtime": { "type": "integer" } },
+              "required": ["path", "name"]
+            }
+          },
+          "exports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "name": { "type": "string" },
+                "size": { "type": "integer", "minimum": 0 },
+                "slides": { "type": "integer", "minimum": 0 },
+                "kind": { "enum": ["standard", "native_charts", "video"] }
+              },
+              "required": ["path", "name"]
+            }
+          }
+        },
+        "required": ["id", "name", "kind"]
+      }
+    }
+  },
+  "required": ["title", "projects"]
+}

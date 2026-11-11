@@ -1,0 +1,32 @@
+FROM debian:bookworm-slim
+
+ARG APP_USER=boost
+ARG APP_UID=10001
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid ${APP_UID} ${APP_USER} \
+    && useradd --system --uid ${APP_UID} --gid ${APP_UID} --home-dir /app --create-home --shell /usr/sbin/nologin ${APP_USER} \
+    && mkdir -p /data \
+    && chown -R ${APP_UID}:${APP_UID} /app /data
+
+COPY boost-service /usr/local/bin/boost-service
+
+ENV BOOST_SERVICE_ADDR=0.0.0.0:48760
+ENV BOOST_DB_PATH=/data/boost.db
+ENV BOOST_RPC_TOKEN_FILE=/data/boost.rpc-token
+ENV BOOST_GATEWAY_TRACE_STDOUT=1
+ENV BOOST_GATEWAY_ERROR_STDOUT=1
+
+VOLUME ["/data"]
+EXPOSE 48760
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:48760/health || exit 1
+
+USER ${APP_USER}
+
+CMD ["boost-service"]

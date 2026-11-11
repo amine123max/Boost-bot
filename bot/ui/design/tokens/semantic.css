@@ -1,0 +1,315 @@
+/* L2 · 语义 token：按用途命名，按主题取值。组件和页面只用这一层的颜色。
+   中性灰、圆角与动效改编自 yetone/magpie internal/gui/assets/app.css（MIT，© 2026 yetone）。
+   中性色按主题逐个精调，直接写在这里，不经过原始色板。
+
+   层次（见 README「容器与层次」，参考 Codex、Grok）：窗口底色和侧栏是同一个平面；主区和信息面板是白 / 浅一档的面板，
+   只有一道细线；内容里的组靠底色深一级。投影只给真正浮在内容上的东西，而且很淡。
+   填充、悬停、描边都是半透明的一层，放在哪种底上都对。
+
+   容器（见 README「容器与层次」）：内容里的一组东西靠底色深一级（--well）和间距成组，不画描边、不加投影，
+   也不在一组里面再套一组；行与行之间需要分开时只用一条细线（--line-2）。描边只留给两种东西：
+   文字输入框（--ctl-edge，对所在表面 ≥ 3:1）和浮在内容上的玻璃（--glass-edge）。
+
+   主题可以局部生效：任何元素加 data-theme="light|dark"，它的子树就换一套取值。
+   <html data-theme> 总是解析后的值，由 index.html 在首帧前设置、lib/theme.js 保持同步。 */
+:root, [data-theme="light"] {
+  color-scheme: light;
+
+  /* —— 环境：窗口底色是一层纯色的中性灰，不放光晕、不随机器人变色 —— */
+  --bg: #f5f5f6;              /* 窗口底色、引导页 */
+
+  /* —— 材质：层次靠底色和一道细线。半透明只留给盖在滚动内容上的东西（顶栏、输入框、浮层），也几乎不透 —— */
+  --surface: #ffffff;                        /* 主区：对话、设置 */
+  --surface-solid: #ffffff;                  /* 主区上需要实色的地方 */
+  --glass-side: transparent;                 /* 侧栏：直接是窗口底色，和窗口是同一个平面 */
+  --glass-chrome: rgba(255, 255, 255, .88);  /* 盖在滚动内容上的顶栏 */
+  --glass-float: rgba(255, 255, 255, .94);   /* 输入框、回到底部 */
+  --glass-panel: #ffffff;                    /* 信息面板：和主区同一层 */
+  --glass-pop: rgba(255, 255, 255, .97);     /* 菜单、命令面板、提示 */
+  --glass-sheet: #ffffff;                    /* 对话框 */
+  --glass-edge: rgba(0, 0, 0, .08);          /* 细线：面板和浮层的边 */
+
+  /* —— 表面：分组的底色与静默填充。填充都是半透明的一层 —— */
+  --card: #ffffff;            /* 实色面：聚焦的侧栏搜索框、样例页的演示区 */
+  --well: rgba(0, 0, 0, .04);         /* 内容里的一组（只有这一层）：设置分组、对话里的卡片、代码块、行内提示、文件、模板卡 */
+  --well-hover: rgba(0, 0, 0, .06);   /* 可点的一组：悬停 */
+  --well-press: rgba(0, 0, 0, .08);   /* 可点的一组：按下 */
+  --pill: rgba(0, 0, 0, .045);    /* 次级按钮、标签、静默填充；也是控件的悬停层 */
+  --pill-hover: rgba(0, 0, 0, .075);
+  --pill-press: rgba(0, 0, 0, .1);
+  --seg-track: rgba(0, 0, 0, .055);
+  --seg-thumb-bg: var(--white);
+  --side-hover: rgba(0, 0, 0, .04);         /* 侧栏行：悬停一层淡灰 */
+  --side-press: rgba(0, 0, 0, .07);
+  --side-active: rgba(0, 0, 0, .065);       /* 选中：同一种灰深一级，没有投影、不浮起 */
+  --side-solid: #f5f5f6;      /* 侧栏的实色：压在侧栏头像上的状态点要挖一圈和底一样的缺口 */
+  --side-solid-on: #e5e5e6;   /* 选中的行上的实色 */
+  --bubble-user: rgba(0, 0, 0, .05);        /* 用户消息气泡；机器人回复不加气泡 */
+  --bubble-ai: rgba(0, 0, 0, .035);         /* 信息面板里的会话记录等次要气泡 */
+  --qr-bg: var(--white);      /* 二维码在任何主题下都要白底 */
+  --scrim: rgba(0, 0, 0, .2);
+  --scrim-soft: rgba(0, 0, 0, .1);
+  --scroll-thumb: rgba(0, 0, 0, .16);
+  --scroll-thumb-hover: rgba(0, 0, 0, .3);
+
+  /* —— 线 —— */
+  --line: rgba(0, 0, 0, .1);          /* 表格表头的下沿、正文里的分隔线 hr */
+  --line-2: rgba(0, 0, 0, .06);       /* 行与行之间的细线：列表行、表格行、菜单里的分隔 */
+  --line-strong: rgba(0, 0, 0, .18);  /* 聚焦时的边：对话输入框、侧栏搜索框 */
+  --split-line: rgba(0, 0, 0, .2);    /* 分隔条：指针停住时空隙中间亮起的细线（拖动、键盘焦点时换成 --accent） */
+  --ctl-edge: rgba(0, 0, 0, .44);     /* 文字输入框的边：对主区、信息面板、对话框和 --well 都 ≥ 3:1（3.2:1） */
+  --ctl-edge-hover: rgba(0, 0, 0, .6);
+
+  /* —— 文字 —— */
+  --fg: #1a1a1a;
+  --fg-2: #4d4d4d;
+  --muted: #6b6b6b;          /* 玻璃上的次要文字，侧栏最浅处约 4:1 */
+  --faint: #b3b3b3;
+  --ctl-fg: #5e5e5e;          /* 静默控件上的图标与文字 */
+  --placeholder: #949494;
+
+  /* —— 品牌：操作一律是中性的墨色 / 近白，黄绿只留给应用标志和几个很小的信号，不做底色（用法见 README「品牌色」） —— */
+  --primary: #1a1a1a;        /* 主按钮、打开的开关：浅色下是墨色 */
+  --primary-hover: color-mix(in srgb, #1a1a1a 92%, var(--white));
+  --primary-press: color-mix(in srgb, #1a1a1a 86%, var(--white));
+  --on-primary: var(--white);
+  --send-bg: #1a1a1a;        /* 发送 / 停止：墨色圆钮 + 黄绿箭头（墨色上的一点光） */
+  --send-fg: var(--lime-500);
+  --accent: #1a1a1a;         /* 焦点描边、勾选、链接 */
+  --signal: #1a1a1a;         /* "有新东西"的小点：未读、上新、回到底部。黄绿在白底上看不见，浅色下用墨色 */
+  --brand: var(--lime-500);  /* 品牌填充：只给应用标志 */
+  --on-brand: var(--olive-950);
+  --brand-line: color-mix(in srgb, var(--olive-500) 35%, transparent);
+  --accent-soft: rgba(0, 0, 0, .1);   /* 焦点光晕：中性 */
+  --mark: rgba(0, 0, 0, .12);         /* 选中文字、定位闪烁：中性 */
+  --on-mark: var(--fg);
+  --sel: rgba(0, 0, 0, .055);         /* 菜单、命令面板的当前项（悬停或键盘） */
+  --sel-press: rgba(0, 0, 0, .09);
+  --switch-off: rgba(0, 0, 0, .13);
+  --switch-off-hover: rgba(0, 0, 0, .19);
+  --switch-knob: var(--white);
+  --switch-knob-on: var(--white);
+
+  /* —— 状态 —— */
+  --green: var(--green-600);
+  --green-soft: var(--green-50);
+  --red: var(--red-600);
+  --red-soft: var(--red-50);
+  --on-danger: var(--white);
+  --amber: var(--amber-700);
+  --amber-soft: var(--amber-50);
+  --red-wash: color-mix(in srgb, var(--red-600) 8%, transparent);     /* 出错的提示行：只铺一层淡红，字用 --fg，图标用 --red */
+  --amber-wash: color-mix(in srgb, var(--amber-700) 8%, transparent); /* 需要注意的提示行 */
+
+  /* —— 投影：只有浮在内容上的东西才有，而且很淡。窗口、面板、组、选中项都没有（见 README「容器与层次」） —— */
+  --drop-float: 0 1px 3px rgba(0, 0, 0, .05);     /* 常驻的浮件：输入框、回到底部、提示胶囊 */
+  --drop-pop: 0 4px 16px rgba(0, 0, 0, .08);      /* 临时弹出：菜单、引导卡片、抽屉 */
+  --drop-modal: 0 12px 40px rgba(0, 0, 0, .14);   /* 模态：对话框、命令面板 */
+  --seg-edge: 0 1px 2px rgba(0, 0, 0, .1);        /* 分段 thumb、开关圆钮：白色小件放在灰底上要一点点影子 */
+
+  /* —— 机器人头像：角色颜色在 primitives 的 --bot-*，这里只给随主题变的光晕和影子 —— */
+  --avatar-aura: 30%;         /* 工作中头像背后的辉光（角色辉光色的混合比例） */
+  --avatar-shadow: rgba(0, 0, 0, .16);  /* 大头像脚下的影子 */
+
+}
+/* 由其他语义 token 推导的值：每个主题作用域都要重新计算，否则子树会继承外层主题算好的结果 */
+:root, [data-theme] {
+  --code-bg: color-mix(in srgb, var(--fg) 7%, transparent);
+  --ring: 0 0 0 2px var(--accent-soft);   /* 焦点光晕，配合 accent 色描边 */
+  --ring-danger: 0 0 0 2px color-mix(in srgb, var(--red) 18%, transparent);
+  --shadow-pane: 0 0 0 var(--hairline) var(--glass-edge);                       /* 面板：只有一道细线 */
+  --shadow-float: 0 0 0 var(--hairline) var(--glass-edge), var(--drop-float);   /* 常驻的浮件 */
+  --shadow-pop: 0 0 0 var(--hairline) var(--glass-edge), var(--drop-pop);       /* 临时弹出 */
+  --shadow-modal: 0 0 0 var(--hairline) var(--glass-edge), var(--drop-modal);   /* 模态 */
+}
+/* 间距角色：按用途命名，取值都来自 primitives.css 的 --space-*，与主题无关（见 README「间距」）。
+   一个角色只用一个值，兄弟表面靠它们对齐：侧栏顶部、对话顶栏、信息面板顶栏在同一条中线上；
+   侧栏的行、搜索框、账户落在同一条竖线上；对话列、输入框、设置页、新建页共用同一个居中列的边距。 */
+:root {
+  /* —— 窗口：浮起的面板与它们的顶栏 —— */
+  --pane-gap: var(--space-2);       /* 主区、信息面板与窗口边缘的间隙；弹出层离窗口边缘也是这么远 */
+  --pane-px: var(--space-4);        /* 面板里内容的左右边距：信息面板的标题与行文字、对话顶栏的头像 */
+  --head-px: var(--space-2-5);      /* 顶栏到首尾按钮；按钮自带 6px 内边距，里面的头像、文字正好落在 --pane-px */
+  --bar-gap: var(--space-1);        /* 一排图标按钮之间：顶栏、输入框工具栏、消息操作 */
+
+  /* —— 侧栏：行、搜索框、顶部按钮、账户都离侧栏边缘 --side-inset —— */
+  --side-inset: var(--pane-gap);    /* 和面板间隙一样：侧栏的行与主区之间也是这么宽 */
+  --side-row-px: var(--space-2-5);  /* 行的左右内边距：头像、导航图标、搜索图标、返回箭头落在同一条竖线上 */
+  --side-row-gap: var(--space-0-5); /* 相邻两行 */
+
+  /* —— 页面：居中的内容列（对话列、输入框、设置页、新建页、引导页） —— */
+  --page-gutter: var(--space-6);    /* 内容列两侧至少留这么多；窗口窄于 1000px 时 16 */
+  --page-top: var(--space-10);      /* 设置页标题、新建页、引导页离上沿 */
+  --page-bottom: var(--space-16);   /* 滚到底时下面留的空 */
+  --section-gap: var(--space-8);    /* 页面里两个分组之间（分组标题的上方） */
+  --section-gap-sm: var(--space-5); /* 窄面板里两个分组之间：信息面板、默认的 .list-head */
+  --heading-gap: var(--space-2);  /* 页面分组标题到它下面的内容 */
+
+  /* —— 卡片与浮层 —— */
+  --card-pad: var(--space-4);       /* 内容卡片：对话里的提问 / 审批卡、引导页卡片、侧栏空状态、模板卡 */
+  --sheet-pad: var(--space-5);      /* 对话框 */
+  --ctl-gap: var(--space-2);        /* 一组按钮之间：对话框、卡片、展开编辑区的操作 */
+  --float-inset: var(--space-4);    /* 提示胶囊、命令面板、对话框离窗口边缘 */
+  --pop-offset: var(--space-1-5);   /* 弹出层离锚点（ui.js 的 usePopPosition 读它） */
+}
+@media (max-width: 1000px) {
+  :root { --page-gutter: var(--space-4); }
+}
+/* 圆角角色：同一种面只用一个圆角（见 README「容器与层次」），取值来自 primitives.css 的 --r-* */
+:root {
+  --r-well: var(--r-xl);    /* 内容里的一组：设置分组、对话里的卡片、代码块、行内提示、文件、模板卡、展开编辑区 */
+  --r-pane: var(--r-2xl);   /* 浮起的面板与浮层：主区、信息面板、对话框、命令面板、引导页卡片 */
+  --r-bubble: var(--r-3xl); /* 消息气泡：对话里的用户消息、会话记录里的双方消息 */
+}
+/* 字体：与主题无关。--font-system / --code-system 是各平台的系统字体；页面和组件只用 --font / --code，
+   它们默认就是系统字体，设置 › 外观可以换成衬线或自定义字体（见下文「用户偏好」）。 */
+:root {
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --code-system: ui-monospace, "SF Mono", Menlo, Consolas, "Microsoft YaHei UI", monospace;
+  --font-serif: ui-serif, "New York", Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif SC", "SimSun", serif;
+  --font: var(--font-system);
+  --code: var(--code-system);
+}
+:root.win {
+  --font-system: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --code-system: "Cascadia Mono", Consolas, "Microsoft YaHei UI", "Microsoft YaHei", monospace;
+}
+
+/* 用户偏好（设置 › 外观）：lib/prefs.js 把偏好解析成 <html> 上的 data-* 属性（首帧前 index.html 先套一遍），
+   这里只把属性翻译成 token，页面和组件不认这些属性。都只挂在 :root 上，和主题作用域无关。
+     data-text       sm | md | lg | xl     字体大小：--fs-* 都乘以 --fs-scale；控件高度、图标和间距不变
+     data-font       system | serif | custom  界面字体；custom 时 prefs.js 在 <html> 上内联 --font（自定义字体 + 系统字体兜底），
+                                           自定义代码字体同样内联 --code
+     data-width      normal | wide | full  对话宽度（--col-w）
+     data-code-wrap  on | off              代码块自动换行（--code-wrap）
+     data-glass      on | off              不是用户设置，只跟随系统的"降低透明度"；off 时材质换成实色（见下一段）
+     data-motion     full | reduce | off   动画（tokens/motion.css） */
+:root {
+  --fs-scale: 1;
+  --code-wrap: pre;   /* 代码块的 white-space */
+}
+:root[data-text="sm"] { --fs-scale: .92; }
+:root[data-text="lg"] { --fs-scale: 1.1; }
+:root[data-text="xl"] { --fs-scale: 1.2; }
+:root[data-font="serif"] { --font: var(--font-serif); }
+:root[data-width="wide"] { --col-w: var(--col-w-wide); --bubble-w: var(--bubble-w-wide); }
+:root[data-width="full"] { --col-w: 100%; --bubble-w: var(--bubble-w-wide); }   /* 对话列铺满，两侧仍留 --page-gutter */
+:root[data-code-wrap="on"] { --code-wrap: pre-wrap; }
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e0e0e;
+
+  --surface: #191919;                     /* 比窗口底色亮一档；越靠上越亮 */
+  --surface-solid: #191919;
+  --glass-side: transparent;
+  --glass-chrome: rgba(25, 25, 25, .88);
+  --glass-float: rgba(35, 35, 35, .94);
+  --glass-panel: #191919;
+  --glass-pop: rgba(40, 40, 40, .98);
+  --glass-sheet: #222222;
+  --glass-edge: rgba(255, 255, 255, .09);
+
+  --card: rgba(255, 255, 255, .045);
+  --well: rgba(255, 255, 255, .045);
+  --well-hover: rgba(255, 255, 255, .07);
+  --well-press: rgba(255, 255, 255, .095);
+  --pill: rgba(255, 255, 255, .065);
+  --pill-hover: rgba(255, 255, 255, .095);
+  --pill-press: rgba(255, 255, 255, .125);
+  --seg-track: rgba(255, 255, 255, .05);
+  --seg-thumb-bg: rgba(255, 255, 255, .14);
+  --side-hover: rgba(255, 255, 255, .05);
+  --side-press: rgba(255, 255, 255, .075);
+  --side-active: rgba(255, 255, 255, .085);
+  --side-solid: #0e0e0e;
+  --side-solid-on: #232323;
+  --bubble-user: rgba(255, 255, 255, .075);
+  --bubble-ai: rgba(255, 255, 255, .05);
+  --scrim: rgba(0, 0, 0, .48);
+  --scrim-soft: rgba(0, 0, 0, .3);
+  --scroll-thumb: rgba(255, 255, 255, .16);
+  --scroll-thumb-hover: rgba(255, 255, 255, .3);
+
+  --line: rgba(255, 255, 255, .1);
+  --line-2: rgba(255, 255, 255, .065);
+  --line-strong: rgba(255, 255, 255, .22);
+  --split-line: rgba(255, 255, 255, .22);
+  --ctl-edge: rgba(255, 255, 255, .36);   /* 3.2:1 */
+  --ctl-edge-hover: rgba(255, 255, 255, .5);
+
+  --fg: #ececec;
+  --fg-2: #b4b4b4;
+  --muted: #959595;
+  --faint: #5a5a5a;
+  --ctl-fg: #a3a3a3;
+  --placeholder: #707070;
+
+  --primary: #ececec;        /* 深色下主操作是近白 */
+  --primary-hover: #f7f7f7;
+  --primary-press: #dedede;
+  --on-primary: #141414;
+  --send-bg: #ececec;
+  --send-fg: #141414;
+  --accent: #ececec;
+  --signal: var(--lime-500);  /* 深色下这几个小点是黄绿 */
+  --brand-line: color-mix(in srgb, var(--lime-500) 30%, transparent);
+  --accent-soft: rgba(255, 255, 255, .14);
+  --mark: rgba(255, 255, 255, .2);
+  --on-mark: var(--fg);
+  --sel: rgba(255, 255, 255, .08);
+  --sel-press: rgba(255, 255, 255, .115);
+  --switch-off: rgba(255, 255, 255, .16);
+  --switch-off-hover: rgba(255, 255, 255, .22);
+  --switch-knob: #d4d4d4;
+  --switch-knob-on: #141414;
+
+  --green: var(--green-300);
+  --green-soft: var(--green-900);
+  --red: var(--red-300);
+  --red-soft: var(--red-900);
+  --on-danger: var(--red-950);
+  --amber: var(--amber-300);
+  --amber-soft: var(--amber-900);
+  --red-wash: color-mix(in srgb, var(--red-300) 9%, transparent);
+  --amber-wash: color-mix(in srgb, var(--amber-300) 8%, transparent);
+
+  --drop-float: 0 1px 3px rgba(0, 0, 0, .25);
+  --drop-pop: 0 4px 16px rgba(0, 0, 0, .35);
+  --drop-modal: 0 12px 40px rgba(0, 0, 0, .5);
+  --seg-edge: none;
+
+  --avatar-aura: 52%;
+  --avatar-shadow: rgba(0, 0, 0, .5);
+}
+
+/* 系统开了"降低透明度"时（data-glass="off"，prefers-reduced-transparency）：
+   盖在内容上的几样也换成实色、不再模糊背景。局部主题作用域也要跟着换，所以两种写法都要 */
+:root[data-glass="off"] {
+  --glass-filter: none;
+  --glass-filter-lg: none;
+  --glass-filter-sm: none;
+}
+:root[data-glass="off"][data-theme="light"], :root[data-glass="off"] [data-theme="light"] {
+  --glass-chrome: #ffffff;
+  --glass-float: #ffffff;
+  --glass-pop: #ffffff;
+}
+:root[data-glass="off"][data-theme="dark"], :root[data-glass="off"] [data-theme="dark"] {
+  --glass-chrome: #191919;
+  --glass-float: #232323;
+  --glass-pop: #282828;
+}
+
+/* Locale-specific system fallbacks also apply when a custom font lacks these glyphs. */
+:root:lang(ja) {
+  --font-system: system-ui, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", sans-serif;
+  --font-serif: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+  --code-system: ui-monospace, "SF Mono", Consolas, "Noto Sans JP", monospace;
+}
+:root:lang(ko) {
+  --font-system: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --font-serif: "Batang", "AppleMyungjo", "Noto Serif KR", serif;
+  --code-system: ui-monospace, "SF Mono", Consolas, "Noto Sans KR", monospace;
+}

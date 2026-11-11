@@ -1,0 +1,26 @@
+import type { TranslatedCatalog } from "../../index.js";
+export default {
+  "external_mode": "外部のモデルエンドポイントを使用しているため、OKINTO New API 接続は管理しません",
+  "bot_not_found": "ボットが見つかりません",
+  "magpie_failed": "magpie を起動できませんでした：{message}",
+  "default_bot_name": "マイアシスタント",
+  "default_bot_prompt": "あなたは親切なアシスタントです。簡潔で正確に答えてください。",
+  "feishu_failed": "Feishu アカウント「{name}」：持続接続を開始できませんでした：{message}",
+  "messenger_failed": "{channel} アカウント「{name}」に接続できません。「設定 > 接続」で認証情報を確認してください：{message}",
+  "feishu_history_denied": "Feishu アカウント「{name}」はメッセージ履歴を読み取れないため、オフライン中に届いたメッセージを取得できません。Feishu Open Platform でアプリに im:message.history:readonly スコープを付与してください。",
+  "weixin_expired": "WeChat アカウント「{name}」：ログインの有効期限が切れました。「設定 > 接続」で QR コードを読み取り直してください",
+  "weixin_connected": "WeChat アカウント「{name}」が接続されました",
+  "weixin_account_name": "WeChat",
+  "feishu_account_name": "Feishu",
+  "media_image": "画像",
+  "media_file": "ファイル",
+  "media_video": "動画",
+  "media_quoted_image": "引用された画像",
+  "media_quoted_file": "引用されたファイル",
+  "media_quoted_video": "引用された動画",
+  "media_voice": "[音声]",
+  "media_not_downloaded": "{label}（ダウンロードできませんでした：{error}）",
+  "weixinExpiredSubject": "WeChat のログイン期限切れ",
+  "data_dir_locked": "別の Boost プロセス（{who}）がデータディレクトリ {dir} を使用しています。そのプロセスを終了するか、別のデータディレクトリ（AMB_DATA_DIR）を使用してください。",
+  "data_dir_locked_remote": "{host} 上の PID {pid}"
+} satisfies TranslatedCatalog["app"];

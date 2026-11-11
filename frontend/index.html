@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0e0e0e" />
+    <script src="/boost-theme.js"></script>
+    <link rel="icon" href="/boost-assets/images/favicon.ico" />
+    <title>Boost</title>
+    <style>
+      .boost-bootstrap { position: fixed; inset: 0; display: grid; place-items: center; background: inherit; }
+      .boost-loading-ring { display: block; width: 32px; height: 32px; flex-shrink: 0; box-sizing: border-box; border: 3px solid var(--border, #e4e4e7); border-top-color: var(--blue, #0f766e); border-radius: 50%; animation: boost-loading-spin .8s linear infinite; }
+      @keyframes boost-loading-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .boost-loading-ring { animation-duration: 2s; } }
+    </style>
+  </head>
+  <body>
+    <div id="app"><div class="boost-bootstrap" role="status" aria-label="正在加载 Boost"><span class="boost-loading-ring" aria-hidden="true"></span></div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

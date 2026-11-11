@@ -1,0 +1,7 @@
+{
+  "title": "TODO sample title",
+  "items": [
+    { "id": "1", "text": "TODO a sample that fills the view and looks like real use" },
+    { "id": "2", "text": "TODO another sample" }
+  ]
+}

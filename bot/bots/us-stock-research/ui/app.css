@@ -1,0 +1,46 @@
+/* 三栏：研究记录、计划和取数记录、报告。窄了先把报告放到下面，再收成一栏。颜色、间距、字号只用设计系统的 token。 */
+.layout { display: grid; gap: var(--space-6); align-items: start; grid-template-columns: minmax(180px, 220px) minmax(240px, 320px) minmax(0, 1fr); }
+.pane { display: grid; gap: var(--space-5); min-width: 0; }
+
+.runs, .plan, .calls { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.run { display: grid; gap: var(--space-1); width: 100%; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--r-md); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.run:hover { background: var(--well-hover); }
+.run.on { background: var(--well); }
+.run:focus-visible { outline: 2px solid var(--accent); }
+.run-q { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: var(--lh-snug); overflow-wrap: anywhere; }
+
+.step-count { margin: 0; }
+.step { display: grid; grid-template-columns: var(--space-4) minmax(0, 1fr); gap: var(--space-2); line-height: var(--lh-snug); }
+.step-mark { color: var(--muted); }
+.step.done .step-mark { color: var(--fg); }
+
+.calls { gap: var(--space-3); }
+.call { display: grid; gap: var(--space-0-5); min-width: 0; }
+.call-tool { font-weight: var(--fw-medium); }
+.call-target { font-size: var(--fs-sm); color: var(--fg-2); overflow-wrap: anywhere; }
+
+.md { display: grid; gap: var(--space-3); line-height: var(--lh-relaxed); }
+.md-h, .md-p, .md-quote, .md-list { margin: 0; }
+.md-h { font-weight: var(--fw-semibold); line-height: var(--lh-snug); }
+.md-h1 { font-size: var(--fs-xl); }
+.md-h2 { margin-top: var(--space-3); font-size: var(--fs-lg); }
+.md-h3, .md-h4 { font-size: var(--fs-md); }
+.md-list { display: grid; gap: var(--space-1); padding-inline-start: var(--space-5); }
+.md-quote { color: var(--fg-2); font-size: var(--fs-sm); }
+.md-rule { width: 100%; margin: 0; border: 0; border-top: 1px solid var(--line); }
+.md-code { margin: 0; padding: var(--space-3); overflow-x: auto; border-radius: var(--r-md); background: var(--well); font-size: var(--fs-sm); }
+.md-url { margin: 0; overflow-wrap: anywhere; }
+.md-scroll { overflow-x: auto; }
+.md-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.md-table th, .md-table td { padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.md-table th { color: var(--fg-2); font-weight: var(--fw-medium); }
+.md-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1040px) {
+  .layout { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr); }
+  .report { grid-column: 2; }
+}
+@media (max-width: 640px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .report { grid-column: auto; }
+}

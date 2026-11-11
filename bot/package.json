@@ -1,0 +1,31 @@
+{
+  "name": "boost-bot-runtime",
+  "productName": "Boost",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-appearance.mjs",
+    "start": "node dist/src/boost-host.js",
+    "prepare:tools": "node ../scripts/prepare-boost-bot.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.76.0",
+    "htm": "^3.1.1",
+    "preact": "^11.0.2",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/qrcode": "^1.5.6",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

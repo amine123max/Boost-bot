@@ -1,0 +1,74 @@
+{
+  "id": "company-research",
+  "version": "1.0.1",
+  "minAppVersion": "0.1.20",
+  "name": {
+    "zh-CN": "尽调助手",
+    "en": "Company Research",
+    "ja": "企業リサーチ",
+    "ko": "기업 리서치",
+    "ru": "Исследование компаний"
+  },
+  "summary": {
+    "zh-CN": "本机公司尽调：四路研究、策展、简报与可溯源报告/PDF",
+    "en": "Local company diligence with parallel research, curation, and sourced reports",
+    "ja": "手元のデバイスで企業を調査：4 方面のリサーチ、選別、要約、出典付きレポートと PDF",
+    "ko": "내 기기에서 기업 실사: 네 방향 조사, 선별, 브리핑, 출처 있는 보고서와 PDF",
+    "ru": "Изучает компании на вашем устройстве и пишет отчёт со ссылками на источники"
+  },
+  "about": {
+    "zh-CN": [
+      "报告和来源留在你的设备上；在聊天渠道里发起，结果也发回那里",
+      "仅供信息与学习参考，不构成投资建议"
+    ],
+    "en": [
+      "Reports and sources stay on your device; start it in a chat channel and the result comes back there",
+      "For information and learning only, not investment advice"
+    ],
+    "ja": [
+      "レポートと出典はお使いのデバイスに残ります。チャットチャネルから始めると、結果もそこに届きます",
+      "情報提供と学習のためのものであり、投資助言ではありません"
+    ],
+    "ko": [
+      "보고서와 출처는 내 기기에 남습니다. 채팅 채널에서 시작하면 결과도 그곳으로 옵니다",
+      "정보 제공과 학습용이며 투자 조언이 아닙니다"
+    ],
+    "ru": [
+      "Отчёты и источники остаются на вашем устройстве. Если начать в чат-канале, результат придёт туда же",
+      "Только для информации и обучения, не является инвестиционной рекомендацией"
+    ]
+  },
+  "avatar": "data",
+  "permissions": [
+    "workspace-write",
+    "network"
+  ],
+  "starters": {
+    "zh-CN": [
+      "对 Stripe 做完整尽调并生成报告",
+      "打开上一份报告的来源与策展列表",
+      "把当前报告导出为 PDF"
+    ],
+    "en": [
+      "Run full diligence on Stripe and generate a report",
+      "Open sources and curation from the latest report",
+      "Export the current report to PDF"
+    ],
+    "ja": [
+      "Stripe を徹底的に調査してレポートを作成して",
+      "最新のレポートの出典と選別結果を開いて",
+      "現在のレポートを PDF に書き出して"
+    ],
+    "ko": [
+      "Stripe를 전체 실사하고 보고서를 만들어 줘",
+      "최근 보고서의 출처와 선별 목록을 열어 줘",
+      "현재 보고서를 PDF로 내보내 줘"
+    ],
+    "ru": [
+      "Проведи полное исследование Stripe и подготовь отчёт",
+      "Открой источники и результаты отбора из последнего отчёта",
+      "Экспортируй текущий отчёт в PDF"
+    ]
+  },
+  "skills": []
+}

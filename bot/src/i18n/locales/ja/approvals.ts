@@ -1,0 +1,25 @@
+import type { TranslatedCatalog } from "../../index.js";
+export default {
+  "noSuchCode": "⚠️ 承認待ちのリクエスト {code} はありません。有効期限切れか、対応済みの可能性があります",
+  "needCode": "{count} 件のリクエストが承認待ちです。「y {code}」のようにコードを付けて返信してください",
+  "expiredOrDone": "⚠️ リクエスト {code} は有効期限切れか、対応済みです",
+  "approved": "✅ {code} を今回のみ許可しました",
+  "rejected": "❌ {code} を拒否しました",
+  "prompt": "承認が必要です：{tool}{cmd}{why} — y {code} / n {code} と返信してください",
+  "promptWhy": "（{reason}）",
+  "hintMulti": "（質問ごとに 1 行で回答してください。選択肢の番号または自由な回答を入力できます）",
+  "hintOptions": "（選択肢の番号{multi}、または自由な回答を入力してください）",
+  "hintOptionsMulti": "、複数ならカンマ区切り",
+  "hintFree": "（回答を入力してください）",
+  "replyYesNo": "y {code} で許可、n {code} で拒否できます",
+  "quoteNeedsAnswer": "メッセージを引用して回答を入力してください",
+  "alreadyAnswered": "この質問には回答済みです",
+  "taskApproval": "承認が必要です（タスク「{title}」）：{what} — y {code} / n {code} と返信してください",
+  "taskQuestion": "❓「{title}」からの質問：{question}",
+  "taskHintOptions": "（番号で返信{multi}、またはこのメッセージを引用して回答してください）",
+  "taskHintMulti": "。複数選択できます",
+  "taskHintQuote": "（このメッセージを引用して回答してください）",
+  "taskDefault": "返信がない場合は {answer} で進めます",
+  "allowOnce": "今回のみ許可",
+  "deny": "拒否"
+} satisfies TranslatedCatalog["approvals"];

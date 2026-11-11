@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Boost",
+  "version": "0.5.0",
+  "identifier": "com.boost.desktop",
+  "build": {
+    "beforeDevCommand": "node ./desktop/scripts/before-build.mjs dev:desktop",
+    "beforeBuildCommand": "node ./desktop/scripts/before-build.mjs build:desktop",
+    "devUrl": "http://127.0.0.1:3005",
+    "frontendDist": "../../frontend/out"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Boost",
+        "width": 1100,
+        "height": 760,
+        "resizable": true,
+        "minWidth": 640,
+        "minHeight": 520
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:* http://127.0.0.1:*; frame-src 'self' http://127.0.0.1:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "resources": {
+      "../../bot/dist/": "boost-bot/dist/",
+      "../../bot/ui/": "boost-bot/ui/",
+      "../../bot/bots/": "boost-bot/bots/",
+      "../../bot/assets/": "boost-bot/assets/",
+      "../../bot/bin/": "boost-bot/bin/",
+      "../../bot/node_modules/": "boost-bot/node_modules/",
+      "../../bot/dsh-runtime/": "boost-bot/dsh-runtime/",
+      "../../bot/LICENSES/": "boost-bot/LICENSES/",
+      "../../bot/LICENSE": "boost-bot/LICENSE",
+      "../../bot/THIRD_PARTY_NOTICES.md": "boost-bot/THIRD_PARTY_NOTICES.md",
+      "../../bot/package.json": "boost-bot/package.json"
+    },
+    "targets": "all",
+    "icon": [
+      "icons/favicon.ico",
+      "icons/favicon.png"
+    ]
+  },
+  "plugins": {}
+}

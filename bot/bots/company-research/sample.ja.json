@@ -1,0 +1,161 @@
+{
+  "title": "企業リサーチ",
+  "runtime": {
+    "mode": "auto",
+    "track": "b"
+  },
+  "jobs": [
+    {
+      "id": "job-sample-sprucefield",
+      "company": "スプルースフィールド・ロボティクス",
+      "companyUrl": "https://example.com/sprucefield/about",
+      "industry": "倉庫ロボット",
+      "hqLocation": "蘇州",
+      "status": "completed",
+      "track": "b",
+      "currentStep": "editor",
+      "progress": 100,
+      "docCounts": {
+        "financial": 9,
+        "news": 7,
+        "industry": 8,
+        "company": 11
+      },
+      "nodes": {
+        "grounding": "done",
+        "financial_analyst": "done",
+        "news_scanner": "done",
+        "industry_analyst": "done",
+        "company_analyst": "done",
+        "collector": "done",
+        "curator": "done",
+        "enricher": "done",
+        "briefing": "done",
+        "editor": "done"
+      },
+      "curation": {
+        "total": 35,
+        "kept": 22,
+        "threshold": 0.4
+      },
+      "sample": true,
+      "updatedAt": "2026-11-03T02:10:00Z"
+    }
+  ],
+  "timeline": [
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:00:00Z",
+      "node": "grounding",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:01:00Z",
+      "node": "financial_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:02:00Z",
+      "node": "news_scanner",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:03:00Z",
+      "node": "industry_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:04:00Z",
+      "node": "company_analyst",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:05:00Z",
+      "node": "collector",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:06:00Z",
+      "node": "curator",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:07:00Z",
+      "node": "enricher",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:08:00Z",
+      "node": "briefing",
+      "status": "done"
+    },
+    {
+      "jobId": "job-sample-sprucefield",
+      "at": "2026-11-03T02:09:00Z",
+      "node": "editor",
+      "status": "done"
+    }
+  ],
+  "selectedJobId": "job-sample-sprucefield",
+  "view": "report",
+  "reportPreview": "# スプルースフィールド・ロボティクス 調査レポート\n\n> これは画面のサンプルです。会社、数字、出典はすべて架空です。\n\n## 要約\n\n- スプルースフィールド・ロボティクスは倉庫向け仕分けロボットを製造し、主な顧客は地域の EC 事業者と物流会社です（[会社概要](https://example.com/sprucefield/about)）。\n- 2026 年 3 月にシリーズ B で 6,000 万ドルを調達し、パインストーン・キャピタルが主導しました（[資金調達の発表](https://example.org/news/sprucefield-series-b)）。\n- 公開情報に監査済みの売上高はありません。2025 年の受注が前年比で倍増したというのは会社の説明で、**未検証**です。\n\n## 会社と事業\n\n2019 年設立、本社は蘇州で、モジュール式の仕分けロボットと運用管理ソフトウェアを販売しています（[会社概要](https://example.com/sprucefield/about)）。ロボットは台数単位、ソフトウェアは年間サブスクリプションで提供しています（[製品ページ](https://example.com/sprucefield/pricing)）。\n\n## 業界と競争\n\n業界レポートによると、2025 年の世界の倉庫ロボット市場は約 90 億ドルで、年約 15% で成長しています（[業界レポート](https://example.net/reports/warehouse-robotics-2026)）。主な競合は規模の大きい上場企業 2 社で、同社は導入期間の短さで差別化しています（[業界レポート](https://example.net/reports/warehouse-robotics-2026)）。\n\n## 財務\n\n| 項目 | 数字 | 出典 |\n| --- | --- | --- |\n| シリーズ B | 6,000 万ドル（2026 年 3 月） | [資金調達の発表](https://example.org/news/sprucefield-series-b) |\n| 累計調達額 | 約 9,500 万ドル | [資金調達データベース](https://example.org/data/sprucefield) |\n| 2025 年の売上高 | 非公開 | なし |\n\n## 最近のニュース\n\n- 2026 年 6 月：地域の物流会社と 3 年間の提携を締結しました（[提携ニュース](https://example.org/news/sprucefield-partnership)）。\n- 2026 年 8 月：新しい最高財務責任者を任命しました（[人事ニュース](https://example.org/news/sprucefield-cfo)）。\n\n## 不足と未検証の項目\n\n- 監査済みの財務データは見つかりませんでした。\n- 受注の倍増は会社自身の説明で、第三者の出典はありません。\n\n## 出典\n\n1. [会社概要](https://example.com/sprucefield/about)\n2. [製品ページ](https://example.com/sprucefield/pricing)\n3. [資金調達の発表](https://example.org/news/sprucefield-series-b)\n4. [資金調達データベース](https://example.org/data/sprucefield)\n5. [業界レポート](https://example.net/reports/warehouse-robotics-2026)\n6. [提携ニュース](https://example.org/news/sprucefield-partnership)\n7. [人事ニュース](https://example.org/news/sprucefield-cfo)\n\n---\n\n**免責事項**：このレポートは AI が公開情報をもとにまとめたもので、情報提供と学習のためのものです。投資、税務、法律に関する助言ではありません。出典は古いか誤っている場合があるため、利用前にご確認ください。作成者と Boost は、このレポートに基づく判断について責任を負いません。\n",
+  "sourcesPreview": [
+    {
+      "url": "https://example.com/sprucefield/about",
+      "title": "会社概要",
+      "score": 0.95,
+      "domain": "company",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-series-b",
+      "title": "資金調達の発表",
+      "score": 0.92,
+      "domain": "financial",
+      "used": true
+    },
+    {
+      "url": "https://example.net/reports/warehouse-robotics-2026",
+      "title": "業界レポート",
+      "score": 0.88,
+      "domain": "industry",
+      "used": true
+    },
+    {
+      "url": "https://example.org/data/sprucefield",
+      "title": "資金調達データベース",
+      "score": 0.81,
+      "domain": "financial",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-partnership",
+      "title": "提携ニュース",
+      "score": 0.77,
+      "domain": "news",
+      "used": true
+    },
+    {
+      "url": "https://example.com/sprucefield/pricing",
+      "title": "製品ページ",
+      "score": 0.74,
+      "domain": "company",
+      "used": true
+    },
+    {
+      "url": "https://example.org/news/sprucefield-cfo",
+      "title": "人事ニュース",
+      "score": 0.62,
+      "domain": "news",
+      "used": true
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "title": "미국 주식 리서치",
+  "runs": [
+    {
+      "id": "sample-aapl",
+      "question": "Apple의 최근 5년 매출과 매출총이익률 추이를 조사해 보고서로 만들어 줘",
+      "status": "done",
+      "updatedAt": "2026-11-03T10:30:00Z",
+      "plan": [
+        {
+          "text": "Apple의 CIK 찾기",
+          "done": true
+        },
+        {
+          "text": "FY2021~FY2025 매출과 매출총이익 가져오기",
+          "done": true
+        },
+        {
+          "text": "FY2025 10-K의 매출총이익률 설명 읽기",
+          "done": true
+        },
+        {
+          "text": "매출총이익률을 계산하고 원본 데이터와 대조하기",
+          "done": true
+        },
+        {
+          "text": "보고서 쓰기",
+          "done": true
+        }
+      ],
+      "limitations": [
+        "FY2023은 53주이고 다른 해는 52주입니다",
+        "부문별 이익률은 FY2023~FY2025만 다룹니다"
+      ],
+      "preview": "# Apple 매출과 매출총이익률, FY2021~FY2025\n\n## 결론\n\n5개 회계연도 동안 매출은 13.8% 늘어 $365.817B에서 $416.161B가 되었습니다. 매출총이익률은 41.78%에서 46.91%로 5.13포인트 올랐습니다. 10-K의 부문 데이터를 보면 FY2023 이후 상승분의 대부분은 Services에서 나왔습니다. Services의 이익률은 70.8%에서 75.4%로 올랐고, Products는 36.5%에서 36.8%로 소폭 움직였습니다.\n\n## 데이터\n\n단위는 10억 달러입니다. 매출총이익률은 표의 값으로 계산했습니다.\n\n| 회계연도 | 결산일 | 매출 | 매출총이익 | 매출총이익률 |\n| --- | --- | ---: | ---: | ---: |\n| FY2021 | 2021-09-25 | 365.817 | 152.836 | 41.78% |\n| FY2022 | 2022-09-24 | 394.328 | 170.782 | 43.31% |\n| FY2023 | 2023-09-30 | 383.285 | 169.148 | 44.13% |\n| FY2024 | 2024-09-28 | 391.035 | 180.683 | 46.21% |\n| FY2025 | 2025-09-27 | 416.161 | 195.201 | 46.91% |\n\nFY2025 10-K의 Item 7에 있는 부문별 매출총이익률:\n\n| | FY2023 | FY2024 | FY2025 |\n| --- | ---: | ---: | ---: |\n| Products | 36.5% | 37.2% | 36.8% |\n| Services | 70.8% | 73.9% | 75.4% |\n\n## 분석\n\n- 매출은 FY2023에 2.8% 줄어든 뒤 2년 연속 늘었습니다.\n- FY2025 10-K는 Products 이익률 하락의 주된 원인으로 제품 구성과 관세 비용을 꼽습니다.\n- 같은 문서에서 Apple은 매출총이익률 전반이 변동과 하락 압력을 받을 것으로 예상합니다.\n\n## 한계\n\n- FY2023은 53주이고 다른 해는 52주여서 전년 대비 비교에 약간 영향을 줍니다.\n- 부문별 이익률은 FY2023~FY2025만 다루며, 그 이전 연도는 읽지 않았습니다.\n- 이 예시는 2026-11-03에 가져왔으며, 당시 EDGAR의 최신 연간 보고서는 FY2025였습니다.\n\n## 출처\n\n- XBRL 데이터: accession 0000320193-23-000106, 0000320193-24-000123, 0000320193-25-000079\n- FY2025 10-K: https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm\n\n> 이 보고서는 AI가 공개 데이터로 작성한 것으로 학습과 정보 제공용입니다. 투자, 세무, 법률 조언이 아닙니다. 데이터는 불완전하거나 틀리거나 오래되었을 수 있으며, 과거 실적이 미래 결과를 예측하지는 않습니다. 투자하기 전에 자격을 갖춘 전문가와 상담하세요. 손실에 대한 책임은 본인에게 있습니다.\n",
+      "calls": [
+        {
+          "ts": "2026-11-03T10:25:58Z",
+          "tool": "lookup",
+          "target": "AAPL",
+          "url": "https://www.sec.gov/files/company_tickers.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:25:59Z",
+          "tool": "concept",
+          "target": "0000320193 us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax annual",
+          "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:00Z",
+          "tool": "concept",
+          "target": "0000320193 us-gaap/GrossProfit annual",
+          "url": "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/GrossProfit.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:01Z",
+          "tool": "filings",
+          "target": "0000320193 10-K 1",
+          "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+          "status": 200
+        },
+        {
+          "ts": "2026-11-03T10:26:02Z",
+          "tool": "read",
+          "target": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

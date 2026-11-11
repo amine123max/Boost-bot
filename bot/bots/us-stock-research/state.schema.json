@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "question": { "type": "string" },
+          "status": { "type": "string", "enum": ["planning", "running", "validating", "done", "error"] },
+          "updatedAt": { "type": "string" },
+          "plan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": { "type": "string" },
+                "done": { "type": "boolean" }
+              },
+              "required": ["text"]
+            }
+          },
+          "limitations": { "type": "array", "items": { "type": "string" } },
+          "preview": { "type": "string" },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ts": { "type": "string" },
+                "tool": { "type": "string" },
+                "target": { "type": "string" },
+                "url": { "type": "string" },
+                "status": { "type": "number" }
+              },
+              "required": ["tool", "target"]
+            }
+          }
+        },
+        "required": ["id", "question", "status"]
+      }
+    }
+  },
+  "required": ["title", "runs"]
+}

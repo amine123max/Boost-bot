@@ -1,0 +1,90 @@
+FROM node:24-bookworm-slim AS bot
+WORKDIR /src
+COPY bot ./bot
+COPY scripts/prepare-boost-bot.mjs ./scripts/prepare-boost-bot.mjs
+RUN node scripts/prepare-boost-bot.mjs && cd bot && npm prune --omit=dev --no-audit --no-fund
+
+FROM node:24-bookworm-slim AS ui
+
+WORKDIR /src/frontend
+
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/tsconfig.json frontend/vite.config.ts frontend/index.html frontend/boost-theme.js ./
+COPY frontend/src ./src
+COPY assets /src/assets
+COPY bot/shared /src/bot/shared
+
+RUN --mount=type=cache,id=boost-pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store \
+    && pnpm run build
+
+FROM rust:1-bookworm AS builder
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+WORKDIR /src
+
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+ENV CARGO_NET_RETRY=10
+ENV CARGO_HTTP_TIMEOUT=600
+
+COPY Cargo.toml Cargo.lock ./
+COPY backend ./backend
+
+COPY --from=ui /src/frontend/out ./frontend/out
+
+RUN --mount=type=cache,id=boost-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=boost-cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=boost-cargo-target-${TARGETARCH}${TARGETVARIANT},target=/src/target \
+    cargo build --locked -p boost-service --release \
+    && cargo build --locked -p boost-web --release --features embedded-ui \
+    && cargo build --locked -p boost-start --release \
+    && mkdir -p /out \
+    && cp /src/target/release/boost-service /out/boost-service \
+    && cp /src/target/release/boost-web /out/boost-web \
+    && cp /src/target/release/boost-start /out/boost-start
+
+FROM debian:bookworm-slim
+
+ARG APP_USER=boost
+ARG APP_UID=10001
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid ${APP_UID} ${APP_USER} \
+    && useradd --system --uid ${APP_UID} --gid ${APP_UID} --home-dir /app --create-home --shell /usr/sbin/nologin ${APP_USER} \
+    && mkdir -p /data \
+    && chown -R ${APP_UID}:${APP_UID} /app /data
+
+COPY --from=builder /out/boost-service /usr/local/bin/boost-service
+COPY --from=builder /out/boost-web /usr/local/bin/boost-web
+COPY --from=builder /out/boost-start /usr/local/bin/boost-start
+COPY --from=bot /src/bot /usr/local/bin/boost-bot
+
+ENV BOOST_SERVICE_ADDR=0.0.0.0:48760
+ENV BOOST_WEB_ADDR=0.0.0.0:12580
+ENV BOOST_WEB_NO_OPEN=1
+ENV BOOST_DB_PATH=/data/boost.db
+ENV BOOST_RPC_TOKEN_FILE=/data/boost.rpc-token
+ENV BOOST_GATEWAY_TRACE_STDOUT=1
+ENV BOOST_GATEWAY_ERROR_STDOUT=1
+ENV BOOST_GATEWAY_TRACE_STDOUT_SLOW_MS=5000
+
+VOLUME ["/data"]
+EXPOSE 12580
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:48760/health \
+    && wget --no-verbose --tries=1 --spider http://127.0.0.1:12580/__auth_status \
+    || exit 1
+
+STOPSIGNAL SIGINT
+
+USER ${APP_USER}
+
+CMD ["/usr/local/bin/boost-start"]

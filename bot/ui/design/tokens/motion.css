@@ -1,0 +1,63 @@
+/* 动效 token。原则：
+   - 简约（用户 2026-11-03 要求）：出现 / 消失只淡入淡出，不位移、不缩放、不回弹；按下只深一级底色，不缩小。
+   - 状态反馈（悬停、按下、颜色）用 fast；出现/消失、视图切换用 base；只有布局滑动（信息面板开合）用 slow。
+   - 入场用 ease-out，退场用 ease-in，循环用 ease-in-out 或 linear。--ease-back 只给机器人头像。
+   - 唯一的位移是窄窗口的信息面板抽屉（--slide），乘以 --motion；关闭动画时连淡入也没有（见文末 data-motion）。 */
+:root {
+  --dur-fast: 100ms;
+  --dur-base: 140ms;
+  --dur-moderate: 180ms;
+  --dur-slow: 240ms;
+
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(.42, 0, .58, 1);
+  --ease-spring: cubic-bezier(.16, 1, .3, 1);
+  --ease-back: cubic-bezier(.34, 1.56, .64, 1);   /* 越过一点再回来：只给机器人头像 */
+
+  /* 时长 + 缓动的组合：transition: background var(--t-fast), color var(--t-fast) */
+  --t-fast: var(--dur-fast) var(--ease-out);
+  --t-base: var(--dur-base) var(--ease-out);
+  --t-moderate: var(--dur-moderate) var(--ease-out);
+
+  /* 循环 */
+  --dur-spin: 800ms;
+  --dur-blink: 1s;
+  --dur-shimmer: 1.2s;
+  --dur-sheen: 2.4s;    /* 文字微光（思考中 / 正在回复）：扫过一遍后停一拍，比骨架慢，不抢正文的注意力 */
+  --dur-egg-spin: 5s;     /* 模型选择器彩蛋：内沿渐变描边转一圈 */
+  --dur-egg-flow: 2.4s;   /* 彩蛋：轨道渐变流过一遍 */
+  --dur-egg-spark: 3.2s;  /* 彩蛋：光点亮起、上浮、熄灭一次 */
+  --dur-pulse: 1.4s;
+  --dur-flash: 1.2s;
+  --stagger: 150ms;
+  --dur-intent: 240ms;  /* 悬停意图：指针停这么久才亮起提示（分隔条的细线），只是划过去不闪 */
+  --dur-off: .01ms;   /* 减少动态效果时代替 0：时长为 0 的过渡不触发 transitionend */
+
+  /* 机器人头像的一次性反应（avatar.js 用 ms() 读，播完回到持续状态） */
+  --bot-hello: 1.6s;
+  --bot-done: 1.3s;
+  --bot-error: 1.5s;
+  --bot-poke: .7s;
+  --bot-love: 1.6s;
+  --bot-dizzy: 2.2s;
+
+  /* 位移量 */
+  --motion: 1;
+  --slide: 12px;   /* 窄窗口的信息面板抽屉 */
+}
+/* 动画偏好：<html data-motion> 由 lib/prefs.js 解析（设置 › 外观 › 动画；跟随系统时看 prefers-reduced-motion）。
+   reduce：位移归零，过渡几乎瞬时（base/motion.css）。
+   off：在 reduce 之上，出现 / 消失 / 视图切换也瞬时完成；只留表示"正在进行"的循环（转圈、骨架、光标）和定位闪烁。 */
+:root:is([data-motion="reduce"], [data-motion="off"]) {
+  --motion: 0;
+  --dur-spin: 1.6s;
+}
+:root[data-motion="off"] {
+  --dur-fast: var(--dur-off);
+  --dur-base: var(--dur-off);
+  --dur-moderate: var(--dur-off);
+  --dur-slow: var(--dur-off);
+  --dur-intent: 0ms;
+  --stagger: 0ms;
+}

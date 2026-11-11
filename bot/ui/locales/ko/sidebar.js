@@ -1,0 +1,55 @@
+export default {
+  "localUser": "로컬 사용자",
+  "settingsTitle": "설정 (⌘,)",
+  "openSettings": "설정 열기",
+  "account": "계정",
+  "accountDetails": "계정 및 사용량",
+  "balance": "잔액",
+  "topUp": "충전 ↗",
+  "lowBalance": "잔액이 얼마 남지 않았습니다",
+  "belowLine": "알림 기준 {amount} 미만",
+  "update": "{version} 버전을 사용할 수 있습니다 — 다운로드 ↗",
+  "updateDismiss": "이 버전 알림 숨기기",
+  "renamed": "이름이 변경되었습니다",
+  "delete": {
+    "done": "‘{name}’ 삭제됨",
+    "handover": "{channels}에는 앞으로 ‘{bot}’ 봇이 답합니다.",
+    "handoverNone": "마지막 봇입니다. 새 봇을 만들 때까지 {channels} 메시지에는 답이 없습니다.",
+    "listSep": ", ",
+    "title": "“{name}”을(를) 삭제할까요?",
+    "body": "봇과 모든 대화가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "confirm": "영구 삭제"
+  },
+  "bots": "봇",
+  "newShortcut": "새 봇 (⌘N)",
+  "newMenu": "새로 만들기",
+  "newBotItem": "새 봇",
+  "newGroupItem": "새 그룹 채팅",
+  "groupActionsFor": "“{name}” 작업",
+  "groupEdit": "이름 및 멤버",
+  "search": "봇 검색",
+  "list": "봇 목록",
+  "newBot": "새 봇",
+  "creating": "만드는 중…",
+  "loadFailed": "봇을 불러오지 못했습니다",
+  "empty": "아직 봇이 없습니다",
+  "create": "새 봇",
+  "noMatch": "일치하는 봇이 없습니다",
+  "newName": "새 이름",
+  "working": "작업 중",
+  "workingNow": "작업 중…",
+  "noChats": "아직 대화가 없습니다",
+  "moreFor": "{name}의 추가 작업",
+  "actionsFor": "{name}의 작업",
+  "menu": {
+    "settings": "봇 설정",
+    "copyId": "봇 ID 복사",
+    "delete": "봇 삭제"
+  },
+  "pending": {
+    "other": "승인 대기 {count}건"
+  },
+  "needs": {
+    "other": "내 확인 필요 {count}건"
+  }
+};

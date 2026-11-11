@@ -1,0 +1,109 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["auto", "a", "b"] },
+        "track": { "enum": ["a", "b"] },
+        "python": { "type": "boolean" },
+        "apiReachable": { "type": "boolean" },
+        "openrouter": { "type": "boolean" },
+        "openai": { "type": "boolean" },
+        "defaultModel": { "type": "string" },
+        "checkedAt": { "type": "string" }
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "company": { "type": "string", "minLength": 1 },
+          "companyUrl": { "type": "string" },
+          "industry": { "type": "string" },
+          "hqLocation": { "type": "string" },
+          "status": { "enum": ["pending", "grounding", "researching", "collecting", "curating", "enriching", "briefing", "editing", "completed", "failed", "cancelled"] },
+          "track": { "enum": ["a", "b"] },
+          "currentStep": { "type": "string" },
+          "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+          "docCounts": {
+            "type": "object",
+            "properties": {
+              "financial": { "type": "integer", "minimum": 0 },
+              "news": { "type": "integer", "minimum": 0 },
+              "industry": { "type": "integer", "minimum": 0 },
+              "company": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "nodes": {
+            "type": "object",
+            "properties": {
+              "grounding": { "enum": ["pending", "running", "done", "failed"] },
+              "financial_analyst": { "enum": ["pending", "running", "done", "failed"] },
+              "news_scanner": { "enum": ["pending", "running", "done", "failed"] },
+              "industry_analyst": { "enum": ["pending", "running", "done", "failed"] },
+              "company_analyst": { "enum": ["pending", "running", "done", "failed"] },
+              "collector": { "enum": ["pending", "running", "done", "failed"] },
+              "curator": { "enum": ["pending", "running", "done", "failed"] },
+              "enricher": { "enum": ["pending", "running", "done", "failed"] },
+              "briefing": { "enum": ["pending", "running", "done", "failed"] },
+              "editor": { "enum": ["pending", "running", "done", "failed"] }
+            }
+          },
+          "curation": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer", "minimum": 0 },
+              "kept": { "type": "integer", "minimum": 0 },
+              "threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          },
+          "reportPath": { "type": "string" },
+          "sourcesPath": { "type": "string" },
+          "pdfPath": { "type": "string" },
+          "pdfError": { "type": "string" },
+          "error": { "type": "string" },
+          "sample": { "type": "boolean" },
+          "updatedAt": { "type": "string" }
+        },
+        "required": ["id", "company", "status"]
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "properties": {
+          "jobId": { "type": "string" },
+          "at": { "type": "string" },
+          "node": { "type": "string" },
+          "status": { "enum": ["running", "done", "failed"] },
+          "text": { "type": "string" }
+        },
+        "required": ["jobId"]
+      }
+    },
+    "selectedJobId": { "type": "string" },
+    "view": { "enum": ["report", "sources"] },
+    "reportPreview": { "type": "string" },
+    "sourcesPreview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "domain": { "enum": ["financial", "news", "industry", "company"] },
+          "used": { "type": "boolean" }
+        },
+        "required": ["url"]
+      }
+    }
+  },
+  "required": ["title", "jobs"]
+}

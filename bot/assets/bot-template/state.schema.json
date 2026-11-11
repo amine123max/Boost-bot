@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "changed": { "type": "boolean" }
+        },
+        "required": ["id", "text"]
+      }
+    }
+  },
+  "required": ["title", "items"]
+}

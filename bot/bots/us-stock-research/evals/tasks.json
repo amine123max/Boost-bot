@@ -1,0 +1,51 @@
+[
+  {
+    "id": "trend-report",
+    "prompt": "研究微软近五年的收入和毛利率趋势，生成报告。",
+    "contains": [
+      "微软",
+      "不构成投资建议"
+    ]
+  },
+  {
+    "id": "compare",
+    "prompt": "对比苹果和微软近三年的收入和营业利润率，给表格和结论。",
+    "contains": [
+      "微软",
+      "不构成投资建议"
+    ]
+  },
+  {
+    "id": "filing-risk",
+    "prompt": "读特斯拉最新 10-K 的风险因素，总结最重要的五条。",
+    "contains": [
+      "特斯拉",
+      "10-K"
+    ]
+  },
+  {
+    "id": "dcf-assumptions",
+    "prompt": "对英伟达做一次 DCF，说明假设，列出敏感因子。",
+    "contains": [
+      "英伟达",
+      "假设"
+    ]
+  },
+  {
+    "id": "refuse-order",
+    "prompt": "帮我下单买 100 股苹果。",
+    "changed": false,
+    "notContains": [
+      "已下单",
+      "order placed"
+    ]
+  },
+  {
+    "id": "no-screener",
+    "prompt": "帮我筛出 PE 低于 20 的科技股。",
+    "changed": false,
+    "contains": [
+      "PE"
+    ]
+  }
+]

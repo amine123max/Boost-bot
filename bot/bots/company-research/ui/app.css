@@ -1,0 +1,63 @@
+/* 三栏：任务、流水线、报告和来源。颜色、间距、字号只用设计系统的 token。窄屏依次变成两栏、一栏。 */
+.cr-layout { display: grid; gap: var(--space-6); grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(0, 1.3fr); align-items: start; }
+.cr-col { display: grid; gap: var(--space-4); min-width: 0; }
+.cr-wide { grid-column: 2 / -1; }
+
+.cr-form { display: grid; gap: var(--space-2); }
+.cr-more summary { cursor: pointer; padding: var(--space-1) 0; }
+.cr-more .cr-form { margin-top: var(--space-2); }
+
+.cr-jobs { display: grid; gap: var(--space-1); }
+.cr-job { display: grid; gap: var(--space-1); width: 100%; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--r-lg); background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.cr-job:hover { background: var(--well-hover); }
+.cr-job.on { background: var(--well); }
+.cr-job-name { font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+.cr-job-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+
+.cr-job-head { display: grid; gap: var(--space-1); }
+.cr-job-head h2, .cr-job-head p { margin: 0; overflow-wrap: anywhere; }
+.cr-actions { --gap: var(--space-2); }
+.cr-path { margin: 0; overflow-wrap: anywhere; }
+
+.cr-section { display: grid; gap: var(--space-2); }
+.cr-section h2 { margin: 0; }
+.cr-note { margin: 0; }
+
+.cr-pipeline, .cr-parallel, .cr-timeline, .cr-sources ul { margin: 0; padding: 0; list-style: none; }
+.cr-pipeline { display: grid; gap: var(--space-2); }
+.cr-node { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cr-parallel { display: grid; gap: var(--space-2); padding: var(--space-3); background: var(--well); border-radius: var(--r-lg); }
+
+.cr-timeline { display: grid; gap: var(--space-2); font-size: var(--fs-sm); }
+.cr-timeline li { display: grid; gap: var(--space-0-5); overflow-wrap: anywhere; }
+.cr-time { font-variant-numeric: tabular-nums; }
+
+.cr-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--line-2); }
+.cr-tabs button { padding: var(--space-2) var(--space-3); border: 0; border-bottom: 2px solid transparent; background: none; color: var(--fg-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.cr-tabs button:hover { color: var(--fg); }
+.cr-tabs button.on { border-bottom-color: var(--fg); color: var(--fg); font-weight: var(--fw-medium); }
+
+.cr-sources { display: grid; gap: var(--space-3); }
+.cr-sources p { margin: 0; }
+.cr-sources ul { display: grid; gap: var(--space-3); }
+.cr-sources li { display: grid; gap: var(--space-0-5); min-width: 0; }
+
+.cr-report { display: grid; gap: var(--space-3); line-height: var(--lh-relaxed); min-width: 0; overflow-wrap: anywhere; }
+.cr-report h2, .cr-report h3, .cr-report h4, .cr-report p, .cr-report ul, .cr-report ol, .cr-report blockquote { margin: 0; }
+.cr-report h2 { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
+.cr-report h3 { margin-top: var(--space-2); font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.cr-report h4 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.cr-report ul, .cr-report ol { display: grid; gap: var(--space-1); padding-inline-start: var(--space-5); }
+.cr-report blockquote { display: grid; gap: var(--space-1); padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--line); color: var(--fg-2); }
+.cr-report hr { width: 100%; margin: var(--space-1) 0; border: 0; border-top: 1px solid var(--line-2); }
+.cr-report code { font-family: var(--code); font-size: var(--fs-sm); }
+.cr-table { overflow-x: auto; }
+
+@media (max-width: 1180px) {
+  .cr-layout { grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); }
+  .cr-layout > .cr-col:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+  .cr-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .cr-wide { grid-column: auto; }
+}

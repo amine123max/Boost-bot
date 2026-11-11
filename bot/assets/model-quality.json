@@ -1,0 +1,202 @@
+{
+  "updatedAt": "2026-11-02",
+  "source": "https://artificialanalysis.ai/leaderboards/models",
+  "attribution": "Artificial Analysis (artificialanalysis.ai)",
+  "models": {
+    "claude-fable-5-1": {
+      "aa": "claude-fable-5-1",
+      "name": "Claude Fable 5.1",
+      "default": {
+        "variant": "max",
+        "intelligence": 49,
+        "costPerTask": 12.99
+      },
+      "medium": {
+        "intelligence": 43,
+        "costPerTask": 5.56
+      }
+    },
+    "claude-haiku-5-5": {
+      "aa": "claude-haiku-5-5",
+      "name": "Claude Haiku 5.5",
+      "default": {
+        "variant": "max",
+        "intelligence": 36,
+        "costPerTask": 0.41
+      },
+      "medium": {
+        "intelligence": 25,
+        "costPerTask": 0.09
+      }
+    },
+    "claude-opus-5-5": {
+      "aa": "claude-opus-5-5",
+      "name": "Claude Opus 5.5",
+      "default": {
+        "variant": "max",
+        "intelligence": 58,
+        "costPerTask": 10.04
+      },
+      "medium": {
+        "intelligence": 48,
+        "costPerTask": 2.45
+      }
+    },
+    "claude-sonnet-5-5": {
+      "aa": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
+      "default": {
+        "variant": "max",
+        "intelligence": 54,
+        "costPerTask": 10.02
+      },
+      "medium": {
+        "intelligence": 30,
+        "costPerTask": 0.78
+      }
+    },
+    "deepseek-v4-pro": {
+      "aa": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro 0813",
+      "default": {
+        "variant": "max",
+        "intelligence": 23,
+        "costPerTask": 1.77
+      }
+    },
+    "deepseek-v4.1-flash": {
+      "aa": "deepseek-v4-1-flash-1017",
+      "name": "DeepSeek V4.1 Flash 1017",
+      "default": {
+        "variant": "max",
+        "intelligence": 32,
+        "costPerTask": 0.6
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "aa": "gemini-3-5-flash-lite",
+      "name": "Gemini 3.5 Flash-Lite",
+      "default": {
+        "intelligence": 12,
+        "costPerTask": 0.69
+      }
+    },
+    "gemini-3.8-flash": {
+      "aa": "gemini-3-8-flash",
+      "name": "Gemini 3.8 Flash",
+      "default": {
+        "variant": "high",
+        "intelligence": 31,
+        "costPerTask": 7.77
+      },
+      "medium": {
+        "intelligence": 30,
+        "costPerTask": 6.26
+      }
+    },
+    "gemini-3.8-flash-high": {
+      "aa": "gemini-3-8-flash",
+      "name": "Gemini 3.8 Flash",
+      "default": {
+        "variant": "high",
+        "intelligence": 31,
+        "costPerTask": 7.77
+      }
+    },
+    "gemini-4-argon": {
+      "aa": "gemini-4-argon",
+      "name": "Gemini 4 Argon",
+      "default": {
+        "variant": "high",
+        "intelligence": 50,
+        "costPerTask": 7.68
+      }
+    },
+    "glm-5.3": {
+      "aa": "glm-5-3",
+      "name": "GLM-5.3",
+      "default": {
+        "variant": "max",
+        "intelligence": 32,
+        "costPerTask": 5.01
+      }
+    },
+    "glm-5.3-flash": {
+      "aa": "glm-5-3-flash",
+      "name": "GLM-5.3-Flash",
+      "default": {
+        "intelligence": 28,
+        "costPerTask": 0.58
+      }
+    },
+    "gpt-6-astra": {
+      "aa": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "default": {
+        "variant": "max",
+        "intelligence": 57,
+        "costPerTask": 6.24
+      },
+      "medium": {
+        "intelligence": 51,
+        "costPerTask": 2.73
+      }
+    },
+    "gpt-6-luna": {
+      "aa": "gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "default": {
+        "variant": "max",
+        "intelligence": 28,
+        "costPerTask": 0.15
+      },
+      "medium": {
+        "intelligence": 18,
+        "costPerTask": 0.04
+      }
+    },
+    "gpt-6.1-sol": {
+      "aa": "gpt-6-1-sol",
+      "name": "GPT-6.1 Sol",
+      "default": {
+        "variant": "max",
+        "intelligence": 55,
+        "costPerTask": 1.27
+      },
+      "medium": {
+        "intelligence": 46,
+        "costPerTask": 0.36
+      }
+    },
+    "gpt-6.1-terra": {
+      "aa": "gpt-6-1-terra",
+      "name": "GPT-6.1 Terra",
+      "default": {
+        "variant": "max",
+        "intelligence": 51,
+        "costPerTask": 0.96
+      },
+      "medium": {
+        "intelligence": 38,
+        "costPerTask": 0.17
+      }
+    },
+    "grok-4.7": {
+      "aa": "grok-4-7",
+      "name": "Grok 4.7",
+      "default": {
+        "variant": "xhigh",
+        "intelligence": 34,
+        "costPerTask": 7.51
+      }
+    },
+    "qwen3.8-max": {
+      "aa": "qwen3-8-max",
+      "name": "Qwen3.8 Max (0902)",
+      "default": {
+        "intelligence": 34,
+        "costPerTask": 10.02
+      }
+    }
+  }
+}

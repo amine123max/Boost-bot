@@ -1,0 +1,32 @@
+/* 界面套件的样式：设计系统（token、基础组件）加上几个专属界面常用的布局。Bot 的界面只引用这一个文件。
+   颜色、间距、字号都来自 token，主题和字号跟着 App 走。 */
+@import url("./design/index.css");
+
+@layer components {
+  html, body { height: 100%; background: transparent; }
+  body { margin: 0; color: var(--fg); font-family: var(--font); font-size: var(--fs-md); }
+  .kit-page { display: grid; gap: var(--space-5); padding: var(--space-6); }
+  .kit-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .kit-head-text { display: grid; gap: var(--space-1); min-width: 0; }
+  .kit-head h1 { margin: 0; }
+  .kit-head p { margin: 0; }
+  .kit-section { display: grid; gap: var(--space-2); }
+  .kit-section > h2 { margin: 0; }
+  .kit-card { display: grid; gap: var(--space-2); padding: var(--space-4); background: var(--well); border-radius: var(--r-lg); }
+  .kit-grid { --kit-col-min: 280px; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(min(var(--kit-col-min), 100%), 1fr)); }
+  .kit-field { display: grid; gap: var(--space-1); }
+  .kit-empty { padding: var(--space-5); text-align: center; }
+  .kit-meter { height: var(--space-2); background: var(--well); border-radius: var(--r-full); overflow: hidden; }
+  .kit-meter > i { display: block; height: 100%; background: var(--fg); border-radius: inherit; transition: width var(--dur-base) var(--ease-out); }
+  .kit-table { width: 100%; border-collapse: collapse; }
+  .kit-table th { text-align: left; font-weight: var(--fw-medium); color: var(--fg-2); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); }
+  .kit-table td { padding: var(--space-2); }
+  .kit-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .kit-link { text-decoration: underline; text-decoration-color: var(--line); overflow-wrap: anywhere; }
+  /* 被 Bot 改动的内容：设计系统的高亮底色 */
+  .kit-changed { background: var(--accent-soft); }
+  @media (max-width: 480px) {
+    .kit-page { padding: var(--space-4); }
+    .kit-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+}

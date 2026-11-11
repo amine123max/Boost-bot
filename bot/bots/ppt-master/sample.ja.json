@@ -1,0 +1,85 @@
+{
+  "title": "PPT マスター",
+  "runtime": {
+    "ready": true
+  },
+  "activeProjectId": "launch_20261021",
+  "job": {
+    "projectId": "launch_20261021",
+    "route": "generate",
+    "profile": "default",
+    "phase": "done",
+    "done": 8,
+    "total": 8,
+    "sample": true,
+    "message": "",
+    "warnings": []
+  },
+  "pendingSpec": null,
+  "projects": [
+    {
+      "id": "launch_20261021",
+      "name": "Lumen X1 発表会",
+      "kind": "generate",
+      "format": "ppt169",
+      "pages": 8,
+      "sample": true,
+      "updatedAt": "2026-10-21T01:40:00+00:00",
+      "previewsDraft": false,
+      "previews": [
+        {
+          "path": "sample/ja-1.svg",
+          "name": "01 表紙"
+        },
+        {
+          "path": "sample/ja-2.svg",
+          "name": "02 アジェンダ"
+        },
+        {
+          "path": "sample/ja-3.svg",
+          "name": "03 課題"
+        },
+        {
+          "path": "sample/ja-4.svg",
+          "name": "04 製品"
+        },
+        {
+          "path": "sample/ja-5.svg",
+          "name": "05 予約"
+        },
+        {
+          "path": "sample/ja-6.svg",
+          "name": "06 ロードマップ"
+        },
+        {
+          "path": "sample/ja-7.svg",
+          "name": "07 価格"
+        },
+        {
+          "path": "sample/ja-8.svg",
+          "name": "08 まとめ"
+        }
+      ],
+      "exports": [
+        {
+          "path": "app/projects/launch_20261021/exports/lumen_x1_launch_20261021_094012.pptx",
+          "name": "lumen_x1_launch_20261021_094012.pptx",
+          "size": 2841932,
+          "slides": 8,
+          "kind": "standard"
+        }
+      ]
+    },
+    {
+      "id": "brand_template_20261012",
+      "name": "ブランドテンプレート",
+      "kind": "template",
+      "pages": 0,
+      "sample": true,
+      "updatedAt": "2026-10-12T06:20:00+00:00",
+      "previewsDraft": false,
+      "previews": [],
+      "exports": []
+    }
+  ]
+}

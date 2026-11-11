@@ -1,0 +1,74 @@
+{
+  "id": "us-stock-research",
+  "version": "1.0.1",
+  "minAppVersion": "0.1.20",
+  "name": {
+    "zh-CN": "美股研报",
+    "en": "US Stock Research",
+    "ja": "米国株リサーチ",
+    "ko": "미국 주식 리서치",
+    "ru": "Анализ акций США"
+  },
+  "summary": {
+    "zh-CN": "查美股财报和申报文件，写出每个数字都能追溯的研究报告",
+    "en": "Research US-listed companies from SEC filings, with every number traceable",
+    "ja": "米国上場企業の決算と SEC 提出書類を調べ、すべての数字をたどれるレポートを作成",
+    "ko": "미국 상장사의 재무제표와 SEC 공시를 조사해 모든 숫자를 추적할 수 있는 보고서를 작성",
+    "ru": "Изучает компании США по документам SEC, каждое число в отчёте можно проверить"
+  },
+  "about": {
+    "zh-CN": [
+      "取数记录和原始数据都留在你的工作区；没有股价、PE 和筛选器",
+      "研究流程灵感来自开源项目 Dexter，不含其代码，也无关联。仅供参考，不构成投资建议"
+    ],
+    "en": [
+      "Fetch logs and raw data stay in your workspace. It has no prices, PE ratios or stock screener",
+      "Inspired by the open-source Dexter project, with none of its code and no affiliation. Not investment advice"
+    ],
+    "ja": [
+      "取得記録と元データはワークスペースに残ります。株価、PER、銘柄スクリーナーはありません",
+      "調査の流れはオープンソースの Dexter を参考にしていますが、コードは含まず関係もありません。投資助言ではありません"
+    ],
+    "ko": [
+      "수집 기록과 원본 데이터는 작업 공간에 남습니다. 주가, PER, 종목 스크리너는 없습니다",
+      "조사 흐름은 오픈소스 Dexter에서 착안했지만 코드는 포함하지 않으며 관련도 없습니다. 투자 조언이 아닙니다"
+    ],
+    "ru": [
+      "Журнал запросов и исходные данные остаются в рабочей папке. Котировок, P/E и скринера акций нет",
+      "Процесс вдохновлён открытым проектом Dexter, но его кода здесь нет и связи с ним нет. Это не инвестиционная рекомендация"
+    ]
+  },
+  "avatar": "finance",
+  "permissions": [
+    "workspace-write",
+    "network"
+  ],
+  "starters": {
+    "zh-CN": [
+      "研究英伟达近五年的收入和毛利率趋势，生成报告",
+      "对比微软和 Alphabet 近三年的收入和营业利润率",
+      "读特斯拉最新 10-K 的风险因素，总结最重要的五条"
+    ],
+    "en": [
+      "Research NVIDIA's revenue and gross margin trends over five years into a report",
+      "Compare Microsoft and Alphabet on revenue and operating margin over three years",
+      "Read Tesla's latest 10-K risk factors and summarize the top five"
+    ],
+    "ja": [
+      "NVIDIA の過去 5 年の売上と粗利率の推移を調べてレポートにして",
+      "Microsoft と Alphabet の過去 3 年の売上と営業利益率を比較して",
+      "Tesla の最新の 10-K のリスク要因を読んで、重要な 5 つにまとめて"
+    ],
+    "ko": [
+      "NVIDIA의 최근 5년 매출과 매출총이익률 추이를 조사해 보고서로 만들어 줘",
+      "Microsoft와 Alphabet의 최근 3년 매출과 영업이익률을 비교해 줘",
+      "Tesla 최신 10-K의 위험 요인을 읽고 가장 중요한 다섯 가지로 요약해 줘"
+    ],
+    "ru": [
+      "Изучи динамику выручки и валовой маржи NVIDIA за пять лет и подготовь отчёт",
+      "Сравни выручку и операционную маржу Microsoft и Alphabet за три года",
+      "Прочитай факторы риска в последнем 10-K Tesla и выдели пять главных"
+    ]
+  },
+  "skills": []
+}

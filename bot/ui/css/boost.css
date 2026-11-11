@@ -1,0 +1,57 @@
+@font-face { font-family: 'Bahamas Bold'; src: url('../assets/BAHAMASB.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'Public Sans'; src: url('../assets/public-sans-normal-latin.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+.side-brand > span { font-family: 'Bahamas Bold', sans-serif; font-size: 26px; }
+.side-top > .boost-brand-return { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-right: auto; padding: 0; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+.boost-brand-return:hover { opacity: .78; }
+.side-top.start { height: auto; min-height: calc(var(--pane-gap) + var(--head-h)); flex-wrap: wrap; padding-bottom: 8px; }
+.side-top.start > .boost-brand-return { flex-basis: 100%; }
+.side-list { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.side-list .thread .title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.side-list .catalog-thread { height: auto; min-height: 76px; padding-block: 12px; align-items: flex-start; }
+.side-list .catalog-thread .snip { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.5; }
+.app { height: 100dvh; }
+[data-boost-bot-avatar] { color-scheme: light; }
+:root[data-theme="dark"] [data-boost-bot-avatar] { color-scheme: dark; }
+@layer app { :root { --font-system: 'Public Sans', 'Segoe UI', 'Microsoft YaHei', sans-serif; } }
+
+/* The embedded workspace shares Boost's NutDashboard-inspired Zinc palette. */
+:root[data-theme="light"] {
+  --bg: #fafafa;
+  --side-solid: #fafafa;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --glass-panel: #ffffff;
+  --glass-sheet: #ffffff;
+  --fg: #3f3f46;
+  --fg-2: #52525b;
+  --muted: #71717a;
+  --primary: #0f766e;
+  --primary-hover: #115e59;
+  --primary-press: #134e4a;
+  --on-primary: #ffffff;
+  --accent: #0f766e;
+  --accent-soft: #0f766e14;
+  --send-bg: #0f766e;
+  --send-fg: #ffffff;
+}
+:root[data-theme="dark"] {
+  --bg: #18181b;
+  --side-solid: #18181b;
+  --surface: #18181b;
+  --surface-solid: #18181b;
+  --glass-panel: #18181b;
+  --glass-sheet: #27272a;
+  --glass-pop: #27272a;
+  --glass-chrome: #18181bf0;
+  --fg: #e4e4e7;
+  --fg-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --primary: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-press: #14b8a6;
+  --on-primary: #042f2e;
+  --accent: #2dd4bf;
+  --accent-soft: #2dd4bf14;
+  --send-bg: #2dd4bf;
+  --send-fg: #042f2e;
+}

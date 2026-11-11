@@ -1,0 +1,11 @@
+# Runtime integration
+
+The imported Bot retains conversation streaming and cancellation, bot/group management, memory, approvals, messaging channels, persistent outbox, tasks and rules, file delivery, signed catalog verification, and the DSH tool bridge. Model authentication is supplied only by the Boost host. Independent provider sign-in and gateway reconfiguration are disabled when hosted.
+
+The UI title and visible brand are Boost. License and copyright notices remain in the accompanying license files. Root application graphics use the Boost mascot; raster app/tray icons use a static frame. The left sidebar contains the Boost wordmark and custom animated mascot. The sidebar brand keeps its gentle idle motion when chat avatars are set to static or reduced motion is requested; clicking the mark returns home. There is no added top toolbar. Individual bots keep their original distinct character avatars. Catalog instance summaries wrap fully, and the instance list scrolls within the available viewport. The same shared SVG renderer is compiled into the Vue production bundle and the embedded Bot assets bundled into the desktop resource directory.
+
+Service boundaries are implemented in `backend/service/src/bot/`, Web session proxying in `backend/web/src/bot_proxy.rs`, and desktop IPC in `backend/desktop/src/commands/service.rs`. Bot data is stored below the active Boost database directory as `bots/<actor-scope>/`. Scope names are SHA-256 hashes of the authenticated role and user identity. Bot reuses an existing authorized OpenAI-compatible API key and remembers its id in Boost app settings. Opening/refreshing never creates keys. Disabled keys remain disabled; keys belonging to other users cannot be selected. Secret values remain on the server and are delivered to the Node child through stdin.
+
+Administrator-owned hosts retain the imported tool and channel capabilities. Member hosts disable DSH and reject tool, task, channel-credential and system-configuration mutations server-side. Gateway requests still carry the member-owned API key, enforcing model groups, ownership, billing and quota at the existing gateway.
+
+Build/runtime environment variables are documented in `README.md`. The source trees `bots/`, `src/`, `ui/`, `dsh-runtime/plugins/` and `shared/appearance/` belong to Boost and do not refer to an external checkout at runtime.

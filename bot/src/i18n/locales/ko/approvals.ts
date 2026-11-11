@@ -1,0 +1,25 @@
+import type { TranslatedCatalog } from "../../index.js";
+export default {
+  "noSuchCode": "⚠️ 승인 대기 중인 요청 {code}이(가) 없습니다(만료되었거나 이미 처리되었을 수 있습니다)",
+  "needCode": "요청 {count}개가 승인을 기다립니다. 번호를 포함해 답하세요. 예: y {code}",
+  "expiredOrDone": "⚠️ 요청 {code}은(는) 만료되었거나 이미 처리되었습니다",
+  "approved": "✅ {code} 승인됨(이번만)",
+  "rejected": "❌ {code} 거부됨",
+  "prompt": "승인 필요: {tool}{cmd}{why} — y {code} / n {code}로 답하세요",
+  "promptWhy": "({reason})",
+  "hintMulti": "(한 줄에 한 질문씩 선택지 번호나 답변을 입력하세요)",
+  "hintOptions": "(선택지 번호{multi} 또는 답변을 입력하세요)",
+  "hintOptionsMulti": ", 여러 개라면 쉼표로 구분",
+  "hintFree": "(답변을 입력하세요)",
+  "replyYesNo": "승인하려면 y {code}, 거부하려면 n {code}로 답하세요",
+  "quoteNeedsAnswer": "메시지를 인용할 때 답변을 함께 입력하세요",
+  "alreadyAnswered": "이미 답변한 질문입니다",
+  "taskApproval": "승인 필요(작업 ‘{title}’): {what} — y {code} / n {code}로 답하세요",
+  "taskQuestion": "❓ ‘{title}’의 질문: {question}",
+  "taskHintOptions": "(번호{multi}로 답하거나 이 메시지를 인용해 답하세요)",
+  "taskHintMulti": " 여러 개를 선택할 수 있습니다",
+  "taskHintQuote": "(이 메시지를 인용해 답하세요)",
+  "taskDefault": "답변이 없으면 {answer}(으)로 진행합니다",
+  "allowOnce": "허용(이번만)",
+  "deny": "거부"
+} satisfies TranslatedCatalog["approvals"];

@@ -1,0 +1,23 @@
+// Authored localization. Keep technical identifiers unchanged.
+export default {
+  title: "Требует внимания",
+  head: "{bot}: {what}",
+  headSpaced: "{bot}: {what}",
+  collapse: "Свернуть",
+  viewTask: "Посмотреть задачу",
+  viewRule: "Посмотреть правило",
+  openChat: "Открыть разговор",
+  reply: "Ответить…",
+  approveOnce: "Разрешить один раз",
+  deny: "Отказать",
+  stop: "Остановить",
+  relogin: "Сканировать заново",
+  answerPlaceholder: "Ваш ответ",
+  send: "Отправить",
+  none: "Сейчас ничего не требует вашего внимания",
+  dismiss: "Больше не показывать",
+  continue: "Продолжить",
+  raiseBudget: "Изменить бюджет",
+  toAct: "Перейти к выполнению",
+  keepObserving: "Продолжить наблюдение",
+};

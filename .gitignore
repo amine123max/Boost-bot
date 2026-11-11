@@ -53,6 +53,7 @@ __pycache__/
 *.log
 *.db
 *.sqlite
+/backend/service/selection-all-low-quota-no-fallback-test
 boost.rpc-token
 codex resume*.txt
 .tmp_stage_ps/

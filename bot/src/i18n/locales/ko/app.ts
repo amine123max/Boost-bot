@@ -1,0 +1,26 @@
+import type { TranslatedCatalog } from "../../index.js";
+export default {
+  "external_mode": "외부 모델 엔드포인트를 사용할 때는 OKINTO New API 연결을 관리하지 않습니다",
+  "bot_not_found": "봇을 찾을 수 없습니다",
+  "magpie_failed": "magpie를 시작하지 못했습니다: {message}",
+  "default_bot_name": "내 도우미",
+  "default_bot_prompt": "당신은 유능한 도우미입니다. 간결하고 정확하게 답변하세요.",
+  "feishu_failed": "Feishu 계정 ‘{name}’의 지속 연결을 시작하지 못했습니다: {message}",
+  "messenger_failed": "{channel} 계정 ‘{name}’에 연결할 수 없습니다. 설정 > 연결에서 인증 정보를 확인하세요: {message}",
+  "feishu_history_denied": "Feishu 계정 ‘{name}’이 메시지 기록을 읽을 수 없어 오프라인 동안 보낸 메시지를 가져올 수 없습니다. Feishu Open Platform에서 앱에 im:message.history:readonly 권한을 부여하세요.",
+  "weixin_expired": "WeChat 계정 ‘{name}’의 로그인이 만료되었습니다. 설정 > 연결에서 QR 코드를 다시 스캔하세요",
+  "weixin_connected": "WeChat 계정 ‘{name}’ 연결됨",
+  "weixin_account_name": "WeChat",
+  "feishu_account_name": "Feishu",
+  "media_image": "이미지",
+  "media_file": "파일",
+  "media_video": "동영상",
+  "media_quoted_image": "인용한 이미지",
+  "media_quoted_file": "인용한 파일",
+  "media_quoted_video": "인용한 동영상",
+  "media_voice": "[음성]",
+  "media_not_downloaded": "{label}(다운로드 실패: {error})",
+  "weixinExpiredSubject": "WeChat 로그인 만료",
+  "data_dir_locked": "다른 Boost 프로세스({who})가 데이터 폴더 {dir}을(를) 사용하고 있습니다. 해당 프로세스를 종료하거나 다른 데이터 폴더(AMB_DATA_DIR)를 사용하세요.",
+  "data_dir_locked_remote": "{host}의 pid {pid}"
+} satisfies TranslatedCatalog["app"];
