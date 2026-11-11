@@ -63,11 +63,9 @@ def main():
             **os.environ, "TEMP": str(scratch), "TMP": str(scratch), "TMPDIR": str(scratch),
             "BOOST_EMBEDDED_BOT_ARCHIVE": str(archive), "BOOST_EMBEDDED_BOT_DIGEST": digest.hexdigest(),
         }
-        command = ["cargo", "tauri", "build", "--features", "portable-runtime", "--no-bundle",
-                   "--config", json.dumps({"build": {"beforeBuildCommand": ""}})]
+        command = ["cargo", "build", "--release", "--features", "portable-runtime", "--bin", "Boost", "--locked"]
         if args.target:
             command.extend(["--target", args.target])
-        command.extend(["--", "--locked"])
         subprocess.run(command, cwd=ROOT / "backend/desktop", env=env, check=True)
         release = ROOT / "backend/desktop/target"
         if args.target:
