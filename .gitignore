@@ -1,0 +1,85 @@
+# Rust
+/target/
+**/target/
+**/*.rs.bk
+
+# Tauri
+/backend/desktop/target/
+/backend/desktop/gen/
+/backend/desktop/bin/*.exe
+/backend/desktop/bin/*.dll
+/backend/desktop/bin/*.pdb
+
+# Node/Vite
+/node_modules/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/.turbo/
+# Build outputs
+/portable/
+/output/
+/artifacts/
+
+# Local credentials, diagnostics and disposable caches
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.pdb
+*.ilk
+*.dmp
+*.pyc
+__pycache__/
+.pytest_cache/
+.cache/
+*.tsbuildinfo
+
+# Worktrees
+/.worktrees/
+/.tmp-antigravity-manager*/
+
+# Documentation sources and screenshots are versioned.
+/docs/**/*.tmp.md
+/docs/**/*.local.md
+/specs/
+
+# Logs & local data
+/data/
+*.log
+*.db
+*.sqlite
+boost.rpc-token
+codex resume*.txt
+.tmp_stage_ps/
+.tmp_stage_sh/
+.codex-manager-run/
+
+# IDE/editor files
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+codex resume 019cbbf9-0037-73b1-b353-1cd0946a1acd
+# claude
+.claude
+
+# Project-local temporary work
+/tmp/
+/frontend/out/
+/frontend/.next/
+/frontend/test-results/
+/frontend/playwright-report/
+
+# Embedded Boost Bot runtime dependencies and generated assets
+/bot/node_modules/
+/bot/dist/
+/bot/build/
+/bot/bin/
+/bot/ui/boost-appearance/
+/bot/dsh-runtime/node_modules/
