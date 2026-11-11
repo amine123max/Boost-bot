@@ -422,6 +422,7 @@ fn stage_portable_payload(
     payload_path: &Path,
     payload_name: &str,
     staging_dir: &Path,
+    current_exe_name: &str,
 ) -> Result<(), String> {
     let extension = payload_path
         .extension()
@@ -433,7 +434,12 @@ fn stage_portable_payload(
         return extract_zip_archive(payload_path, staging_dir);
     }
 
-    let file_name = Path::new(payload_name)
+    let staged_name = if cfg!(windows) && extension == "exe" {
+        current_exe_name
+    } else {
+        payload_name
+    };
+    let file_name = Path::new(staged_name)
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or_else(|| format!("无法解析便携更新文件名：{payload_name}"))?;
@@ -759,12 +765,17 @@ pub(super) fn prepare_update_impl(app: &tauri::AppHandle) -> Result<UpdatePrepar
             fs::remove_dir_all(&staging_dir).map_err(|err| format!("清理暂存目录失败：{err}"))?;
         }
         fs::create_dir_all(&staging_dir).map_err(|err| format!("创建暂存目录失败：{err}"))?;
-        stage_portable_payload(&payload_path, &payload_asset.name, &staging_dir)?;
         let current_exe_name = current_exe_path()?
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| "解析当前可执行文件名失败".to_string())?
             .to_string();
+        stage_portable_payload(
+            &payload_path,
+            &payload_asset.name,
+            &staging_dir,
+            &current_exe_name,
+        )?;
         let _ = resolve_portable_restart_exe(&staging_dir, &current_exe_name)?;
         pending.staging_dir = Some(staging_dir.display().to_string());
     } else {
@@ -883,6 +894,48 @@ mod tests {
             "Boost_0.5.0_x64-setup.exe"
         );
         assert!(super::select_payload_asset("installer", "0.5.0", &assets[..1]).is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn versioned_portable_exe_updates_replace_the_current_file_name() {
+        use std::{
+            fs,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let root = parent.join(format!(
+            "boost-versioned-update-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let staging = root.join("staging");
+        fs::create_dir_all(&staging).unwrap();
+        let payload = root.join("Boost_0.5.1_x64.exe");
+        fs::write(&payload, b"new desktop executable").unwrap();
+        super::stage_portable_payload(
+            &payload,
+            "Boost_0.5.1_x64.exe",
+            &staging,
+            "Boost_0.5.0_x64.exe",
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read(staging.join("Boost_0.5.0_x64.exe")).unwrap(),
+            b"new desktop executable"
+        );
+        assert_eq!(
+            super::resolve_portable_restart_exe(&staging, "Boost_0.5.0_x64.exe").unwrap(),
+            "Boost_0.5.0_x64.exe"
+        );
+        assert!(!staging.join("Boost_0.5.1_x64.exe").exists());
+        assert_eq!(
+            root.canonicalize().unwrap().parent(),
+            Some(parent.as_path())
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     /// 函数 `sanitize_tag_replaces_unsafe_characters`

@@ -82,6 +82,8 @@ node scripts/check-release-version.mjs v0.5.0
 
 After preparing the Bot runtime and frontend on Windows, run `python scripts/package-portable.py` to build `output/Boost_0.5.0_x64.exe`. Pass `--target x86_64-pc-windows-msvc` for an explicit Rust target. The portable Cargo feature embeds the complete Bot runtime inside the native desktop executable; first launch extracts it into the application's versioned runtime cache. No manual extraction or installation is required. Build the NSIS installer before this command, using the normal desktop feature set.
 
+The packaging script sets `BOOST_EMBEDDED_BOT_ARCHIVE` and `BOOST_EMBEDDED_BOT_DIGEST` only for the portable Cargo build. They identify the project-local temporary runtime archive and its SHA-256 cache key; users do not need to configure them when launching the desktop program.
+
 Version fields must match across the root Cargo workspace, native desktop manifest/configuration and frontend package. Build jobs define intended targets; validate platform-specific artifacts before distributing them. Update behavior and release configuration are documented in [中文](zh-CN/release/自动更新与GitHub发布.md) and [English](en/report/app-updates-and-releases.md).
 
 ## Verification and screenshots
