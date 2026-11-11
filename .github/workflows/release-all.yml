@@ -50,7 +50,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
-      - run: mkdir -p "$TMPDIR"
+      - name: Prepare Windows temporary directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path $env:TMPDIR -Force | Out-Null
+      - name: Prepare Unix temporary directory
+        if: runner.os != 'Windows'
+        run: mkdir -p "$TMPDIR"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
