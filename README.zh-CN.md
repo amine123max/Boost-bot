@@ -32,9 +32,8 @@ Boost 将 AI 账号、模型路由、平台密钥、用量监控与内置智能�
 
 | 平台 | 发布格式 |
 | --- | --- |
-| Windows x64 | NSIS 安装程序（`.exe`） |
-| macOS Intel / Apple Silicon | 磁盘映像（`.dmg`） |
-| Linux x64 | Debian 安装包（`.deb`）/ AppImage |
+| Windows x64 | NSIS 安装程序（`.exe`）/ 免安装压缩包（`.zip`） |
+| macOS Apple Silicon | 磁盘映像（`.dmg`）/ 免安装应用压缩包（`.zip`） |
 
 以上为发布工作流定义的打包目标，具体下载内容以已发布版本为准。
 

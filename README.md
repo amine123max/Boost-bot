@@ -32,9 +32,8 @@ The Release badge reads the latest published version directly from GitHub. Versi
 
 | Platform | Release format |
 | --- | --- |
-| Windows x64 | NSIS installer (`.exe`) |
-| macOS Intel / Apple Silicon | Disk image (`.dmg`) |
-| Linux x64 | Debian package (`.deb`) / AppImage |
+| Windows x64 | NSIS installer (`.exe`) / portable archive (`.zip`) |
+| macOS Apple Silicon | Disk image (`.dmg`) / portable app archive (`.zip`) |
 
 These are the packaging targets defined by the release workflow. Download availability follows the published release.
 
