@@ -1,3 +1,5 @@
+@property --bot-task-progress-hue { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+@property --bot-task-progress-sweep { syntax: "<angle>"; inherits: true; initial-value: 86.4deg; }
 .tray-page {
   --tray-ring-size: 32px;
   --tray-bg: var(--sidebar); --tray-text: var(--text); --tray-muted: var(--muted);
@@ -33,9 +35,11 @@
 .tray-quota-ring.low .tray-ring-value { stroke: var(--tray-danger); }
 .tray-quota-ring.unknown .tray-ring-track { stroke-dasharray: 2 3; }
 .tray-tps-ring { color: var(--tray-text); }
-.tray-tps-ring circle { fill: none; stroke-width: 1.7; }
-.tray-tps-ring .tps-arc { stroke: var(--tps-color, var(--tray-muted)); stroke-linecap: round; transform-origin: center; animation: tray-tps-orbit var(--tps-duration, 3s) linear infinite; transition: stroke 500ms ease; }
-.tray-tps-ring > span { display: grid; place-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
+.tray-tps-ring .tps-track, .tray-tps-ring .tps-arc { position: absolute; inset: 1px; border-radius: 50%; }
+.tray-tps-ring .tps-track { border: 1.7px solid var(--tray-line); }
+.tray-tps-ring .tps-arc { background: conic-gradient(#ef4444 0deg 86deg, transparent 86deg 1turn); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px)); transform-origin: center; filter: hue-rotate(var(--tps-hue, 0deg)); transition: filter 500ms ease; }
+.tray-tps-ring .tps-arc.is-unknown { filter: grayscale(1); }
+.tray-tps-ring .tps-reading { position: relative; z-index: 1; display: grid; place-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
 .tray-tps-ring strong { font-size: 9px; font-weight: 500; }
 .tray-tps-ring small { font-size: 6px; color: var(--tray-muted); }
 .tray-rail-metrics { display: grid; gap: 0; width: 100%; padding-top: 3px; border-top: 1px solid var(--tray-line); }
@@ -53,5 +57,4 @@
 .tray-rail.is-horizontal .tray-rail-metrics { flex: 1; min-width: 40px; max-width: 44px; width: auto; border-top: 0; border-left: 1px solid var(--tray-line); padding: 0 0 0 4px; }
 .tray-rail.is-horizontal .tray-drag-handle { top: 50%; left: 3px; width: 2px; height: 12px; transform: translateY(-50%); }
 .tray-rail.is-horizontal.is-top .tray-drag-handle { top: auto; bottom: 3px; left: 50%; width: 14px; height: 2px; transform: translateX(-50%); }
-@keyframes tray-tps-orbit { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .tray-tps-ring .tps-arc { animation: none; } .tray-ring-value { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tray-ring-value { transition: none; } }

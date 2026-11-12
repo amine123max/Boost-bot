@@ -8,6 +8,7 @@ async function desktop(
     portable?: boolean;
     failure?: string;
     localTps?: number;
+    progressPercent?: number;
     activityState?: 'idle' | 'working' | 'waiting' | 'done' | 'failed' | 'stopped';
     dockEdge?: "top" | "left" | "right";
   } = {},
@@ -17,6 +18,8 @@ async function desktop(
       auto: options.auto ?? true,
       available: options.available ?? true,
       portable: options.portable ?? false,
+      localTps: options.localTps ?? null,
+      progressPercent: options.progressPercent ?? 40,
       dailyTrafficCleanupEnabled:
         localStorage.getItem("test.dailyTrafficCleanupEnabled") !== "false",
       failure: options.failure || "",
@@ -59,7 +62,7 @@ async function desktop(
             return { edge: options.dockEdge || "floating", horizontal: options.dockEdge === "top" };
           case "app_local_agent_activity": {
             const activityState = options.activityState || (options.localTps == null ? "idle" : "working");
-            return { available: true, state: activityState, percent: activityState === "done" ? 100 : activityState === "idle" ? null : 40, activeTasks: activityState === "working" || activityState === "waiting" ? 1 : 0, waitingTasks: activityState === "waiting" ? 1 : 0, tokensPerSecond: options.localTps ?? null };
+            return { available: true, state: activityState, percent: activityState === "done" ? 100 : activityState === "idle" ? null : state.progressPercent, activeTasks: activityState === "working" || activityState === "waiting" ? 1 : 0, waitingTasks: activityState === "waiting" ? 1 : 0, tokensPerSecond: state.localTps };
           }
           case "app_main_window_close":
             (window as any).__closeChoice = args;
@@ -391,22 +394,28 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   const side = page.locator('.tray-rail');
   await expect(side).toHaveClass(/is-right/);
   await expect(page.locator('[data-boost-bot-avatar]')).toHaveAttribute('data-bot-motion', 'gentle');
+  await expect.poll(() => page.locator('.tps-arc').evaluate(element =>
+    element.getAnimations().find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+  )).toBe(20);
   const sideGeometry = await page.evaluate(() => ({
     rings: ['.tray-logo', '.tray-quota-ring', '.tray-tps-ring'].map(selector =>
       document.querySelector(selector)!.getBoundingClientRect().width),
     progress: document.querySelector('.bot-task-progress')!.getBoundingClientRect().width,
     avatar: Number.parseFloat(getComputedStyle(document.querySelector('[data-boost-bot-avatar]')!).width),
     motion: document.querySelector('[data-boost-bot-avatar]')!.getAttribute('data-bot-motion'),
-    duration: getComputedStyle(document.querySelector('.tps-arc')!).animationDuration,
-    progressColor: getComputedStyle(document.querySelector('.bot-task-arc')!).stroke,
+    playbackRate: document.querySelector('.tps-arc')!.getAnimations()
+      .find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+    progressColor: getComputedStyle(document.querySelector('.bot-task-ring')!).getPropertyValue('--bot-task-progress-hue'),
+    progressTransition: getComputedStyle(document.querySelector('.bot-task-ring')!).transitionProperty,
   }));
   expect(sideGeometry.rings).toEqual([32, 32, 32]);
   expect(sideGeometry.progress).toBe(32);
   expect(sideGeometry.avatar).toBe(26);
   expect(sideGeometry.avatar).toBeLessThan(sideGeometry.progress);
   expect(sideGeometry.motion).toBe('gentle');
-  expect(sideGeometry.duration).toBe('3s');
-  expect(sideGeometry.progressColor).not.toBe('rgb(141, 146, 157)');
+  expect(sideGeometry.playbackRate).toBe(20);
+  expect(sideGeometry.progressColor).toBe('48deg');
+  expect(sideGeometry.progressTransition).toContain('--bot-task-progress-hue');
 
   const valuesPage = await page.context().newPage();
   await valuesPage.setViewportSize({ width: 64, height: 157 });
@@ -418,7 +427,42 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   await expect(valuesPage.locator('.bot-task-number')).toHaveText('40');
   await expect(valuesPage.locator('.tray-tps-ring strong')).toHaveText('20');
   await expect(valuesPage.locator('.tray-tps-ring')).toHaveAttribute('aria-label', 'TPS 20.0 TPS');
-  await expect(valuesPage.locator('.tps-arc')).toHaveCSS('animation-duration', '3s');
+  await expect.poll(() => valuesPage.locator('.tps-arc').evaluate(element =>
+    element.getAnimations().find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+  )).toBe(20);
+  const initialProgressHue = await valuesPage.locator('.bot-task-ring')
+    .evaluate(element => getComputedStyle(element).getPropertyValue('--bot-task-progress-hue'));
+  const initialProgressBackground = await valuesPage.locator('.bot-task-arc')
+    .evaluate(element => getComputedStyle(element).backgroundImage);
+  expect(initialProgressHue).toBe('48deg');
+  expect(initialProgressBackground).toContain('conic-gradient');
+  expect(initialProgressBackground).not.toContain('url(');
+  const initialOrbit = await valuesPage.locator('.tps-arc').evaluate(element => ({
+    playbackRate: element.getAnimations()
+      .find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+    currentTime: Number(element.getAnimations()
+      .find(animation => animation.id === 'tray-tps-orbit')?.currentTime ?? 0),
+  }));
+  expect(initialOrbit.playbackRate).toBe(20);
+  await valuesPage.evaluate(() => {
+    const fixture = (window as any).__updateFixture;
+    fixture.localTps = 40;
+    fixture.progressPercent = 80;
+  });
+  await expect.poll(() => valuesPage.locator('.tps-arc').evaluate(element =>
+    element.getAnimations().find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+  )).toBe(40);
+  await expect.poll(() => valuesPage.locator('.bot-task-ring')
+    .evaluate(element => getComputedStyle(element).getPropertyValue('--bot-task-progress-hue'))).toBe('96deg');
+  await expect.poll(() => valuesPage.locator('.bot-task-arc')
+    .evaluate(element => getComputedStyle(element).backgroundImage)).not.toBe(initialProgressBackground);
+  const updatedOrbit = await valuesPage.locator('.tps-arc').evaluate(element => ({
+    playbackRate: element.getAnimations()
+      .find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+    currentTime: Number(element.getAnimations()
+      .find(animation => animation.id === 'tray-tps-orbit')?.currentTime ?? 0),
+  }));
+  expect(updatedOrbit.currentTime).toBeGreaterThan(initialOrbit.currentTime);
   await valuesPage.close();
 
   const topPage = await page.context().newPage();
@@ -434,7 +478,9 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   });
   await topPage.goto('/tray-preview/');
   await expect(topPage.locator('.tray-rail')).toHaveClass(/is-top/);
-  await expect(topPage.locator('.tps-arc')).toHaveCSS('animation-duration', '1.5s');
+  await expect.poll(() => topPage.locator('.tps-arc').evaluate(element =>
+    element.getAnimations().find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+  )).toBe(40);
   const topSizes = await topPage.locator('.tray-logo, .tray-quota-ring, .tray-tps-ring').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().width));
   expect(topSizes).toEqual(sideGeometry.rings);
@@ -453,6 +499,12 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   await expect(doneProgress).toHaveAttribute('data-task-state', 'done');
   await expect(doneProgress.locator('.bot-task-number')).toHaveText('100');
   await expect(donePage.locator('.bot-task-complete-dot')).toBeVisible();
-  await expect(donePage.locator('.bot-task-arc')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
+  const completedBackground = await donePage.locator('.bot-task-arc')
+    .evaluate(element => getComputedStyle(element).backgroundImage);
+  expect(completedBackground).toContain('rgb(34, 197, 94)');
+  expect(completedBackground).not.toContain('url(');
+  await expect.poll(() => donePage.locator('.tps-arc').evaluate(element =>
+    element.getAnimations().find(animation => animation.id === 'tray-tps-orbit')?.playbackRate,
+  )).toBe(20);
   await donePage.close();
 });

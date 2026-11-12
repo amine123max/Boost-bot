@@ -27,6 +27,7 @@ async function change(event: Event) {
     <CountryFlag
       :code="node?.countryCode || ''"
       :country="node?.country || '跟随全局策略'"
+      :icon-size="16"
     />
     <select
       :value="binding"

@@ -23,8 +23,13 @@ const progressColor = computed(() => {
   const hue = 142 * Math.min(1, Math.max(0, progress.value) / 100);
   return `hsl(${hue} 71% 45%)`;
 });
-const ringProgress = computed(() =>
-  progress.value === 0 ? 1.5 : progress.value,
+const progressSweep = computed(() =>
+  progress.value == null
+    ? 86.4
+    : Math.max(5.4, Math.min(100, progress.value)) * 3.6,
+);
+const progressHue = computed(() =>
+  120 * Math.min(1, Math.max(0, progress.value ?? 0) / 100),
 );
 </script>
 <template>
@@ -43,19 +48,22 @@ const ringProgress = computed(() =>
     :data-task-state="activity.state"
     :style="{ color: progressColor }"
   >
-    <svg class="bot-task-ring" viewBox="0 0 48 48" aria-hidden="true">
-      <circle class="bot-task-track" cx="24" cy="24" r="21" />
-      <circle
+    <span
+      class="bot-task-ring"
+      aria-hidden="true"
+      :style="{
+        '--bot-task-progress-hue': `${activity.state === 'done' ? 120 : progressHue}deg`,
+        '--bot-task-progress-sweep': `${progressSweep}deg`,
+      }"
+      :data-progress="progress ?? 'unknown'"
+    >
+      <span class="bot-task-track" />
+      <span
         v-if="activity.state !== 'idle' && activity.state !== 'unavailable'"
         class="bot-task-arc"
-        cx="24"
-        cy="24"
-        r="21"
-        pathLength="100"
-        :stroke-dasharray="ringProgress == null ? '24 76' : '100'"
-        :stroke-dashoffset="ringProgress == null ? 0 : 100 - ringProgress"
+        :class="{ 'is-unknown': progress == null }"
       />
-    </svg>
+    </span>
     <strong
       v-if="showValue && progress != null"
       class="bot-task-number"
@@ -101,23 +109,46 @@ const ringProgress = computed(() =>
 .bot-task-ring {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-.bot-task-ring circle {
-  fill: none;
-  stroke-width: 2;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  pointer-events: none;
+  transition:
+    --bot-task-progress-hue 500ms ease,
+    --bot-task-progress-sweep 500ms ease;
 }
 .bot-task-track {
-  stroke: currentColor;
+  position: absolute;
+  inset: 1px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
   opacity: 0.12;
 }
 .bot-task-arc {
-  stroke: currentColor;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 500ms ease, stroke 500ms ease;
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    hsl(0 82% 48%) 0deg,
+    hsl(calc(var(--bot-task-progress-hue) / 2) 82% 48%) calc(var(--bot-task-progress-sweep) / 2),
+    hsl(var(--bot-task-progress-hue) 82% 48%) var(--bot-task-progress-sweep),
+    transparent var(--bot-task-progress-sweep) 1turn
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
+}
+.bot-task-progress.done .bot-task-arc {
+  background: conic-gradient(from -90deg, #22c55e 0deg, #22c55e 1turn);
+}
+.bot-task-progress.failed .bot-task-arc {
+  background: conic-gradient(from -90deg, #ef4444 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
+}
+.bot-task-progress.waiting .bot-task-arc {
+  background: conic-gradient(from -90deg, #e9ac43 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
+}
+.bot-task-arc.is-unknown {
+  background: conic-gradient(from -90deg, var(--tray-muted, #8d929d) 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
 }
 .bot-task-complete-dot {
   position: absolute;

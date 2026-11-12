@@ -290,6 +290,8 @@ test('network workbench imports flagged cards, tests speed, selects strategy, bi
   await page.getByRole('dialog').getByRole('button', { name: '添加代理', exact: true }).click();
   await expect(cards).toHaveCount(4);
   await expect(cards.last().locator('img.country-flag')).toHaveAttribute('src', '/boost-assets/flags/jp.svg');
+  state.nodes.push({ id: 'unknown', name: '未知节点', countryCode: '', country: '', protocol: 'http', latencyMs: null, measurement: {} });
+  await cards.first().locator('h3').dblclick();
   await page.getByRole('button', { name: '内核管理', exact: true }).click();
   await page.getByRole('menuitem', { name: '自动更新设置', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -303,6 +305,9 @@ test('network workbench imports flagged cards, tests speed, selects strategy, bi
   await expect(dialog).toContainText('1.14.4');
   await page.keyboard.press('Escape');
   await page.getByRole('link', { name: '账号管理', exact: true }).click();
+  await page.getByLabel('账号 a1 的代理节点', { exact: true }).selectOption('unknown');
+  await expect(page.getByLabel('账号 a1 的代理节点', { exact: true })).toHaveValue('unknown');
+  await expect(page.locator('.account-node-control .boost-icon').first()).toHaveCSS('width', '16px');
   await page.getByLabel('账号 a1 的代理节点', { exact: true }).selectOption('jp1');
   await expect(page.getByLabel('账号 a1 的代理节点', { exact: true })).toHaveValue('jp1');
   await page.reload();

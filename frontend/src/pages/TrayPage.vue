@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import BoostIcon from "@/components/BoostIcon.vue";
 import BotTaskProgress from "@/components/BotTaskProgress.vue";
 import { useBotActivity } from "@/composables/useBotActivity";
@@ -56,14 +56,30 @@ const primary = computed(() =>
   ),
 );
 const tps = computed(() => activity.value.tokensPerSecond);
-const tpsAnimationDuration = computed(() =>
-  tps.value == null ? "3s" : `${60 / Math.max(tps.value, 1)}s`,
-);
-const tpsColor = computed(() => {
-  const speed = tps.value;
-  if (speed == null || !Number.isFinite(speed)) return "var(--tray-muted)";
-  const hue = 120 * Math.min(1, Math.max(0, speed) / 40);
-  return `hsl(${hue} 78% 54%)`;
+const tpsKnown = computed(() => tps.value != null && Number.isFinite(tps.value));
+const tpsArc = ref<HTMLElement | null>(null);
+let tpsOrbit: Animation | undefined;
+function syncTpsOrbitSpeed() {
+  if (!tpsOrbit) return;
+  tpsOrbit.updatePlaybackRate(tpsKnown.value ? Math.max(0, tps.value!) : 20);
+}
+watch(tpsArc, (arc) => {
+  tpsOrbit?.cancel();
+  tpsOrbit = undefined;
+  if (!arc) return;
+  tpsOrbit = arc.animate(
+    [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
+    { duration: 60_000, iterations: Infinity, easing: "linear" },
+  );
+  tpsOrbit.id = "tray-tps-orbit";
+  syncTpsOrbitSpeed();
+}, { flush: "post" });
+watch(tps, syncTpsOrbitSpeed);
+onBeforeUnmount(() => tpsOrbit?.cancel());
+const tpsHue = computed(() => {
+  if (!tpsKnown.value) return 0;
+  const speed = tps.value!;
+  return 120 * Math.min(1, Math.max(0, speed) / 40);
 });
 const tpsLabel = computed(() =>
   tps.value == null
@@ -198,24 +214,20 @@ const metrics = computed(() =>
       <div
         v-if="trayPreferences.showTps"
         class="tray-tps-ring"
-        :style="{ '--tps-duration': tpsAnimationDuration }"
         role="img"
         :aria-label="`TPS ${tps == null ? '暂无数据' : tps.toFixed(1) + ' TPS'}`"
         title="最近输出速率 · tokens/s"
       >
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <circle class="tps-track" cx="16" cy="16" r="14" />
-          <circle
-            class="tps-arc"
-            cx="16"
-            cy="16"
-            r="14"
-            pathLength="100"
-            stroke-dasharray="24 76"
-            :style="{ '--tps-color': tpsColor }"
-          />
-        </svg>
+        <span class="tps-track" aria-hidden="true" />
+        <span
+          ref="tpsArc"
+          class="tps-arc"
+          :class="{ 'is-unknown': !tpsKnown }"
+          :style="{ '--tps-hue': `${tpsHue}deg` }"
+          aria-hidden="true"
+        />
         <span v-if="trayPreferences.showRingValues"
+          class="tps-reading"
           ><strong>{{ tpsLabel }}</strong
           ><small>TPS</small></span
         >
