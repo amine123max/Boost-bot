@@ -15,9 +15,6 @@ import { appUpdates } from "@/composables/useAppUpdates";
     <div class="detail-line">
       <span>新版本</span><strong>{{ appUpdates.check.latestVersion }}</strong>
     </div>
-    <p class="hint">
-      {{ appUpdates.check.reason || "更新可用。下载完成后，点击安装更新。" }}
-    </p>
     <p v-if="appUpdates.error" role="alert">{{ appUpdates.error }}</p>
     <template #footer>
       <button class="secondary" @click="appUpdates.dialogOpen = false">

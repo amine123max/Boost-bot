@@ -47,13 +47,13 @@ fn resolve_redirect_uri_prefers_login_server() {
 
     std::env::remove_var("BOOST_REDIRECT_URI");
     std::env::set_var("BOOST_LOGIN_ADDR", "127.0.0.1:0");
-    std::env::set_var("BOOST_SERVICE_ADDR", "localhost:48760");
+    std::env::set_var("BOOST_SERVICE_ADDR", "localhost:12580");
 
     let uri = resolve_redirect_uri().expect("redirect uri");
     let url = Url::parse(&uri).expect("parse redirect uri");
     assert_eq!(url.host_str(), Some("localhost"));
     let port = url.port_or_known_default().expect("port");
-    assert_ne!(port, 48760);
+    assert_ne!(port, 12580);
     assert_eq!(url.path(), "/auth/callback");
 
     match prev_redirect {

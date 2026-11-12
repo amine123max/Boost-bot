@@ -361,6 +361,7 @@ export class AgentManager {
         id,
         state: this.approvals.pendingChat(id).length ? "waiting" : "working",
         percent: turn.activity.progress,
+        tokensPerSecond: turn.activity.outputTps(now),
         updatedAt: now,
       })),
       ...this.recentTaskProgress,
@@ -369,7 +370,7 @@ export class AgentManager {
 
   private recordTaskEnding(id: string, turn: TurnProgress, state: TaskProgress["state"]) {
     this.recentTaskProgress = [
-      { id, state, percent: state === "done" ? 100 : turn.activity.progress, updatedAt: Date.now() },
+      { id, state, percent: state === "done" ? 100 : turn.activity.progress, tokensPerSecond: turn.activity.outputTps(), updatedAt: Date.now() },
       ...this.recentTaskProgress.filter(task => task.id !== id),
     ].slice(0, 32);
   }

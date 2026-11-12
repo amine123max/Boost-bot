@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "./HelpHint.vue";
 import { computed, ref, onMounted, watch } from "vue";
 import type { ApiKey, ApiKeyOwner, AppUser } from "@/types";
 import { accountClient } from "@/lib/api/account-client";
@@ -187,7 +188,7 @@ async function save() {
         >名称<input v-model="name" required placeholder="例如：桌面客户端"
       /></label>
       <label v-if="memberOwnershipEnabled" class="form-field"
-        >归属成员<select
+        ><span>归属成员<HelpHint label="归属成员" :text="distributionEnabled ? '额度分发开启时，密钥必须归属到一个成员。' : '可先不分配；开启额度分发后再补齐归属。'" /></span><select aria-label="归属成员"
           v-model="ownerUserId"
           :disabled="!eligibleUsers.length"
         >
@@ -201,11 +202,7 @@ async function save() {
                 : user.username
             }}
           </option></select
-        ><small>{{
-          distributionEnabled
-            ? "额度分发开启时，密钥必须归属到一个成员。"
-            : "可先不分配；开启额度分发后再补齐归属。"
-        }}</small></label
+        ></label
       >
       <div class="form-two">
         <label class="form-field"

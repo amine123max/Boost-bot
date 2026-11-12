@@ -2011,6 +2011,7 @@ export function normalizeAppSettings(payload: unknown): AppSettings {
   const source = asObject(payload);
   return {
     updateAutoCheck: asBoolean(source.updateAutoCheck, true),
+    mainWindowCloseAction: (["exit", "floating", "minimize"].includes(asString(source.mainWindowCloseAction)) ? source.mainWindowCloseAction : "ask") as AppSettings["mainWindowCloseAction"],
     closeToTrayOnClose: asBoolean(source.closeToTrayOnClose, false),
     closeToTraySupported: asBoolean(source.closeToTraySupported, false),
     lowTransparency: asBoolean(source.lowTransparency, false),
@@ -2035,7 +2036,7 @@ export function normalizeAppSettings(payload: unknown): AppSettings {
     localeOptions: asArray(source.localeOptions)
       .map((item) => asString(item))
       .filter(Boolean),
-    serviceAddr: asString(source.serviceAddr) || "localhost:48760",
+    serviceAddr: asString(source.serviceAddr) || "localhost:12580",
     serviceListenMode: asString(source.serviceListenMode) || "loopback",
     serviceListenModeOptions: asArray(source.serviceListenModeOptions).map(
       (item) => asString(item),

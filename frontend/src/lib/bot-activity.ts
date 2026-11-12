@@ -8,6 +8,9 @@ export type BotActivityState =
   | "unavailable";
 export interface BotActivity {
   available: boolean;
+  stale?: boolean;
+  sources?: string[];
+  tokensPerSecond?: number | null;
   state: BotActivityState;
   percent: number | null;
   activeTasks: number;
@@ -29,6 +32,9 @@ export function readBotActivity(value: unknown): BotActivity {
     source.percent <= 100;
   return {
     available: source.available === true && state !== "unavailable",
+    stale: source.stale === true,
+    tokensPerSecond: typeof source.tokensPerSecond === "number" && Number.isFinite(source.tokensPerSecond) && source.tokensPerSecond >= 0 ? source.tokensPerSecond : null,
+    sources: Array.isArray(source.sources) ? source.sources.filter((v): v is string => typeof v === "string") : [],
     state,
     percent:
       state === "done"
@@ -47,4 +53,13 @@ export function readBotActivity(value: unknown): BotActivity {
         ? Math.max(0, Math.floor(source.waitingTasks))
         : 0,
   };
+}
+
+export function mergeActivities(values: BotActivity[]): BotActivity {
+  const live = values.filter(v => v.available);
+  const active = live.filter(v => v.state === "working" || v.state === "waiting");
+  const selected = active.find(v => v.state === "waiting") || active[0] || live.find(v => ["done", "failed", "stopped"].includes(v.state)) || live[0];
+  const activeTasks = active.reduce((n, v) => n + v.activeTasks, 0);
+  const rates = live.map(v => v.tokensPerSecond).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0);
+  return { ...readBotActivity(selected), tokensPerSecond: rates.length ? rates.reduce((sum, value) => sum + value, 0) : null, activeTasks, waitingTasks: active.reduce((n, v) => n + v.waitingTasks, 0), percent: activeTasks > 1 ? null : selected?.percent ?? null };
 }

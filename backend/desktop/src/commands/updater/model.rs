@@ -58,6 +58,8 @@ pub struct UpdateActionResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PendingUpdate {
+    #[serde(default)]
+    pub(crate) repo: String,
     pub(crate) mode: String,
     pub(crate) is_portable: bool,
     pub(crate) release_tag: String,

@@ -38,6 +38,7 @@ export interface QuotaGuardSettings {
 
 export interface AppSettings {
   updateAutoCheck: boolean;
+  mainWindowCloseAction: "ask" | "exit" | "floating" | "minimize";
   closeToTrayOnClose: boolean;
   closeToTraySupported: boolean;
   lowTransparency: boolean;

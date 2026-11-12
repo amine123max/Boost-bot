@@ -192,6 +192,7 @@ pub(super) fn current_app_settings_value(
 
     let mut result = serde_json::json!({
         "updateAutoCheck": update_auto_check,
+        "mainWindowCloseAction": crate::app_settings::current_main_window_close_action(),
         "closeToTrayOnClose": close_to_tray,
         "closeToTraySupported": close_to_tray_supported,
         "lightweightModeOnCloseToTray": lightweight_mode_on_close_to_tray,

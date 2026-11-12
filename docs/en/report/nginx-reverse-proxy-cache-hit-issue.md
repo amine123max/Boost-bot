@@ -147,8 +147,8 @@ See:
 
 The sample covers:
 
-- `manager.example.com -> boost-service:48760`
-- `web.example.com -> boost-web:12580`
+- `manager.example.com -> boost-service:12580`
+- `web.example.com -> boost-web:12000`
 - HTTPS redirect
 - underscore header support
 - explicit session header forwarding

@@ -122,8 +122,8 @@ send_timeout 3600s;
 
 Пример покрывает:
 
-- `manager.example.com -> boost-service:48760`
-- `web.example.com -> boost-web:12580`
+- `manager.example.com -> boost-service:12580`
+- `web.example.com -> boost-web:12000`
 - HTTPS redirect
 - поддержку заголовков с подчеркиванием
 - явную передачу session-заголовков

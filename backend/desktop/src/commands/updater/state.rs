@@ -150,6 +150,9 @@ pub(super) fn read_pending_update(app: &tauri::AppHandle) -> Result<Option<Pendi
     let parsed = serde_json::from_slice::<PendingUpdate>(&bytes)
         .map_err(|err| format!("解析待安装更新信息失败：{err}"))?;
     let target = super::runtime::normalize_version(&parsed.latest_version)?;
+    if parsed.repo != super::runtime::resolve_update_repo() {
+        return Ok(None);
+    }
     let current = super::runtime::normalize_version(env!("CARGO_PKG_VERSION"))?;
     if target <= current || !std::path::Path::new(&parsed.asset_path).is_file() {
         return Ok(None);

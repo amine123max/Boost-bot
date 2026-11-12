@@ -70,7 +70,7 @@ const zh = readFileSync(resolve(root,'README.zh-CN.md'),'utf8');
 for (const [name, text] of [['README.md',en],['README.zh-CN.md',zh]]) {
   if (!text.includes('img.shields.io/github/v/release/amine123max/Boost-bot')) errors.push(`${name}: missing dynamic Release badge`);
   if (!text.includes('api.star-history.com/svg?repos=amine123max/Boost-bot')) errors.push(`${name}: missing Star history`);
-  if (!text.includes('http://localhost:12580')) errors.push(`${name}: missing normal Web entry`);
+  if (!text.includes('http://localhost:12000')) errors.push(`${name}: missing normal Web entry`);
 }
 if ([...en.matchAll(/^## /gm)].length !== [...zh.matchAll(/^## /gm)].length) errors.push('README section counts differ');
 const screenshots = text => [...text.matchAll(/docs\/images\/[\w.-]+/g)].map(match => match[0]).sort().join('\n');

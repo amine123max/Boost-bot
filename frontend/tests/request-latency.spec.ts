@@ -14,7 +14,7 @@ async function setupLogs(page: Page, locale = "zh-CN", theme = "tech") {
     const { id, method } = route.request().postDataJSON();
     let result: unknown = { items: [] };
     if (method === "appSettings/get") result = { locale, theme, codexCliGuideDismissed: true,
-      serviceAddr: "localhost:48760", backgroundTasks: { usagePollingEnabled: false } };
+      serviceAddr: "localhost:12580", backgroundTasks: { usagePollingEnabled: false } };
     if (method === "initialize") result = { userAgent: "codex_cli_rs/0.1.19", codexHome: "C:/Test", platformFamily: "windows", platformOs: "windows" };
     if (method === "accountManager/session/current") result = { mode: "none", role: "system_admin", currentUser: null, permissions: [] };
     if (method === "requestlog/list") result = { items: rows, total: rows.length, page: 1, pageSize: 20 };

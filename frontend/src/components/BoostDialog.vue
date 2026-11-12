@@ -32,6 +32,7 @@ onBeforeUnmount(() => {
       @click="$event.target === dialog && emit('close')"
     >
       <div class="modal-heading">
+        <slot name="title-leading" />
         <h2 :id="titleId">{{ title }}</h2>
         <slot name="title-extra" />
         <button

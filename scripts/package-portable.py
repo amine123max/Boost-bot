@@ -79,7 +79,8 @@ def main():
         actual = scratch.resolve()
         if actual.parent != temporary_root or actual.name != f"boost-portable-{os.getpid()}":
             raise RuntimeError("Invalid portable build cleanup directory")
-        shutil.rmtree(actual)
+        if actual.exists():
+            shutil.rmtree(actual)
 
 
 if __name__ == "__main__":

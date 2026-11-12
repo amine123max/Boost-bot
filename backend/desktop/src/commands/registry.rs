@@ -157,9 +157,12 @@ macro_rules! invoke_handler {
             crate::commands::system::open_external_url,
             crate::commands::system::open_in_file_manager,
             crate::commands::system::app_window_unsaved_draft_sections_set,
+            crate::commands::system::app_main_window_close,
+            crate::commands::system::app_close_prompt_ready,
+            crate::commands::system::app_tray_layout_sync,
+            crate::commands::system::app_local_agent_activity,
             crate::commands::system::app_show_main_window,
             crate::commands::system::app_hide_tray_preview_window,
-            crate::commands::system::app_tray_preview_expanded_set,
             // updater
             crate::commands::updater::app_update_check,
             crate::commands::updater::app_update_prepare,

@@ -95,7 +95,7 @@ test("capture the documentation gallery with isolated fixture data", async ({ pa
     ["/accounts/", "accounts.png", ".accounts-page"],
     ["/models/", "models.png", ".model-table-wrap"],
     ["/apikeys/", "platform-keys.png", ".keys-page"],
-    ["/settings/", "settings-dark.png", ".theme-color-options"],
+    ["/settings/", "settings-dark.png", ".settings-grid"],
   ]) {
     await page.goto(route);
     await expect(page.locator(ready).first()).toBeVisible();
@@ -111,6 +111,7 @@ test("capture the documentation gallery with isolated fixture data", async ({ pa
     });
     await page.screenshot({ path: resolve(destination, filename), animations: "disabled" });
   }
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   await page.getByRole("group", { name: "主题主色", exact: true }).getByTitle("紫色", { exact: true }).click();
   await page.getByRole("button", { name: "浅色", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -144,10 +145,12 @@ test('bot replaces the plane, opens from its own position, and appearance lives 
   await page.frameLocator('iframe').getByRole('button', { name: '返回 Boost 首页', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '设置外观设置', exact: true }).click();
   await page.getByLabel('动画表情', { exact: true }).selectOption('hearts');
   await page.getByLabel('身体轮廓', { exact: true }).selectOption('star');
   await page.getByLabel('动画速度', { exact: true }).selectOption('1.5');
   await page.reload();
+  await page.getByRole('button', { name: '设置外观设置', exact: true }).click();
   await expect(page.getByLabel('动画表情', { exact: true })).toHaveValue('hearts');
   await expect(page.getByLabel('身体轮廓', { exact: true })).toHaveValue('star');
   expect(await page.locator('.settings-grid').evaluate(el => getComputedStyle(el).columnCount)).toBe('2');
@@ -174,9 +177,11 @@ test('bundled navigation avatar animates on entry, after refresh and with reduce
   const gentle = await frame();
   await expect.poll(frame).not.toBe(gentle);
   await page.getByRole('link',{name:'设置',exact:true}).click();
+  await page.getByRole('button', { name: '设置外观设置', exact: true }).click();
   await page.getByLabel('动画表情',{exact:true}).selectOption('still');
   await expect(avatar).toHaveAttribute('data-bot-motion','gentle');
   const staticPresetBrandFrame = await frame();
+  await page.getByRole('button', { name: '完成', exact: true }).click();
   await page.getByRole('link',{name:'首页',exact:true}).click();
   await expect.poll(frame).not.toBe(staticPresetBrandFrame);
 });
@@ -199,6 +204,7 @@ test('refresh retains light theme before RPC resolves and reveals Bot from viewp
   await fixture(page);
   await page.route('**/boost-bot/?*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Boost</title><aside aria-label="机器人">原始 Bot 侧栏</aside><script>parent.postMessage({type:"boost:bot:ready"},"*");parent.postMessage({type:"boost:workspace:content-ready"},"*")</script>' }));
   await page.goto('/settings/');
+  await page.getByRole('button', { name: '设置主题模式', exact: true }).click();
   await page.getByRole('button', { name: '浅色', exact: true }).click();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('boost.theme.v1'))).toBe('light');
   let release!: () => void;
@@ -486,7 +492,7 @@ async function fixture(page: Page, member = false, failGooglePrices = false) {
       case "appSettings/get":
         result = {
           theme,
-          serviceAddr: "localhost:48760",
+          serviceAddr: "localhost:12580",
           routeStrategy: "ordered",
           quotaGuard: { enabled: true },
           backgroundTasks: {
@@ -505,7 +511,7 @@ async function fixture(page: Page, member = false, failGooglePrices = false) {
         };
         result = {
           theme,
-          serviceAddr: "localhost:48760",
+          serviceAddr: "localhost:12580",
           routeStrategy: "ordered",
           quotaGuard: { enabled: true },
           backgroundTasks: { ...backgroundTasks, usagePollingEnabled: true },
@@ -720,7 +726,7 @@ async function fixture(page: Page, member = false, failGooglePrices = false) {
       }
       case "service/telemetry":
         result = {
-          address: "127.0.0.1:48760",
+          address: "127.0.0.1:12580",
           processId: 1234,
           uploadBytesPerSecond: 1024,
           downloadBytesPerSecond: 24576,
@@ -890,89 +896,48 @@ async function fixture(page: Page, member = false, failGooglePrices = false) {
   });
   return calls;
 }
-test("right-edge monitor stays narrow, expands left on hover and supports pinned details", async ({ page }) => {
-  await page.setViewportSize({ width: 80, height: 420 });
+test("right-edge monitor stays compact on hover and click in both themes", async ({ page }) => {
+  await page.setViewportSize({ width: 64, height: 157 });
   const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", error => errors.push(error.message));
   await fixture(page);
   await page.goto("/tray-preview/");
-  const dock = page.getByRole("main", { name: "Boost 右侧悬浮条" });
-  const rail = dock.getByRole("complementary", { name: "实时指标" });
-  const details = dock.getByRole("region", { name: "监控详情" });
-  await expect(rail.locator(".tray-drag-handle")).toHaveCount(0);
-  await expect(dock.getByRole("status")).toHaveText("服务在线");
-  await expect(rail.locator(".tray-rail-metric strong")).toHaveText(["1.00", "24.00", "26.40"]);
-  await expect(rail.getByRole("button", { name: "5小时剩余额度 75%" })).toBeVisible();
-  await expect(details).toHaveCount(0);
-  await expect(rail).toHaveCSS("width", "64px");
-  await expect(page.locator(".sidebar")).toHaveCount(0);
-
+  const rail = page.locator(".tray-rail");
   const overflow = () => page.evaluate(() =>
-    Array.from(document.querySelectorAll<HTMLElement>("html, body, #app, .tray-page, .tray-rail, .tray-details"))
+    Array.from(document.querySelectorAll<HTMLElement>("html, body, #app, .tray-page, .tray-rail"))
       .filter(element => element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
-      .map(element => ({ element: element.className || element.tagName, width: element.scrollWidth - element.clientWidth, height: element.scrollHeight - element.clientHeight })),
-  );
+      .map(element => element.className || element.tagName));
+  for (const theme of ["dark", "light"]) {
+    if (theme === "light") {
+      await page.route("**/api/rpc", async route => {
+        const { method, id } = route.request().postDataJSON();
+        if (method !== "appSettings/get") return route.fallback();
+        await route.fulfill({ json: { id, result: { theme: "business", serviceAddr: "localhost:12580" } } });
+      });
+      await page.reload();
+    }
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(rail.locator(".tray-rail-metric strong")).toHaveText(["1.0", "24", "26"]);
+    await expect(rail.locator(".tray-rail-caption")).toHaveText(["", "", ""]);
+    await expect(rail).toHaveCSS("width", "64px");
+    for (const selector of [".tray-logo", ".tray-quota-ring", ".tray-rail-metric"]) {
+      const target = rail.locator(selector).first();
+      await target.hover();
+      await target.click();
+      await expect(page.locator(".tray-details")).toHaveCount(0);
+    }
+    expect(await overflow()).toEqual([]);
+    await page.screenshot({ path: resolve(captures, `edge-dock-collapsed-${theme}.png`), animations: "disabled" });
+  }
+  await page.setViewportSize({ width: 186, height: 38 });
+  await expect(rail).toHaveCSS("flex-direction", "row");
   expect(await overflow()).toEqual([]);
-  await page.screenshot({ path: resolve(captures, "edge-dock-collapsed-dark.png"), animations: "disabled" });
-
-  // The native window grows to the left; the Web preview keeps its browser viewport.
-  await page.setViewportSize({ width: 376, height: 420 });
-  await rail.hover();
-  await expect(details).toBeVisible();
-  await expect(details.locator(".tray-account")).toHaveText("Personal · Plus");
-  await expect(details.getByRole("progressbar", { name: "5小时内剩余额度" })).toHaveAttribute("aria-valuenow", "75");
-  await expect(details.locator("dd")).toHaveText(["1.00KB/s", "24.00KB/s", "26.40MB"]);
-  const railBounds = (await rail.boundingBox())!;
-  const detailBounds = (await details.boundingBox())!;
-  expect(detailBounds.x + detailBounds.width).toBeLessThan(railBounds.x);
-  expect(railBounds.x + railBounds.width).toBe(368);
-  expect(await overflow()).toEqual([]);
-  await page.screenshot({ path: resolve(captures, "edge-dock-expanded-dark.png"), animations: "disabled" });
-
-  await page.mouse.move(0, 0);
-  await expect(details).toHaveCount(0);
-  await rail.hover();
-  await details.getByRole("button", { name: "固定详情", exact: true }).click();
-  await expect(rail.getByRole("button", { name: "固定或收起监控详情" })).toHaveAttribute("aria-pressed", "true");
-  await page.mouse.move(0, 0);
-  await page.waitForTimeout(350);
-  await expect(details).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(details).toHaveCount(0);
-
-  await page.route("**/api/rpc", async (route) => {
-    const { method, id } = route.request().postDataJSON();
-    if (method !== "appSettings/get" && method !== "account/list") return route.fallback();
-    const result = method === "appSettings/get"
-      ? { theme: "business", serviceAddr: "localhost:48760" }
-      : { items: [{ id: "a1", label: "Very long workspace account name that must truncate cleanly", hasToken: true, status: "active" }], total: 1 };
-    await route.fulfill({ json: { id, result } });
-  });
-  await page.addInitScript(() => localStorage.setItem("boost.ui.v1", JSON.stringify({ typographyVersion: 1, fontSize: 16 })));
-  await page.setViewportSize({ width: 80, height: 420 });
-  await page.reload();
-  await expect(dock.getByRole("status")).toHaveText("服务在线");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(rail.locator(".tray-rail-metric strong")).toHaveText(["1.00", "24.00", "26.40"]);
-  await expect(rail).toHaveCSS("background-color", "rgb(245, 245, 246)");
-  expect(await overflow()).toEqual([]);
-  await page.screenshot({ path: resolve(captures, "edge-dock-collapsed-light.png"), animations: "disabled" });
-
-  await page.setViewportSize({ width: 376, height: 420 });
-  await rail.hover();
-  await expect(details).toBeVisible();
-  await expect(details).toHaveCSS("background-color", "rgb(245, 245, 246)");
-  expect(await overflow()).toEqual([]);
-  expect(await details.locator(".tray-account").evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
-  await page.screenshot({ path: resolve(captures, "edge-dock-expanded-light.png"), animations: "disabled" });
-  await details.getByRole("button", { name: "收起详情" }).click();
-  await expect(details).toHaveCount(0);
-  await rail.getByRole("button", { name: "打开 Boost" }).click();
+  await page.screenshot({ path: resolve(captures, "edge-dock-horizontal.png"), animations: "disabled" });
+  await rail.dblclick();
   await expect(page).toHaveURL("/");
   await expect(page.locator("html")).not.toHaveClass(/tray-preview-window/);
-
   await page.goto("/tray-preview/");
-  await rail.getByRole("button", { name: "隐藏悬浮条" }).click();
+  await page.keyboard.press("Escape");
   await expect(page).toHaveURL("/");
   expect(errors).toEqual([]);
 });
@@ -981,8 +946,9 @@ test("theme color swatches update global accents, survive refresh and follow sys
   const calls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/settings/");
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   const colors = page.getByRole("group", { name: "主题主色", exact: true });
-  const basic = page.locator(".panel").filter({ has: colors });
+  const basic = page.getByRole("dialog", { name: "主题模式", exact: true });
   await expect(colors.getByRole("radio")).toHaveCount(17);
   await expect(colors.getByRole("radio", { name: "主色：青绿色", exact: true })).toBeChecked();
   const before = calls.filter(call => call.method === "appSettings/set").length;
@@ -1009,6 +975,7 @@ test("theme color swatches update global accents, survive refresh and follow sys
   await page.keyboard.press("Space");
   await expect(colors.getByRole("radio", { name: "主色：紫色", exact: true })).toBeChecked();
   await page.reload();
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   await expect(colors.getByRole("radio", { name: "主色：紫色", exact: true })).toBeChecked();
   await expect.poll(accent).toBe("#c084fc");
   await expect(basic.locator(".segmented button.selected")).toHaveCSS("color", "rgb(24, 24, 27)");
@@ -1041,6 +1008,7 @@ test("theme color swatches update global accents, survive refresh and follow sys
 test("members can select a local theme color without changing service settings", async ({ page }) => {
   const calls = await fixture(page, true);
   await page.goto("/settings/");
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   await page.getByRole("group", { name: "主题主色", exact: true }).getByTitle("蓝色", { exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-accent", "blue");
   expect(calls.some(call => call.method === "appSettings/set")).toBe(false);
@@ -1055,8 +1023,7 @@ test("default typography is 13px system text with compact Settings headings", as
     .locator(".settings-grid .panel-header h2")
     .first()
     .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-  expect(headingSize).toBeGreaterThan(12);
-  expect(headingSize).toBeLessThan(13);
+  expect(headingSize).toBe(18);
   const fontFamily = await page.locator("body").evaluate((element) =>
     getComputedStyle(element).fontFamily,
   );
@@ -1071,7 +1038,7 @@ test("agent progress ring follows live estimates and keeps the avatar animated w
     if (method !== "bot/activity") return route.fallback();
     await route.fulfill({ json: { id, result: state } });
   });
-  await page.setViewportSize({ width: 80, height: 420 });
+  await page.setViewportSize({ width: 64, height: 157 });
   await page.goto("/tray-preview/");
   const ring = page.locator(".bot-task-progress");
   const avatar = ring.locator("[data-boost-bot-avatar]");
@@ -1089,9 +1056,9 @@ test("agent progress ring follows live estimates and keeps the avatar animated w
   state = { ...state, percent: 42 };
   await expect(ring).toHaveAttribute("aria-valuenow", "42");
   await expect(ring.locator(".bot-task-arc")).toHaveAttribute("stroke-dashoffset", "58");
-  await page.setViewportSize({ width: 376, height: 420 });
-  await page.locator(".tray-rail").hover();
-  await expect(page.locator(".tray-status")).toHaveText("任务进度 42%");
+  await page.locator(".tray-logo").click();
+  await expect(page.locator(".tray-details")).toHaveCount(0);
+  await expect(ring).toHaveAttribute("aria-valuenow", "42");
   await page.screenshot({ path: resolve(captures, "agent-progress-working.png"), animations: "disabled" });
   state = { ...state, state: "waiting", waitingTasks: 1 };
   await expect(ring).toHaveAttribute("data-task-state", "waiting");
@@ -1126,7 +1093,7 @@ test("home traffic cards match the supplied metric families and units", async ({
 });
 
 test("right-edge monitor shows unavailable telemetry and respects member permissions", async ({ page }) => {
-  await page.setViewportSize({ width: 80, height: 420 });
+  await page.setViewportSize({ width: 64, height: 157 });
   await fixture(page);
   await page.route("**/api/rpc", async (route) => {
     const { method, id } = route.request().postDataJSON();
@@ -1139,7 +1106,7 @@ test("right-edge monitor shows unavailable telemetry and respects member permiss
   });
   await page.goto("/tray-preview/");
   await expect(page.locator(".tray-page").getByRole("status")).toHaveText("状态不可用");
-  await expect(page.getByRole("button", { name: "5小时剩余额度 暂无数据" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "5小时剩余额度 暂无数据" })).toBeVisible();
   await expect(page.locator(".tray-rail-metric strong")).toHaveText(["—", "—", "—"]);
   await page.goto("about:blank");
   await page.unrouteAll({ behavior: "wait" });
@@ -1160,7 +1127,7 @@ test("refresh restores saved appearance before paint and shows one ring until da
   let hold = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/api/rpc", async route => {
     const { id, method } = route.request().postDataJSON();
-    if (method === "appSettings/get") return route.fulfill({ json: { id, result: { theme: "business", serviceAddr: "localhost:48760" } } });
+    if (method === "appSettings/get") return route.fulfill({ json: { id, result: { theme: "business", serviceAddr: "localhost:12580" } } });
     if (method === "account/list") await hold;
     return route.fallback();
   });
@@ -1207,9 +1174,11 @@ test("Zinc dark and light palettes keep the same management layout", async ({ pa
   const darkBounds = await page.locator(".daily-usage-overview .usage-summary-row").boundingBox();
   await page.screenshot({ path: resolve(captures, "zinc-home-dark.png"), fullPage: true });
   await page.getByRole("link", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   await page.getByRole("button", { name: "浅色", exact: true }).click();
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(245, 245, 246)");
   await expect(page.locator(".sidebar")).toHaveCSS("background-color", "rgb(245, 245, 246)");
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.getByRole("link", { name: "首页", exact: true }).click();
   await page.locator(".page-content").evaluate(element => { element.scrollTop = 0; });
   expect(await page.locator(".daily-usage-overview .usage-summary-row").boundingBox()).toEqual(darkBounds);
@@ -1277,6 +1246,7 @@ test("navigation, dark/light themes, local assets and service telemetry", async 
       title === "测试" ? "测试中心" : title,
     );
   }
+  await page.getByRole("button", { name: "设置主题模式", exact: true }).click();
   await page.getByRole("button", { name: "浅色", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(
@@ -1286,6 +1256,7 @@ test("navigation, dark/light themes, local assets and service telemetry", async 
     path: resolve(captures, "settings-light.png"),
     fullPage: true,
   });
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.getByRole("button", { name: "当前配置", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Codex config.toml", exact: true }),
@@ -1635,7 +1606,7 @@ test("Boost configuration guide uses platform key placeholder and stable footer"
   await expect(dialog).toContainText("$env:BOOST_API_KEY = '平台密钥'");
   await expect(dialog).toContainText('env_key = "BOOST_API_KEY"');
   await expect(dialog).toContainText('model_provider = "Boost"');
-  await expect(dialog).toContainText("http://localhost:48760/v1");
+  await expect(dialog).toContainText("http://localhost:12580/v1");
   await expect(dialog.locator(".guide-code")).not.toContainText("boost-");
   const before = await dialog.locator(".modal-footer").boundingBox();
   await dialog
@@ -2281,4 +2252,42 @@ test("aggregate advanced settings, balance and key actions preserve original con
       .getByRole("dialog")
       .getByRole("button", { name: "从供应商模板导入", exact: true }),
   ).toBeDisabled();
+});
+
+test("sidebar search supports keyboard navigation, settings deep links and permissions", async ({ page }) => {
+  await fixture(page);
+  await page.goto('/settings/');
+  await expect(page.locator('.topbar h1')).toHaveCSS('font-size', '22px');
+  await expect(page.locator('.nav-item').first()).toHaveCSS('letter-spacing', '0.5px');
+  const heading = (await page.locator('.topbar h1').boundingBox())!;
+  const brand = (await page.locator('.brand-word').boundingBox())!;
+  expect(Math.abs(heading.y + heading.height / 2 - brand.y - brand.height / 2)).toBeLessThan(2);
+  await page.getByRole('button', { name: '搜索页面与设置', exact: true }).click();
+  const input = page.getByRole('combobox', { name: '搜索页面与设置', exact: true });
+  await expect(input).toBeFocused();
+  await input.fill('TPS');
+  await expect(page.getByRole('option')).toHaveCount(1);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: '显示内容', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '完成', exact: true }).click();
+  await page.keyboard.press('Control+k');
+  await expect(input).toBeFocused();
+  await input.fill('no-such-entry');
+  await expect(page.getByText('未找到匹配结果', { exact: true })).toBeVisible();
+  await input.fill('model');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('option', { selected: true })).toContainText('模型映射规则');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.setViewportSize({ width: 640, height: 720 });
+  await page.getByRole('button', { name: '搜索页面与设置', exact: true }).click();
+  await expect(input).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.goto('about:blank');
+  await page.unrouteAll({ behavior: 'wait' });
+  await fixture(page, true);
+  await page.goto('/');
+  await page.keyboard.press('Control+k');
+  await input.fill('路由');
+  await expect(page.getByRole('option')).toHaveCount(0);
 });

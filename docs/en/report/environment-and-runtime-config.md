@@ -89,8 +89,8 @@ The embedded runtime source lives in `bot/`; run `node scripts/prepare-boost-bot
 
 ### 地址与入口
 
-- `BOOST_SERVICE_ADDR`：service 地址，默认 `localhost:48760`
-- `BOOST_WEB_ADDR`：web 地址，默认 `localhost:12580`
+- `BOOST_SERVICE_ADDR`：service 地址，默认 `localhost:12580`
+- `BOOST_WEB_ADDR`：web 地址，默认 `localhost:12000`
 - `BOOST_WEB_ROOT`：web 静态资源目录
 - `BOOST_LOGIN_ADDR`：本地 OAuth 回调监听地址
 
@@ -174,8 +174,8 @@ Notes:
 ## env 文件示例
 
 ```dotenv
-BOOST_SERVICE_ADDR=localhost:48760
-BOOST_WEB_ADDR=localhost:12580
+BOOST_SERVICE_ADDR=localhost:12580
+BOOST_WEB_ADDR=localhost:12000
 BOOST_UPSTREAM_BASE_URL=https://chatgpt.com/backend-api/codex
 BOOST_USAGE_POLL_INTERVAL_SECS=600
 BOOST_GATEWAY_KEEPALIVE_INTERVAL_SECS=180
@@ -202,7 +202,7 @@ Boost/
 对应 `boost.env` 示例：
 
 ```dotenv
-BOOST_SERVICE_ADDR=localhost:48760
+BOOST_SERVICE_ADDR=localhost:12580
 BOOST_UPSTREAM_PROXY_URL=http://127.0.0.1:7890
 BOOST_UPSTREAM_TOTAL_TIMEOUT_MS=0
 BOOST_UPSTREAM_STREAM_TIMEOUT_MS=600000
@@ -232,8 +232,8 @@ boost-service-bundle/
 对应 `boost.env` 示例：
 
 ```dotenv
-BOOST_SERVICE_ADDR=0.0.0.0:48760
-BOOST_WEB_ADDR=0.0.0.0:12580
+BOOST_SERVICE_ADDR=0.0.0.0:12580
+BOOST_WEB_ADDR=0.0.0.0:12000
 BOOST_DB_PATH=./data/codexmanager.db
 BOOST_RPC_TOKEN_FILE=./data/codexmanager.rpc-token
 BOOST_UPSTREAM_PROXY_URL=http://127.0.0.1:7890

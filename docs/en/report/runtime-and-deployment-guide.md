@@ -49,7 +49,7 @@ service_tier = "fast"
 
 [model_providers.cm]
 name = "OpenAI"
-base_url = "http://localhost:48760/v1"
+base_url = "http://localhost:12580/v1"
 wire_api = "responses"
 ```
 
@@ -66,8 +66,8 @@ wire_api = "responses"
 2. We recommend starting `boost-start`. It launches service + web together and can be stopped with `Ctrl+C`.
 3. You can also start only `boost-web`; it automatically launches `boost-service` from the same directory and opens the browser.
 4. Or start `boost-service` first, then `boost-web`.
-5. Default addresses: service `localhost:48760`, Web UI `http://localhost:12580/`.
-6. To stop everything, visit `http://localhost:12580/__quit`. If the web process launched the service automatically, it will try to stop both.
+5. Default addresses: service `localhost:12580`, Web UI `http://localhost:12000/`.
+6. To stop everything, visit `http://localhost:12000/__quit`. If the web process launched the service automatically, it will try to stop both.
 7. If you reverse-proxy or split-deploy frontend assets yourself, you must forward both `/api/runtime` and `/api/rpc`. Serving static assets alone is not enough.
 
 ### Run the source build with embedded UI
@@ -101,7 +101,7 @@ You can still set `BOOST_WEB_ROOT=/path/to/out` when you intentionally want to o
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-Then open: `http://localhost:12580/`
+Then open: `http://localhost:12000/`
 
 ### Method 2: build and run separately
 ```bash
@@ -112,7 +112,7 @@ docker network create boost-net
 docker run --rm --name boost-service \
   --network boost-net \
   --network-alias boost-service \
-  -p 48760:48760 \
+  -p 12580:12580 \
   -v boost-data:/data \
   -e BOOST_RPC_TOKEN=replace_with_your_token \
   boost-service
@@ -121,10 +121,10 @@ docker run --rm --name boost-service \
 docker build -f docker/Dockerfile.web -t boost-web .
 docker run --rm --name boost-web \
   --network boost-net \
-  -p 12580:12580 \
+  -p 12000:12000 \
   -v boost-data:/data \
   -e BOOST_WEB_NO_SPAWN_SERVICE=1 \
-  -e BOOST_SERVICE_ADDR=boost-service:48760 \
+  -e BOOST_SERVICE_ADDR=boost-service:12580 \
   -e BOOST_RPC_TOKEN=replace_with_your_token \
   boost-web
 ```

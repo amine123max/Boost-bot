@@ -56,20 +56,6 @@ fn confirm_discard_unsaved_settings(action_label: &str) -> bool {
     )
 }
 
-/// 函数 `confirm_discard_unsaved_settings_for_window_close`
-///
-///
-/// 时间: 2026-04-02
-///
-/// # 参数
-/// - crate: 参数 crate
-///
-/// # 返回
-/// 返回函数执行结果
-pub(crate) fn confirm_discard_unsaved_settings_for_window_close() -> bool {
-    confirm_discard_unsaved_settings("关闭窗口")
-}
-
 /// 函数 `confirm_discard_unsaved_settings_for_app_exit`
 ///
 ///

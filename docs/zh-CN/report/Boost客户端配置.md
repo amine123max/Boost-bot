@@ -26,7 +26,7 @@ model = "填入模型 ID"
 
 [model_providers.Boost]
 name = "Boost"
-base_url = "http://localhost:48760/v1"
+base_url = "http://localhost:12580/v1"
 wire_api = "responses"
 env_key = "BOOST_API_KEY"
 requires_openai_auth = false
@@ -38,7 +38,7 @@ requires_openai_auth = false
 
 ## 其他客户端
 
-选择 OpenAI 兼容提供商，Base URL 填 `http://localhost:48760/v1`，API Key 填平台密钥，并选择已配置路由的模型。使用 SDK 时从 `BOOST_API_KEY` 环境变量读取密钥。管理 RPC 的认证凭据与平台密钥用途不同。
+选择 OpenAI 兼容提供商，Base URL 填 `http://localhost:12580/v1`，API Key 填平台密钥，并选择已配置路由的模型。使用 SDK 时从 `BOOST_API_KEY` 环境变量读取密钥。管理 RPC 的认证凭据与平台密钥用途不同。
 
 ## 模型与官方价格
 

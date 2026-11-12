@@ -2,7 +2,7 @@
 
 [English](README.md) · [项目首页](../README.zh-CN.md) · [构建指南](../docs/BUILDING.md)
 
-管理界面使用 Vue 3、TypeScript 与 Vite，为桌面和 Web 共享。正常 Web 入口为 **http://localhost:12580**。原生桌面包独立位于 `backend/desktop/`。
+管理界面使用 Vue 3、TypeScript 与 Vite，为桌面和 Web 共享。正常 Web 入口为 **http://localhost:12000**。原生桌面包独立位于 `backend/desktop/`。
 
 ![Boost 管理界面](../docs/images/dashboard-dark.png)
 

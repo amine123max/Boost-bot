@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "@/components/HelpHint.vue";
 import { ref, computed, onMounted } from "vue";
 import type { ModelPriceRule } from "@/types";
 import BoostIcon from "./BoostIcon.vue";
@@ -135,10 +136,7 @@ onMounted(() => perform(load));
       </div>
     </div>
     <div class="price-details">
-      <p class="hint price-unit">
-        USD / 百万 tokens · Standard 文本价格；OpenAI
-        同时同步官网提供的服务档位。
-      </p>
+      <p class="price-unit">USD / 百万 tokens<HelpHint label="价格" text="Standard 文本价格；OpenAI 同时同步官网提供的服务档位。" /></p>
       <div v-if="visible.length" class="model-table-wrap price-table-wrap">
         <table
           v-resizable-columns="[27, 11, 12, 11, 15, 14, 10]"

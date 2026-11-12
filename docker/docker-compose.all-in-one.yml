@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile.all-in-one
     restart: unless-stopped
     environment:
-      BOOST_SERVICE_ADDR: 0.0.0.0:48760
-      BOOST_WEB_ADDR: 0.0.0.0:12580
+      BOOST_SERVICE_ADDR: 0.0.0.0:12580
+      BOOST_WEB_ADDR: 0.0.0.0:12000
       BOOST_WEB_NO_OPEN: "1"
       BOOST_DB_PATH: /data/boost.db
       BOOST_RPC_TOKEN_FILE: /data/boost.rpc-token
@@ -17,7 +17,7 @@ services:
     volumes:
       - boost-data:/data
     ports:
-      - "12580:12580"
+      - "12000:12000"
 
 volumes:
   boost-data:

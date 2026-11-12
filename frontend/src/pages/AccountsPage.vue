@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "@/components/HelpHint.vue";
 import DialogActions from "@/components/DialogActions.vue";
 import { computed, ref, onActivated, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -446,13 +447,13 @@ async function refreshUsage() {
       <div class="form-stack">
         <template v-if="importTab === 'file'"
           ><label class="form-field"
-            >选择账号文件<input
+            ><span>选择账号文件<HelpHint label="账号文件" text="支持 auth.json、JSON 数组或多个账号文件。" /></span><input aria-label="选择账号文件"
               type="file"
               accept=".json,.txt"
               multiple
               :disabled="busy"
               @change="pickFiles"
-            /><small>支持 auth.json、JSON 数组或多个账号文件。</small></label
+            /></label
           ><button class="secondary" :disabled="busy" @click="pickDirectory">
             <BoostIcon name="folder-open" :size="15" />从文件夹导入</button
           ><label class="form-field"
@@ -471,9 +472,7 @@ async function refreshUsage() {
             </button></DialogActions
           ></template
         ><template v-else-if="importTab === 'oauth'"
-          ><div class="hint">
-            通过 OpenAI 官方页面授权登录，授权完成后点击检查登录。
-          </div>
+          ><span>授权登录<HelpHint label="授权登录" text="通过 OpenAI 官方页面授权登录，授权完成后点击检查登录。" /></span>
           <template v-if="login"
             ><a
               class="secondary"

@@ -66,8 +66,8 @@ COPY --from=builder /out/boost-web /usr/local/bin/boost-web
 COPY --from=builder /out/boost-start /usr/local/bin/boost-start
 COPY --from=bot /src/bot /usr/local/bin/boost-bot
 
-ENV BOOST_SERVICE_ADDR=0.0.0.0:48760
-ENV BOOST_WEB_ADDR=0.0.0.0:12580
+ENV BOOST_SERVICE_ADDR=0.0.0.0:12580
+ENV BOOST_WEB_ADDR=0.0.0.0:12000
 ENV BOOST_WEB_NO_OPEN=1
 ENV BOOST_DB_PATH=/data/boost.db
 ENV BOOST_RPC_TOKEN_FILE=/data/boost.rpc-token
@@ -76,11 +76,11 @@ ENV BOOST_GATEWAY_ERROR_STDOUT=1
 ENV BOOST_GATEWAY_TRACE_STDOUT_SLOW_MS=5000
 
 VOLUME ["/data"]
-EXPOSE 12580
+EXPOSE 12000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:48760/health \
-    && wget --no-verbose --tries=1 --spider http://127.0.0.1:12580/__auth_status \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:12580/health \
+    && wget --no-verbose --tries=1 --spider http://127.0.0.1:12000/__auth_status \
     || exit 1
 
 STOPSIGNAL SIGINT

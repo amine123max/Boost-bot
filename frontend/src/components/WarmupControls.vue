@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "@/components/HelpHint.vue";
 import { computed, ref } from "vue";
 import type { Account } from "@/types";
 import BoostIcon from "./BoostIcon.vue";
@@ -139,19 +140,17 @@ function choose(value: string) {
         </span>
       </div>
       <label class="form-field">
-        多少小时后预热
+        <span>多少小时后预热<HelpHint label="预热时间" text="支持小数，例如 0.5 小时为 30 分钟；保存后开始计时。" /></span>
         <input v-model="hours" type="number" min="0.01" max="8760" step="0.01" :disabled="saving" />
-        <small>支持小数，例如 0.5 小时为 30 分钟；保存后开始计时。</small>
+
       </label>
       <label class="account-check-label warmup-repeat">
-        <span>重复执行</span>
+        <span>重复执行<HelpHint label="重复执行" :text="repeat ? `每隔 ${hours} 小时预热一次` : '只执行一次，完成后自动关闭计划。'" /></span>
         <input v-model="repeat" type="checkbox" :disabled="saving" />
       </label>
-      <p class="muted warmup-repeat-copy">
-        {{ repeat ? `每隔 ${hours} 小时预热一次` : "只执行一次，完成后自动关闭计划。" }}
-      </p>
+
       <div class="warmup-targets">
-        <div class="section-caption">预热账号（已选 {{ targets.length }} 个）</div>
+        <div class="section-caption">预热账号（已选 {{ targets.length }} 个）<HelpHint label="预热账号" text="定时预热由服务执行，服务需保持运行；重启后保留计划，错过的执行会在服务启动后补一次。不可用账号会跳过。" /></div>
         <div class="warmup-account-list">
           <label v-for="account in accounts" :key="account.id" class="account-check-label">
             <input v-model="targets" type="checkbox" :value="account.id" :disabled="saving" />
@@ -159,9 +158,7 @@ function choose(value: string) {
           </label>
         </div>
       </div>
-      <p class="muted warmup-note">
-        定时预热由服务执行，服务需保持运行；重启后保留计划，错过的执行会在服务启动后补一次。不可用账号会跳过。
-      </p>
+
     </div>
     <template #footer>
       <DialogActions>

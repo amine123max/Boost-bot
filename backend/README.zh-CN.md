@@ -2,7 +2,7 @@
 
 [English](README.md) · [项目首页](../README.zh-CN.md) · [架构说明](../ARCHITECTURE.md)
 
-Rust 后端负责存储、账号与密钥授权、网关路由、带鉴权的 Web 运行时、进程生命周期和桌面原生能力。本地与部署后的 Web 界面统一使用 **12580** 端口。
+Rust 后端负责存储、账号与密钥授权、网关路由、带鉴权的 Web 运行时、进程生命周期和桌面原生能力。本地与部署后的 Web 界面统一使用 **12000** 端口。
 
 | 包 | 职责 | 构建范围 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ cargo build --locked -p boost-service -p boost-web -p boost-start
 cargo run --locked -p boost-start
 ```
 
-访问 `http://localhost:12580`。`web/build.rs` 在默认 `embedded-ui` 功能下嵌入 `frontend/out/`，更新静态前端后需重新构建 Web。
+访问 `http://localhost:12000`。`web/build.rs` 在默认 `embedded-ui` 功能下嵌入 `frontend/out/`，更新静态前端后需重新构建 Web。
 
 桌面开发与打包：
 

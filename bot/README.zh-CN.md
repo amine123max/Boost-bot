@@ -39,7 +39,7 @@ node scripts/stage-boost-bot.mjs <package-directory>
 ## 运行约定
 
 - 服务按身份启动隔离宿主，通过 stdin 提供已有且有权使用的平台密钥，浏览器不接收模型秘密。
-- Web 页面、静态资源、下载与 SSE 均经过 Boost Web 鉴权；正常应用入口为 **12580**。
+- Web 页面、静态资源、下载与 SSE 均经过 Boost Web 鉴权；正常应用入口为 **12000**。
 - 成员只能在自身空间对话；服务器工具、任务修改、渠道凭据与系统配置需要管理员权限。
 - 消息渠道需要真实平台凭据；电脑控制还取决于宿主系统权限与可用图形会话。
 - `BOOST_BOT_ROOT` 指定准备后的运行目录，`BOOST_BOT_NODE` 指定 Node；额外签名目录使用 `BOOST_BOT_CATALOG_URL` 和 `BOOST_BOT_CATALOG_PUBKEY` 配对配置。

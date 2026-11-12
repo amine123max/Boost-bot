@@ -1,3 +1,6 @@
+pub(crate) mod dock_layout;
+pub(crate) mod close_prompt;
+pub(crate) mod close_action;
 mod env;
 mod lifecycle;
 mod prompts;
@@ -14,4 +17,4 @@ pub(crate) use state::{
     KEEP_ALIVE_FOR_LIGHTWEIGHT_CLOSE, LIGHTWEIGHT_MODE_ON_CLOSE_TO_TRAY, TRAY_AVAILABLE,
 };
 pub(crate) use tray::{notify_existing_instance_focused, setup_tray};
-pub(crate) use window::{hide_tray_preview_window, set_tray_preview_expanded, show_main_window};
+pub(crate) use window::{hide_tray_preview_window, show_main_window};

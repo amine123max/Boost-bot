@@ -1,8 +1,8 @@
 # Build and deployment / 构建与部署
 
-Normal local and hosted browser access uses **`http://localhost:12580`** or **`http://<server>:12580`**. Other ports below are internal or development-only.
+Normal local and hosted browser access uses **`http://localhost:12000`** or **`http://<server>:12000`**. Other ports below are internal or development-only.
 
-正常本地及部署后的浏览器入口统一为 **12580**。下列其他端口仅用于内部通信或开发调试。
+正常本地及部署后的浏览器入口统一为 **12000**。下列其他端口仅用于内部通信或开发调试。
 
 ## Toolchain
 
@@ -26,7 +26,7 @@ pnpm -C frontend run build:desktop
 cargo build --locked --release -p boost-service -p boost-web -p boost-start
 ```
 
-Launch `target/release/boost-start` (`boost-start.exe` on Windows). It starts Service and Web together. Open **12580**. For a distributable service package, include the three matching binaries and stage the prepared Bot beside them:
+Launch `target/release/boost-start` (`boost-start.exe` on Windows). It starts Service and Web together. Open **12000**. For a distributable service package, include the three matching binaries and stage the prepared Bot beside them:
 
 ```bash
 node scripts/stage-boost-bot.mjs <package-directory>
@@ -52,8 +52,8 @@ Windows helpers: `scripts/rebuild.ps1`; macOS: `scripts/rebuild-macos.sh`; Linux
 
 | Purpose | Normal mode | Coordinated source development |
 | --- | --- | --- |
-| User-facing Web | **12580** | 48861, isolated developer gateway |
-| Internal service/RPC | 48760 | 48860 |
+| User-facing Web | **12000** | 48861, isolated developer gateway |
+| Internal service/RPC | 12580 | 48860 |
 | Vite HMR | Not used | 3005 |
 | Browser regression server | Not used | 3200 by default; `BOOST_TEST_PORT` overrides |
 
@@ -61,7 +61,7 @@ Windows helpers: `scripts/rebuild.ps1`; macOS: `scripts/rebuild-macos.sh`; Linux
 pnpm -C frontend run dev:full
 ```
 
-This development helper starts matching binaries and a hot-reload frontend, with isolated development listeners. It does not change the normal application's **12580** entry. A plain Vite server is not a complete service-mode deployment.
+This development helper starts matching binaries and a hot-reload frontend, with isolated development listeners. It does not change the normal application's **12000** entry. A plain Vite server is not a complete service-mode deployment.
 
 ## Containers and reverse proxy
 

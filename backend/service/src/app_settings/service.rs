@@ -3,11 +3,11 @@ use super::{
     APP_SETTING_SERVICE_ADDR_KEY,
 };
 
-pub const DEFAULT_ADDR: &str = "localhost:48760";
-pub const DEFAULT_BIND_ADDR: &str = "0.0.0.0:48760";
-pub const DEFAULT_WEB_ADDR: &str = "localhost:12580";
-pub const DEFAULT_WEB_BIND_ADDR: &str = "0.0.0.0:12580";
-const DEFAULT_WEB_PORT: u16 = 12580;
+pub const DEFAULT_ADDR: &str = "localhost:12580";
+pub const DEFAULT_BIND_ADDR: &str = "0.0.0.0:12580";
+pub const DEFAULT_WEB_ADDR: &str = "localhost:12000";
+pub const DEFAULT_WEB_BIND_ADDR: &str = "0.0.0.0:12000";
+const DEFAULT_WEB_PORT: u16 = 12000;
 pub const SERVICE_BIND_MODE_SETTING_KEY: &str = "service.bind_mode";
 pub const SERVICE_BIND_MODE_LOOPBACK: &str = "loopback";
 pub const SERVICE_BIND_MODE_ALL_INTERFACES: &str = "all_interfaces";
@@ -356,8 +356,16 @@ pub fn current_saved_service_addr() -> String {
         .or_else(|| {
             get_persisted_app_setting(APP_SETTING_SERVICE_ADDR_KEY)
                 .and_then(|value| normalize_saved_service_addr(Some(&value)).ok())
+                .map(|value| migrate_legacy_service_addr(&value))
         })
         .unwrap_or_else(|| DEFAULT_ADDR.to_string())
+}
+
+fn migrate_legacy_service_addr(value: &str) -> String {
+    match value.rsplit_once(':') {
+        Some((host, "48760")) if matches!(host, "localhost" | "127.0.0.1" | "[::1]" | "0.0.0.0" | "[::]") => format!("{host}:12580"),
+        _ => value.to_string(),
+    }
 }
 
 /// 函数 `set_saved_service_addr`

@@ -19,14 +19,14 @@ test("configuration views and copies redact nested credentials and proxy user in
   const original = {
     webAccessPasswordConfigured: true,
     routeStrategy: "ordered",
-    envOverrides: { BOOST_ACCESS_TOKEN: "secret", BOOST_PORT: "48760" },
+    envOverrides: { BOOST_ACCESS_TOKEN: "secret", BOOST_PORT: "12580" },
     upstreamProxyUrl: "http://alice:password@127.0.0.1:7897",
   };
   const result = redactConfiguration(original);
   const serialized = JSON.stringify(result);
   assert.equal(result.webAccessPasswordConfigured, true);
   assert.equal(result.routeStrategy, "ordered");
-  assert.equal(result.envOverrides.BOOST_PORT, "48760");
+  assert.equal(result.envOverrides.BOOST_PORT, "12580");
   assert.equal(result.envOverrides.BOOST_ACCESS_TOKEN, "••••••••");
   assert.ok(!serialized.includes("alice"));
   assert.ok(!serialized.includes("password@"));

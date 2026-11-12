@@ -1,6 +1,6 @@
 import type { RuntimeMode } from "@/types";
 
-const DEFAULT_GATEWAY_ADDR = "localhost:48760";
+const DEFAULT_GATEWAY_ADDR = "localhost:12580";
 
 type ResolveGatewayOriginOptions = {
   browserOrigin?: string | null;

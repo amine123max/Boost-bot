@@ -88,7 +88,7 @@ cargo build --locked -p boost-service -p boost-web -p boost-start
 cargo run --locked -p boost-start
 ```
 
-打开 **[http://localhost:12580](http://localhost:12580)**。本地使用与部署后的 Web 均以 **12580** 为正常浏览器入口。
+打开 **[http://localhost:12000](http://localhost:12000)**。本地使用与部署后的 Web 均以 **12000** 为正常浏览器入口。
 
 桌面打包、Docker、开发热更新及持久化配置见[构建指南](docs/BUILDING.md)。
 
@@ -114,3 +114,5 @@ cargo run --locked -p boost-start
 ## 许可
 
 MIT。分发时请保留[项目许可](LICENSE)和[第三方声明](bot/THIRD_PARTY_NOTICES.md)。
+
+桌面版 API 默认地址为 `http://localhost:12580/v1`，Web 管理界面为 `http://localhost:12000`。升级会将已保存的旧本机默认端口 48760 迁移到 12580；显式环境变量和远程地址保持优先。点击主窗口关闭按钮时，先隐藏主窗口，再显示独立确认窗，提供“最小化”和“退出”两个操作并可记住选择；最小化会显示悬浮窗并继续运行服务，默认关闭行为可在系统设置中修改。悬浮窗拖动后吸附顶部或左右侧边，顶部横向、侧边竖向，双击返回主窗口。设置 → 悬浮窗可独立选择余量环、进度环、TPS 环及上传、下载和内存数据，窗口随显示内容收缩。任务监测支持内置 Bot 与本机 Codex、Claude Code、DeepSeek Harness；无可靠进度或速率采样时显示不定进度或“—”。更新来源由构建时仓库确定，历史运行时配置不能覆盖。 左侧搜索支持 Ctrl+K、页面导航与设置直达，并按权限过滤结果；顶部页面标题为 22px，与品牌同高。

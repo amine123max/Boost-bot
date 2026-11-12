@@ -103,6 +103,8 @@ jobs:
       PORTABLE_ONLY: ${{ inputs.portable_only || false }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
       - uses: actions/download-artifact@v4
         with:
           pattern: desktop-*
@@ -126,6 +128,23 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | map(select(.name | endswith(".exe") or endswith(".dmg"))) | length')" -eq 3
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$TEMP/release-assets.json"
+          python - <<'PY_CHECKSUM'
+          import json, os, pathlib, re
+          directory = pathlib.Path(os.environ["TEMP"])
+          release = json.loads((directory / "release-assets.json").read_text())
+          assets = sorted((asset for asset in release["assets"] if asset["name"].endswith((".exe", ".dmg"))), key=lambda asset: asset["name"])
+          if len(assets) != 3:
+              raise SystemExit("Expected three desktop release assets")
+          lines = []
+          for asset in assets:
+              digest = asset.get("digest", "")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                  raise SystemExit(f"Missing SHA-256 for {asset['name']}")
+              lines.append(f"{digest.removeprefix('sha256:')}  {asset['name']}\n")
+          (directory / "SHA256SUMS.txt").write_text("".join(lines), encoding="utf-8")
+          PY_CHECKSUM
+          gh release upload "$RELEASE_TAG" "$TEMP/SHA256SUMS.txt" --clobber
           if [[ -f "docs/releases/$RELEASE_TAG.md" ]]; then
             gh release edit "$RELEASE_TAG" --title "Boost ${RELEASE_TAG#v}" --notes-file "docs/releases/$RELEASE_TAG.md"
           fi

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import PanelCard from "./PanelCard.vue";
 import AppUpdateActions from "./AppUpdateActions.vue";
 import {
@@ -7,11 +6,6 @@ import {
   updateBusy,
   checkAppUpdate,
 } from "@/composables/useAppUpdates";
-const checkedAt = computed(() =>
-  appUpdates.check?.checkedAtUnixSecs
-    ? new Date(appUpdates.check.checkedAtUnixSecs * 1000).toLocaleString()
-    : "尚未检查",
-);
 </script>
 <template>
   <PanelCard title="应用更新" icon="rotate-ccw">
@@ -19,20 +13,14 @@ const checkedAt = computed(() =>
       <span>当前版本</span
       ><strong>{{ appUpdates.currentVersion || "读取中…" }}</strong>
     </div>
-    <div class="detail-line">
-      <span>更新仓库</span><strong>{{ appUpdates.repo || "尚未配置" }}</strong>
-    </div>
-    <div class="detail-line">
-      <span>上次检查</span><strong>{{ checkedAt }}</strong>
-    </div>
     <div v-if="appUpdates.check?.hasUpdate" class="detail-line">
       <span>可用版本</span><strong>{{ appUpdates.check.latestVersion }}</strong>
     </div>
-    <p v-if="appUpdates.check?.reason" class="hint">
+    <p v-if="appUpdates.check?.reason" class="update-status" role="status">
       {{ appUpdates.check.reason }}
     </p>
     <p v-if="appUpdates.error" role="alert">{{ appUpdates.error }}</p>
-    <div class="row">
+    <div class="update-actions">
       <button
         class="secondary"
         :disabled="updateBusy"
@@ -44,3 +32,9 @@ const checkedAt = computed(() =>
     </div>
   </PanelCard>
 </template>
+
+<style scoped>
+.update-status { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+.update-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 20px; }
+.update-actions button { flex-shrink: 0; }
+</style>

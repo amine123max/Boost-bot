@@ -39,24 +39,21 @@ pub(super) fn now_unix_secs() -> u64 {
 /// 返回函数执行结果
 pub(super) fn resolve_update_repo() -> String {
     configured_update_repo(
-        std::env::var("BOOST_UPDATE_REPO").ok().as_deref(),
-        Some(option_env!("BOOST_UPDATE_REPO").unwrap_or(DEFAULT_UPDATE_REPO)),
+        option_env!("BOOST_UPDATE_REPO"),
     )
 }
 
-fn configured_update_repo(runtime: Option<&str>, embedded: Option<&str>) -> String {
-    runtime
-        .into_iter()
-        .chain(embedded)
+fn configured_update_repo(embedded: Option<&str>) -> String {
+    embedded.into_iter()
         .map(str::trim)
         .find(|value| !value.is_empty())
-        .unwrap_or_default()
+        .unwrap_or(DEFAULT_UPDATE_REPO)
         .to_string()
 }
 
 pub(super) fn validate_update_repo(repo: &str) -> Result<(), String> {
     if repo.is_empty() {
-        return Err("尚未配置更新仓库。请使用你自己的 GitHub Releases 构建，或在构建/启动前设置 BOOST_UPDATE_REPO=你的账号/Boost-bot".to_string());
+        return Err("尚未配置更新仓库。请在构建前设置 BOOST_UPDATE_REPO=你的账号/Boost-bot".to_string());
     }
     let parts: Vec<_> = repo.split('/').collect();
     if parts.len() != 2
@@ -236,17 +233,17 @@ mod tests {
 
     #[test]
     fn update_repository_uses_only_explicit_configuration() {
-        assert_eq!(configured_update_repo(None, None), "");
+        assert_eq!(configured_update_repo(None), "amine123max/Boost-bot");
         assert_eq!(
-            configured_update_repo(None, Some(" owner/Boost-bot ")),
+            configured_update_repo(Some(" owner/Boost-bot ")),
             "owner/Boost-bot"
         );
         assert_eq!(
-            configured_update_repo(Some(" "), Some("owner/Boost-bot")),
-            "owner/Boost-bot"
+            configured_update_repo(Some(" ")),
+            "amine123max/Boost-bot"
         );
         assert_eq!(
-            configured_update_repo(Some("other/Boost-bot"), Some("owner/Boost-bot")),
+            configured_update_repo(Some("other/Boost-bot")),
             "other/Boost-bot"
         );
     }

@@ -20,6 +20,7 @@ use super::{
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AppSettingsPatch {
+    main_window_close_action: Option<String>,
     update_auto_check: Option<bool>,
     close_to_tray_on_close: Option<bool>,
     lightweight_mode_on_close_to_tray: Option<bool>,
@@ -81,6 +82,9 @@ pub(super) fn parse_app_settings_patch(params: Option<&Value>) -> Result<AppSett
 /// # 返回
 /// 返回函数执行结果
 pub(super) fn apply_app_settings_patch(patch: AppSettingsPatch) -> Result<(), String> {
+    if let Some(action) = patch.main_window_close_action {
+        crate::app_settings::set_main_window_close_action(&action)?;
+    }
     if let Some(enabled) = patch.update_auto_check {
         set_update_auto_check_enabled(enabled)?;
     }

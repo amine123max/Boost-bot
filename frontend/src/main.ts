@@ -11,6 +11,7 @@ if (import.meta.hot) import.meta.hot.dispose(removeButtonEffects);
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: "/close-confirm/", component: () => import("./components/MainWindowCloseDialog.vue") },
     { path: '/bot/:pathMatch(.*)*', component: () => import('./pages/BotPage.vue'), meta: { title: 'Boost 智能体' } },
     {
       path: "/tray-preview/:pathMatch(.*)*",

@@ -68,6 +68,7 @@ pub(crate) use store::{
     save_persisted_bool_setting,
 };
 pub use ui::{
+    current_main_window_close_action, set_main_window_close_action,
     current_close_to_tray_on_close_setting, current_codex_cli_guide_dismissed,
     current_lightweight_mode_on_close_to_tray_setting, current_ui_appearance_preset,
     current_ui_low_transparency_enabled, current_ui_theme, current_update_auto_check_enabled,

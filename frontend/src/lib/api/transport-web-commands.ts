@@ -670,9 +670,9 @@ export function createWebCommandMap(
         throw new Error("当前环境不支持打开本地目录");
       },
     },
-    app_tray_preview_expanded_set: {
-      direct: async () => {},
-    },
+    app_local_agent_activity: { direct: async () => ({ available: false, state: "unavailable", percent: null, activeTasks: 0, waitingTasks: 0 }) },
+    app_tray_layout_sync: { direct: async () => ({ edge: "floating", horizontal: false }) },
+    app_close_prompt_ready: { direct: async () => {} },
     app_hide_tray_preview_window: {
       direct: async () => {
         if (typeof window !== "undefined") {

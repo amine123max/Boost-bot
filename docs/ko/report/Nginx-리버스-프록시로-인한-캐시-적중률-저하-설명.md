@@ -122,8 +122,8 @@ send_timeout 3600s;
 
 이 예시는 다음을 함께 포함합니다.
 
-- `manager.example.com -> boost-service:48760`
-- `web.example.com -> boost-web:12580`
+- `manager.example.com -> boost-service:12580`
+- `web.example.com -> boost-web:12000`
 - HTTPS 리다이렉트
 - 밑줄 헤더 허용
 - 세션 관련 헤더 명시적 전달

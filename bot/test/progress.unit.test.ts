@@ -35,3 +35,12 @@ describe("request completion estimates", () => {
     expect(progressSnapshot([{ id: "a", state: "failed", percent: 35, updatedAt: now }], now)).toMatchObject({ state: "failed", percent: 35 });
   });
 });
+
+test("TPS uses reported model output and actual response duration", () => {
+  const log = new ActivityLog();
+  log.apply("step/start", { turn: 1, step: 1 }, 1000);
+  log.apply("assistant/message", { turn: 1, step: 1, message: { content: [] }, usage: { outputTokens: 90 } }, 4000);
+  expect(log.outputTps(4000)).toBe(30);
+  expect(log.outputTps(35000)).toBeNull();
+  expect(new ActivityLog().outputTps()).toBeNull();
+});

@@ -98,7 +98,7 @@ cargo build --locked -p boost-service -p boost-web -p boost-start
 cargo run --locked -p boost-start
 ```
 
-Open **[http://localhost:12580](http://localhost:12580)**. Both local use and hosted Web deployments use **port 12580** as the normal browser entry.
+Open **[http://localhost:12000](http://localhost:12000)**. Both local use and hosted Web deployments use **port 12000** as the normal browser entry.
 
 For desktop installers, Docker, development hot reload, and persistent storage, see the [build guide](docs/BUILDING.md).
 
@@ -124,3 +124,5 @@ For desktop installers, Docker, development hot reload, and persistent storage, 
 ## License
 
 MIT. Preserve the [project license](LICENSE) and [third-party notices](bot/THIRD_PARTY_NOTICES.md) when redistributing.
+
+The desktop API defaults to `http://localhost:12580/v1`; the Web management UI uses `http://localhost:12000`. Saved legacy local port 48760 migrates to 12580; explicit environment overrides and remote addresses are preserved. Closing the main window hides it and opens a standalone confirmation with Minimize, Exit and Remember my choice. Minimize shows the floating monitor while the service continues running; the default close behavior can be changed in System Settings. The compact monitor snaps to the top or either side, switches orientation, and returns to the main window on double-click. Settings → Floating monitor controls quota, task progress, TPS, upload, download and memory visibility; its size follows the selected items. Task monitoring supports the built-in Bot and local Codex, Claude Code and DeepSeek Harness logs. Missing estimates stay indeterminate and missing token-rate samples show “—”. Update sources are fixed at build time and cannot be overridden by historical runtime settings. Sidebar search supports Ctrl+K, page navigation and settings shortcuts with role filtering; 22px page headings align with the brand row.

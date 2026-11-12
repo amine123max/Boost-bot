@@ -1,6 +1,6 @@
 # 自动更新与 GitHub 发布
 
-项目仓库为 `amine123max/Boost-bot`。桌面版默认从此仓库的 GitHub Releases 检查版本；GitHub Actions 打包时还会通过 `BOOST_UPDATE_REPO=${{ github.repository }}` 将实际仓库名写入客户端。运行时设置 `BOOST_UPDATE_REPO=账号/仓库` 可显式覆盖。更新器不会回退到其他项目仓库。
+项目仓库为 `amine123max/Boost-bot`。桌面版默认从此仓库的 GitHub Releases 检查版本；GitHub Actions 打包时还会通过 `BOOST_UPDATE_REPO=${{ github.repository }}` 将实际仓库名写入客户端。更新源在构建时确定，运行时环境变量和历史设置不再覆盖；更新弹窗显示实际仓库。更新器不会回退到其他项目仓库。
 
 ## 用户决定是否更新
 

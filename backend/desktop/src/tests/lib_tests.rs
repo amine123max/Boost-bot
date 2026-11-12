@@ -31,7 +31,7 @@ fn normalize_addr_defaults_to_localhost() {
 
 #[test]
 fn localhost_socket_resolution_prefers_ipv4_loopback() {
-    let sockets = resolve_socket_addrs("localhost:48760").expect("resolve localhost sockets");
+    let sockets = resolve_socket_addrs("localhost:12580").expect("resolve localhost sockets");
 
     assert!(sockets.first().is_some_and(|socket| socket.is_ipv4()));
 }
@@ -168,7 +168,7 @@ fn rpc_call_falls_back_to_next_socket_after_empty_response() {
 
     let res = rpc_call_with_sockets(
         "initialize",
-        "localhost:48760",
+        "localhost:12580",
         &[bad_addr, good_addr],
         None,
     )

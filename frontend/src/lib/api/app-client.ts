@@ -346,6 +346,11 @@ export const appClient = {
   getCodexLatestVersion: () =>
     invoke<CodexLatestVersionInfo>("service_gateway_codex_latest_version_get"),
 
+  localAgentActivity: () => invoke<unknown>("app_local_agent_activity"),
+  syncTrayLayout: (rings: number, metrics: number) => invoke<{ edge: "floating" | "top" | "left" | "right"; horizontal: boolean }>("app_tray_layout_sync", { rings, metrics }),
+  closePromptReady: () => invoke<void>("app_close_prompt_ready"),
+  closeMainWindow: (action: "exit" | "floating" | "minimize", remember: boolean) =>
+    invoke<boolean>("app_main_window_close", { action, remember }),
   getCloseToTray: () => invoke<boolean>("app_close_to_tray_on_close_get"),
   setCloseToTray: (enabled: boolean) =>
     invoke("app_close_to_tray_on_close_set", { enabled }),
@@ -355,8 +360,6 @@ export const appClient = {
   openInFileManager: (path: string) => invoke("open_in_file_manager", { path }),
   showMainWindow: () => invoke("app_show_main_window"),
   hideTrayPreview: () => invoke<void>("app_hide_tray_preview_window"),
-  setTrayPreviewExpanded: (expanded: boolean) =>
-    invoke<void>("app_tray_preview_expanded_set", { expanded }),
   openUpdateLogsDir: (assetPath?: string) =>
     invoke("app_update_open_logs_dir", { assetPath: assetPath || null }),
 

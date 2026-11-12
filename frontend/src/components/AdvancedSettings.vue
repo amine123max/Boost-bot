@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "./HelpHint.vue";
 import DialogActions from "@/components/DialogActions.vue";
 import { computed, ref } from "vue";
 import BoostIcon from "./BoostIcon.vue";
@@ -99,17 +100,17 @@ async function saveTransport() {
 <template>
   <PanelCard title="Boost 高级设置" icon="settings"
     ><button class="setting-link" @click="guide = true">
-      <span>配置方法</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>配置方法</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="kind = 'interface'">
-      <span>界面设置</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>界面设置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openTransport">
-      <span>传输设置</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>传输设置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openConfig">
-      <span>当前配置</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>当前配置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openServiceConfig">
-      <span>服务配置</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>服务配置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="kind = 'environment'">
-      <span>环境配置</span><BoostIcon name="chevron-right" :size="16" /></button
+      <span>环境配置</span><BoostIcon name="settings" :size="16" /></button
     ><button
       v-if="isTauriRuntime()"
       class="setting-link"
@@ -172,13 +173,13 @@ async function saveTransport() {
           step="1000"
           required /></label
       ><label class="form-field"
-        >请求总超时（毫秒）<input
+        ><span>请求总超时（毫秒）<HelpHint label="请求总超时" text="0 表示不限制。" /></span><input aria-label="请求总超时（毫秒）"
           v-model="transport.upstreamTotalTimeoutMs"
           type="number"
           min="0"
           step="1000"
           required
-        /><small>0 表示不限制</small></label
+        /></label
       ><label class="form-field"
         >SSE 保活间隔（毫秒）<input
           v-model="transport.sseKeepaliveIntervalMs"

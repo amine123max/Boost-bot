@@ -343,13 +343,6 @@ pub(crate) const ENV_OVERRIDE_CATALOG: &[EnvOverrideCatalogItem] = &[
         "",
     ),
     EnvOverrideCatalogItem::new(
-        "BOOST_UPDATE_REPO",
-        "更新仓库",
-        ENV_OVERRIDE_SCOPE_DESKTOP,
-        ENV_OVERRIDE_APPLY_MODE_RESTART,
-        "qxcnm/Codex-Manager",
-    ),
-    EnvOverrideCatalogItem::new(
         "BOOST_UPSTREAM_BASE_URL",
         "上游基础地址",
         ENV_OVERRIDE_SCOPE_SERVICE,
@@ -438,7 +431,7 @@ pub(crate) const ENV_OVERRIDE_CATALOG: &[EnvOverrideCatalogItem] = &[
         "Web 监听地址",
         ENV_OVERRIDE_SCOPE_WEB,
         ENV_OVERRIDE_APPLY_MODE_RESTART,
-        "localhost:12580",
+        "localhost:12000",
     ),
     EnvOverrideCatalogItem::new(
         "BOOST_WEB_NO_OPEN",

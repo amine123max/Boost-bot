@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PanelCard from "./PanelCard.vue";
 import { uiPreferences } from "@/composables/useUiPreferences";
 import { typographyDefaults } from "@/lib/ui-typography";
 import { notify } from "@/composables/useNotifications";
@@ -9,7 +8,7 @@ function reset() {
 }
 </script>
 <template>
-  <PanelCard title="文字显示" icon="settings">
+  <div class="typography-settings">
     <div class="setting-row typography-row">
       <label for="boost-font-size" class="setting-label">界面字号</label>
       <div class="typography-control">
@@ -49,5 +48,5 @@ function reset() {
     <div class="form-actions">
       <button class="secondary" @click="reset">恢复默认</button>
     </div>
-  </PanelCard>
+  </div>
 </template>

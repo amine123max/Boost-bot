@@ -20,6 +20,7 @@ const routes = [
   "settings",
   "models",
   "tray-preview",
+  "close-confirm",
 ];
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");

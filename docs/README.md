@@ -2,9 +2,9 @@
 
 [English overview](../README.md) · [中文首页](../README.zh-CN.md)
 
-The normal browser entry for local use and hosted Web is **12580**. This index separates product documentation from implementation and operating guides.
+The normal browser entry for local use and hosted Web is **12000**. This index separates product documentation from implementation and operating guides.
 
-本地与部署后的正常浏览器入口均为 **12580**。首页介绍产品，各模块文档说明职责，长篇手册保留在语言目录。
+本地与部署后的正常浏览器入口均为 **12000**。首页介绍产品，各模块文档说明职责，长篇手册保留在语言目录。
 
 | Topic / 主题 | Entry / 入口 |
 | --- | --- |

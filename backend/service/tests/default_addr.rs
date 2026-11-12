@@ -75,7 +75,7 @@ fn with_bind_mode(mode: Option<&str>, test: impl FnOnce()) {
 /// 无
 #[test]
 fn default_addr_is_localhost() {
-    assert_eq!(boost_service::DEFAULT_ADDR, "localhost:48760");
+    assert_eq!(boost_service::DEFAULT_ADDR, "localhost:12580");
 }
 
 /// 函数 `default_bind_addr_is_all_interfaces`
@@ -90,7 +90,7 @@ fn default_addr_is_localhost() {
 /// 无
 #[test]
 fn default_bind_addr_is_all_interfaces() {
-    assert_eq!(boost_service::DEFAULT_BIND_ADDR, "0.0.0.0:48760");
+    assert_eq!(boost_service::DEFAULT_BIND_ADDR, "0.0.0.0:12580");
 }
 
 /// 函数 `default_web_addr_is_localhost`
@@ -105,7 +105,7 @@ fn default_bind_addr_is_all_interfaces() {
 /// 无
 #[test]
 fn default_web_addr_is_localhost() {
-    assert_eq!(boost_service::DEFAULT_WEB_ADDR, "localhost:12580");
+    assert_eq!(boost_service::DEFAULT_WEB_ADDR, "localhost:12000");
 }
 
 /// 函数 `default_web_bind_addr_is_all_interfaces`
@@ -120,7 +120,7 @@ fn default_web_addr_is_localhost() {
 /// 无
 #[test]
 fn default_web_bind_addr_is_all_interfaces() {
-    assert_eq!(boost_service::DEFAULT_WEB_BIND_ADDR, "0.0.0.0:12580");
+    assert_eq!(boost_service::DEFAULT_WEB_BIND_ADDR, "0.0.0.0:12000");
 }
 
 /// 函数 `listener_bind_addr_defaults_to_loopback`
@@ -138,15 +138,15 @@ fn listener_bind_addr_defaults_to_loopback() {
     with_bind_mode(None, || {
         assert_eq!(
             boost_service::default_listener_bind_addr(),
-            "localhost:48760"
+            "localhost:12580"
         );
         assert_eq!(
-            boost_service::listener_bind_addr("localhost:48760"),
-            "localhost:48760"
+            boost_service::listener_bind_addr("localhost:12580"),
+            "localhost:12580"
         );
         assert_eq!(
-            boost_service::listener_bind_addr("127.0.0.1:48760"),
-            "localhost:48760"
+            boost_service::listener_bind_addr("127.0.0.1:12580"),
+            "localhost:12580"
         );
     });
 }
@@ -168,15 +168,15 @@ fn listener_bind_addr_maps_loopback_to_all_interfaces_when_enabled() {
         || {
             assert_eq!(
                 boost_service::default_listener_bind_addr(),
-                "0.0.0.0:48760"
+                "0.0.0.0:12580"
             );
             assert_eq!(
-                boost_service::listener_bind_addr("localhost:48760"),
-                "0.0.0.0:48760"
+                boost_service::listener_bind_addr("localhost:12580"),
+                "0.0.0.0:12580"
             );
             assert_eq!(
-                boost_service::listener_bind_addr("127.0.0.1:48760"),
-                "0.0.0.0:48760"
+                boost_service::listener_bind_addr("127.0.0.1:12580"),
+                "0.0.0.0:12580"
             );
         },
     );
@@ -197,14 +197,14 @@ fn default_web_listener_addr_tracks_service_bind_mode() {
     with_bind_mode(None, || {
         assert_eq!(
             boost_service::default_web_listener_addr(),
-            "localhost:12580"
+            "localhost:12000"
         );
     });
 
     with_bind_mode(
         Some(boost_service::SERVICE_BIND_MODE_ALL_INTERFACES),
         || {
-            assert_eq!(boost_service::default_web_listener_addr(), "0.0.0.0:12580");
+            assert_eq!(boost_service::default_web_listener_addr(), "0.0.0.0:12000");
         },
     );
 }
@@ -269,12 +269,12 @@ fn default_web_listener_addr_tracks_service_port_offset() {
 fn listener_bind_addr_keeps_explicit_all_interfaces() {
     with_bind_mode(None, || {
         assert_eq!(
-            boost_service::listener_bind_addr("0.0.0.0:48760"),
-            "0.0.0.0:48760"
+            boost_service::listener_bind_addr("0.0.0.0:12580"),
+            "0.0.0.0:12580"
         );
         assert_eq!(
-            boost_service::listener_bind_addr("192.168.1.10:48760"),
-            "192.168.1.10:48760"
+            boost_service::listener_bind_addr("192.168.1.10:12580"),
+            "192.168.1.10:12580"
         );
     });
 }
@@ -294,12 +294,12 @@ fn current_service_bind_mode_prefers_runtime_env() {
     with_bind_mode(
         Some(boost_service::SERVICE_BIND_MODE_ALL_INTERFACES),
         || {
-            std::env::set_var("BOOST_SERVICE_ADDR", "localhost:48760");
+            std::env::set_var("BOOST_SERVICE_ADDR", "localhost:12580");
             assert_eq!(
                 boost_service::current_service_bind_mode(),
                 boost_service::SERVICE_BIND_MODE_LOOPBACK
             );
-            std::env::set_var("BOOST_SERVICE_ADDR", "0.0.0.0:48760");
+            std::env::set_var("BOOST_SERVICE_ADDR", "0.0.0.0:12580");
             assert_eq!(
                 boost_service::current_service_bind_mode(),
                 boost_service::SERVICE_BIND_MODE_ALL_INTERFACES

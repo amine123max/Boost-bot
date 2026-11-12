@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "./HelpHint.vue";
 defineProps<{
   label: string;
   description?: string;
@@ -11,7 +12,7 @@ defineEmits<{ "update:modelValue": [value: boolean] }>();
   <div class="setting-row">
     <div class="setting-label">
       {{ label }}
-      <p v-if="description">{{ description }}</p>
+      <HelpHint v-if="description" :label="label" :text="description" />
     </div>
     <button
       class="switch"

@@ -39,7 +39,7 @@ Keep the staged `boost-bot/` beside the service binaries, including its dependen
 ## Runtime contract
 
 - The service starts actor-scoped hosts and supplies an existing authorized platform key through stdin; browsers do not receive model secrets.
-- Web pages, static resources, downloads and SSE pass through authenticated Boost Web. The normal application entry is **12580**.
+- Web pages, static resources, downloads and SSE pass through authenticated Boost Web. The normal application entry is **12000**.
 - Member sessions can chat in their own scope; server tools, task mutations, channel credentials and system configuration require administrator authority.
 - Messaging channels require real platform credentials. Computer control also depends on host system permissions and a usable graphical session.
 - `BOOST_BOT_ROOT` locates the prepared runtime; `BOOST_BOT_NODE` selects Node. Optional signed catalogs use `BOOST_BOT_CATALOG_URL` and `BOOST_BOT_CATALOG_PUBKEY` together.

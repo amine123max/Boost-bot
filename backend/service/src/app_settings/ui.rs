@@ -304,3 +304,19 @@ mod tests {
         assert_eq!(normalize_ui_locale(Some("ko-kr")), "ko");
     }
 }
+
+const MAIN_WINDOW_CLOSE_ACTION_KEY: &str = "app.main_window_close_action";
+
+pub fn current_main_window_close_action() -> String {
+    get_persisted_app_setting(MAIN_WINDOW_CLOSE_ACTION_KEY)
+        .filter(|value| matches!(value.as_str(), "ask" | "exit" | "floating" | "minimize"))
+        .unwrap_or_else(|| "ask".to_string())
+}
+
+pub fn set_main_window_close_action(action: &str) -> Result<String, String> {
+    if !matches!(action, "ask" | "exit" | "floating" | "minimize") {
+        return Err("无效的窗口关闭行为".to_string());
+    }
+    save_persisted_app_setting(MAIN_WINDOW_CLOSE_ACTION_KEY, Some(action))?;
+    Ok(action.to_string())
+}

@@ -187,6 +187,9 @@ fn fetch_latest_release_via_html(client: &Client, repo: &str) -> Result<GitHubRe
         .map_err(|err| format!("最新发布页跳转响应异常：{err}"))?;
 
     let final_url = response.url().as_str().to_string();
+    if !final_url.starts_with(&format!("https://github.com/{repo}/releases/tag/")) {
+        return Err(format!("更新页面跳转到了其他来源：{final_url}"));
+    }
     let tag = extract_tag_from_release_url(&final_url)
         .ok_or_else(|| format!("无法从 GitHub Releases 地址解析最新标签：{final_url}"))?;
     let html = response

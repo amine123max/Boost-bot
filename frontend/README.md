@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Project](../README.md) · [Build guide](../docs/BUILDING.md)
 
-Vue 3, TypeScript and Vite provide the management interface for desktop and Web. The production Web entry is **http://localhost:12580**. The native desktop package lives separately in `backend/desktop/`.
+Vue 3, TypeScript and Vite provide the management interface for desktop and Web. The production Web entry is **http://localhost:12000**. The native desktop package lives separately in `backend/desktop/`.
 
 ![Boost interface](../docs/images/dashboard-dark.png)
 

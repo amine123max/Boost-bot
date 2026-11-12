@@ -360,6 +360,20 @@ fn asset_download_source<'a>(
             return Ok((url, true));
         }
     }
+    let url = reqwest::Url::parse(&asset.browser_download_url)
+        .map_err(|_| "发布资产下载地址无效".to_string())?;
+    let prefix = format!("/{repo}/releases/download/");
+    if url.scheme() != "https"
+        || url.host_str() != Some("github.com")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+        || !url.path().strip_prefix(&prefix).is_some_and(|tail| {
+            tail.split_once('/').is_some_and(|(tag, file)| !tag.is_empty() && !file.is_empty())
+        })
+    {
+        return Err("发布资产下载地址不属于当前更新仓库".to_string());
+    }
     Ok((&asset.browser_download_url, false))
 }
 
@@ -748,6 +762,7 @@ pub(super) fn prepare_update_impl(app: &tauri::AppHandle) -> Result<UpdatePrepar
     );
 
     let mut pending = PendingUpdate {
+        repo: context.check.repo.clone(),
         mode: context.check.mode.clone(),
         is_portable: context.check.is_portable,
         release_tag: context.check.release_tag.clone(),
@@ -815,6 +830,19 @@ mod tests {
         select_macos_dmg_asset_for_arch,
     };
     use crate::commands::updater::model::GitHubAsset;
+
+    #[test]
+    fn public_asset_download_rejects_other_sources() {
+        for url in [
+            "https://github.com/other/repo/releases/download/v1.0/Boost.exe",
+            "https://mirror.example/owner/Boost-bot/releases/download/v1.0/Boost.exe",
+            "http://github.com/owner/Boost-bot/releases/download/v1.0/Boost.exe",
+            "https://github.com/owner/Boost-bot/releases/download/../../other/Boost.exe",
+        ] {
+            let asset = GitHubAsset { name: "Boost.exe".into(), browser_download_url: url.into(), api_url: None };
+            assert!(asset_download_source(&asset, "owner/Boost-bot", false).is_err());
+        }
+    }
 
     #[test]
     fn authenticated_asset_download_uses_only_the_configured_repository_api() {

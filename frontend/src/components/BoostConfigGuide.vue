@@ -15,7 +15,7 @@ const model = ref("");
 const models = ref<{ slug: string; displayName: string }[]>([]);
 const endpoint = ref("");
 onMounted(async () => {
-  const raw = boost.settings?.serviceAddr || "localhost:48760";
+  const raw = boost.settings?.serviceAddr || "localhost:12580";
   try {
     const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
     if (["0.0.0.0", "[::]"].includes(url.hostname)) url.hostname = "localhost";
@@ -25,7 +25,7 @@ onMounted(async () => {
     url.hash = "";
     endpoint.value = url.toString().replace(/\/$/, "");
   } catch {
-    endpoint.value = "http://localhost:48760/v1";
+    endpoint.value = "http://localhost:12580/v1";
   }
   await perform(async () => {
     models.value = (await accountClient.listManagedModels()).items.filter(

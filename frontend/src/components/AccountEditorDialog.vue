@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "@/components/HelpHint.vue";
 import { ref } from "vue";
 import type { Account } from "@/types";
 import BoostDialog from "./BoostDialog.vue";
@@ -77,7 +78,7 @@ async function save() {
         >标签<input v-model="tags" placeholder="多个标签以逗号分隔"
       /></label>
       <label class="form-field">备注<textarea v-model="note" rows="2" /></label>
-      <div class="form-field"><span>账号代理节点</span><AccountNodeControl :account-id="account.id" /><small>选择后即时生效；固定节点失效时阻断请求。</small></div>
+      <div class="form-field"><span>账号代理节点<HelpHint label="账号代理节点" text="选择后即时生效；固定节点失效时阻断请求。" /></span><AccountNodeControl :account-id="account.id" /></div>
       <button
         type="button"
         class="text-button"

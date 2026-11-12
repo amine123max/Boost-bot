@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "./HelpHint.vue";
 import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import BoostIcon from "./BoostIcon.vue";
 import { useUsageHistory } from "@/composables/useUsageHistory";
@@ -212,17 +213,12 @@ function moveCell(event: KeyboardEvent) {
         type="button"
         class="usage-summary-metric"
         :class="{ selected: selected === metric.id }"
-        :title="metric.hint"
         :aria-pressed="selected === metric.id"
         @click="selected = metric.id"
       >
         <span class="usage-summary-label"
           >{{ metric.label
-          }}<BoostIcon
-            v-if="metric.id === 'tokens' || metric.id === 'cache'"
-            name="circle-help"
-            :size="14"
-        /></span>
+          }}<HelpHint :label="metric.label" :text="metric.hint" /></span>
         <strong>{{ metric.value }}</strong>
       </button>
     </div>

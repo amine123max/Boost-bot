@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DB_PATH="${BOOST_DB_PATH:-/Users/kilimiao/Codex-Manager/.codex-manager-run/boost-dev.db}"
-GATEWAY_URL="${BOOST_GATEWAY_URL:-http://localhost:48760}"
+GATEWAY_URL="${BOOST_GATEWAY_URL:-http://localhost:12580}"
 QUOTA_LIMIT_TOKENS="${QUOTA_LIMIT_TOKENS:-1000}"
 
 require_cmd() {

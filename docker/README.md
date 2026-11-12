@@ -2,9 +2,9 @@
 
 [Project](../README.md) · [中文首页](../README.zh-CN.md) · [Build guide](../docs/BUILDING.md)
 
-The Dockerfiles build `frontend/`, `backend/` and the prepared `bot/` runtime from this checkout. The user-facing Web port is **12580**.
+The Dockerfiles build `frontend/`, `backend/` and the prepared `bot/` runtime from this checkout. The user-facing Web port is **12000**.
 
-Dockerfile 从当前源码构建前端、后端和 Bot 运行时，用户访问端口为 **12580**。
+Dockerfile 从当前源码构建前端、后端和 Bot 运行时，用户访问端口为 **12000**。
 
 | File | Purpose / 用途 |
 | --- | --- |
@@ -20,9 +20,9 @@ docker compose -f docker/docker-compose.all-in-one.yml config --quiet
 docker compose -f docker/docker-compose.all-in-one.yml up --build -d
 ```
 
-Open `http://localhost:12580`. The named `boost-data` volume persists `/data`; retain it across container updates. `BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` point into this volume. Split deployments share the same data/token volume.
+Open `http://localhost:12000`. The named `boost-data` volume persists `/data`; retain it across container updates. `BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` point into this volume. Split deployments share the same data/token volume.
 
-访问 `http://localhost:12580`。`boost-data` 命名卷持久化 `/data`，更新容器时保留该卷；数据库和 RPC Token 位于其中。分离式部署需要共享数据和 Token 卷。
+访问 `http://localhost:12000`。`boost-data` 命名卷持久化 `/data`，更新容器时保留该卷；数据库和 RPC Token 位于其中。分离式部署需要共享数据和 Token 卷。
 
 The root `docker-compose.yml` is a separate registry-image example, not a source build. Its image tag and registry are deployment choices; it is not a substitute for validating the current checkout's build.
 

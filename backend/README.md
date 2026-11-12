@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Project overview](../README.md) · [Architecture](../ARCHITECTURE.md)
 
-The Rust backend owns persistence, account and key authorization, gateway routing, the authenticated Web runtime, process lifecycle, and native desktop capabilities. The public Web interface uses **port 12580** for local and hosted deployments.
+The Rust backend owns persistence, account and key authorization, gateway routing, the authenticated Web runtime, process lifecycle, and native desktop capabilities. The public Web interface uses **port 12000** for local and hosted deployments.
 
 | Package | Responsibility | Build scope |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ cargo build --locked -p boost-service -p boost-web -p boost-start
 cargo run --locked -p boost-start
 ```
 
-Open `http://localhost:12580`. `web/build.rs` embeds `frontend/out/` when the default `embedded-ui` feature is enabled. Rebuild Web after changing the static frontend.
+Open `http://localhost:12000`. `web/build.rs` embeds `frontend/out/` when the default `embedded-ui` feature is enabled. Rebuild Web after changing the static frontend.
 
 For desktop work:
 

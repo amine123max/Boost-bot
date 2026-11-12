@@ -15,18 +15,18 @@ RUN apt-get update \
 
 COPY boost-web /usr/local/bin/boost-web
 
-ENV BOOST_WEB_ADDR=0.0.0.0:12580
+ENV BOOST_WEB_ADDR=0.0.0.0:12000
 ENV BOOST_WEB_NO_SPAWN_SERVICE=1
 ENV BOOST_WEB_NO_OPEN=1
-ENV BOOST_SERVICE_ADDR=boost-service:48760
+ENV BOOST_SERVICE_ADDR=boost-service:12580
 ENV BOOST_DB_PATH=/data/boost.db
 ENV BOOST_RPC_TOKEN_FILE=/data/boost.rpc-token
 
 VOLUME ["/data"]
-EXPOSE 12580
+EXPOSE 12000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:12580/__auth_status || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:12000/__auth_status || exit 1
 
 USER ${APP_USER}
 

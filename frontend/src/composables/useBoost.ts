@@ -175,7 +175,7 @@ export async function refreshData() {
   if (boost.error) notify(boost.error, true);
   boost.updatedAt = new Date();
 }
-export async function initialize() {
+export async function initialize(options: { startService?: boolean } = {}) {
   if (boost.loading) return;
   boost.loading = true;
   boost.error = "";
@@ -190,7 +190,8 @@ export async function initialize() {
     useAppStore
       .getState()
       .setServiceStatus({ addr: boost.settings.serviceAddr });
-    if (isTauriRuntime()) await serviceClient.start(boost.settings.serviceAddr);
+    if (isTauriRuntime() && options.startService !== false)
+      await serviceClient.start(boost.settings.serviceAddr);
     await serviceClient.initialize();
     boost.session = await appClient.getCurrentSession();
     boost.connected = true;

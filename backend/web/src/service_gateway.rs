@@ -514,7 +514,7 @@ fn format_upstream_error_message(service_addr: &str, err: impl std::fmt::Display
     let mut message = format!("upstream error: {err}");
     if service_addr.contains("host.docker.internal") {
         message.push_str(
-            "; Linux Docker 中 `host.docker.internal` 可能不可解析，建议让 web 与 service 加入同一 Docker 网络，并使用容器地址如 `boost-service:48760`；如果必须走宿主机端口，请增加 `--add-host=host.docker.internal:host-gateway`",
+            "; Linux Docker 中 `host.docker.internal` 可能不可解析，建议让 web 与 service 加入同一 Docker 网络，并使用容器地址如 `boost-service:12580`；如果必须走宿主机端口，请增加 `--add-host=host.docker.internal:host-gateway`",
         );
     }
     message
@@ -592,15 +592,15 @@ mod tests {
         let err = std::io::Error::other("dns failed");
         let message = format_upstream_error_message("host.docker.internal:9760", &err);
         assert!(message.contains("host.docker.internal"));
-        assert!(message.contains("boost-service:48760"));
+        assert!(message.contains("boost-service:12580"));
     }
 
     #[test]
     fn gateway_proxy_target_url_preserves_path_and_query() {
         let uri: Uri = "/v1/responses?stream=true".parse().expect("valid uri");
         assert_eq!(
-            gateway_proxy_target_url("localhost:48760", &uri),
-            "http://localhost:48760/v1/responses?stream=true"
+            gateway_proxy_target_url("localhost:12580", &uri),
+            "http://localhost:12580/v1/responses?stream=true"
         );
     }
 

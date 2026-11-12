@@ -167,8 +167,8 @@ send_timeout 3600s;
 
 这份示例同时覆盖了：
 
-- `manager.example.com -> boost-service:48760`
-- `web.example.com -> boost-web:12580`
+- `manager.example.com -> boost-service:12580`
+- `web.example.com -> boost-web:12000`
 - HTTPS 跳转
 - 下划线请求头支持
 - 会话相关头透传

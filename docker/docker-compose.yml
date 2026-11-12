@@ -5,7 +5,7 @@ services:
       dockerfile: docker/Dockerfile.service
     restart: unless-stopped
     environment:
-      BOOST_SERVICE_ADDR: 0.0.0.0:48760
+      BOOST_SERVICE_ADDR: 0.0.0.0:12580
       BOOST_DB_PATH: /data/boost.db
       BOOST_RPC_TOKEN_FILE: /data/boost.rpc-token
       BOOST_GATEWAY_TRACE_STDOUT: "1"
@@ -15,7 +15,7 @@ services:
     volumes:
       - boost-data:/data
     ports:
-      - "48760:48760"
+      - "12580:12580"
 
   boost-web:
     build:
@@ -26,9 +26,9 @@ services:
       boost-service:
         condition: service_healthy
     environment:
-      BOOST_WEB_ADDR: 0.0.0.0:12580
+      BOOST_WEB_ADDR: 0.0.0.0:12000
       BOOST_WEB_NO_SPAWN_SERVICE: "1"
-      BOOST_SERVICE_ADDR: boost-service:48760
+      BOOST_SERVICE_ADDR: boost-service:12580
       BOOST_DB_PATH: /data/boost.db
       BOOST_RPC_TOKEN_FILE: /data/boost.rpc-token
       BOOST_WEB_NO_OPEN: "1"
@@ -39,7 +39,7 @@ services:
     volumes:
       - boost-data:/data
     ports:
-      - "12580:12580"
+      - "12000:12000"
 
 volumes:
   boost-data:

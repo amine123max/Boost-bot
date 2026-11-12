@@ -8,7 +8,7 @@ async function setup(page: Page, fail = false, member = false) {
   await page.route("**/api/rpc", async route => {
     const { method, id } = route.request().postDataJSON();
     let result: unknown = { items: [] };
-    if (method === "appSettings/get") result = { locale: "zh-CN", theme: "tech", codexCliGuideDismissed: true, serviceAddr: "localhost:48760", backgroundTasks: { usagePollingEnabled: false } };
+    if (method === "appSettings/get") result = { locale: "zh-CN", theme: "tech", codexCliGuideDismissed: true, serviceAddr: "localhost:12580", backgroundTasks: { usagePollingEnabled: false } };
     if (method === "initialize") result = { userAgent: "codex_cli_rs/0.1.19", codexHome: "C:/Test", platformFamily: "windows", platformOs: "windows" };
     if (method === "accountManager/session/current") result = { mode: member ? "accounts" : "none", role: member ? "member" : "system_admin", permissions: [], currentUser: member ? { id: "member", role: "member", username: "member" } : null };
     if (method === "quota/modelPriceRules") result = rules;

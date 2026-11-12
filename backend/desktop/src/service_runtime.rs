@@ -94,6 +94,12 @@ struct ServiceRuntime {
 
 static SERVICE_RUNTIME: OnceLock<Mutex<Option<ServiceRuntime>>> = OnceLock::new();
 
+pub(super) fn service_is_running_at(addr: &str) -> bool {
+    SERVICE_RUNTIME.get_or_init(|| Mutex::new(None)).lock()
+        .map(|slot| slot.as_ref().is_some_and(|runtime| runtime.addr == addr && !runtime.join.is_finished()))
+        .unwrap_or(false)
+}
+
 /// 函数 `set_service_runtime`
 ///
 ///

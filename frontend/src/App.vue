@@ -8,6 +8,9 @@ import { prepareBotLaunch } from './composables/useBotLaunch';
 import BoostDialog from "./components/BoostDialog.vue";
 import NotificationCenter from "./components/NotificationCenter.vue";
 import AppUpdateNotice from "./components/AppUpdateNotice.vue";
+import GitHubLink from "./components/GitHubLink.vue";
+import HelpHint from "./components/HelpHint.vue";
+import { useMainWindowEvents } from "./composables/useMainWindowEvents";
 import { version as appVersion } from "../package.json";
 import { useAutomaticAppUpdates } from "./composables/useAppUpdates";
 import {
@@ -18,29 +21,22 @@ import {
 } from "./composables/useBoost";
 import { useTelemetry } from "./composables/useTelemetry";
 import { uiPreferences } from "./composables/useUiPreferences";
+import SidebarSearch from "./components/SidebarSearch.vue";
+import { navigation } from "./lib/navigation";
 import SidebarTraffic from "./components/SidebarTraffic.vue";
 import { useLiveUsage } from "./composables/useLiveUsage";
 import { useStartupReady, startupContentReady } from "./composables/useStartupReady";
 useLiveUsage();
 const { telemetry, error: telemetryError, upload, download } = useTelemetry();
 const route = useRoute();
-if (!route.path.startsWith("/tray-preview")) useAutomaticAppUpdates();
+const closePrompt = route.path.startsWith("/close-confirm");
+if (!closePrompt && !route.path.startsWith("/tray-preview")) { useAutomaticAppUpdates(); useMainWindowEvents(); }
 const startupReady = useStartupReady(() =>
   route.path.startsWith("/bot/") || route.path === "/bot"
     ? startupContentReady.value
     : boost.ready,
 );
 const about = ref(false);
-const navigation = [
-  { path: "/home/", title: "首页", icon: "layout-dashboard" },
-  { path: "/accounts/", title: "账号管理", icon: "users-round" },
-  { path: "/aggregate-api/", title: "聚合API", icon: "network", admin: true },
-  { path: "/apikeys/", title: "密钥", icon: "key-round" },
-  { path: "/logs/", title: "日志", icon: "scroll-text" },
-  { path: "/tests/", title: "测试", icon: "flask-conical" },
-  { path: "/models/", title: "模型", icon: "boxes" },
-  { path: "/settings/", title: "设置", icon: "settings" },
-];
 const refreshing = ref(false);
 async function refresh() {
   refreshing.value = true;
@@ -51,10 +47,10 @@ async function refresh() {
     refreshing.value = false;
   }
 }
-onMounted(initialize);
+onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.startsWith('/tray-preview') }); });
 </script>
 <template>
-  <RouterView v-if="route.path.startsWith('/tray-preview')" />
+  <RouterView v-if="closePrompt || route.path.startsWith('/tray-preview')" />
   <RouterView v-else-if="route.path.startsWith('/bot/') || route.path === '/bot'" />
   <div
     v-else
@@ -68,6 +64,7 @@ onMounted(initialize);
           >Boost</span
         ></RouterLink
       >
+      <SidebarSearch />
       <nav aria-label="主导航">
         <RouterLink
           v-for="item in navigation.filter((n) => !n.admin || isAdmin)"
@@ -160,7 +157,7 @@ onMounted(initialize);
           <BoostIcon name="plug" :size="42" />
           <h2>连接你的 Boost 服务</h2>
           <p>桌面版会自动启动本地服务。Web 版请通过 Boost Web 地址访问。</p>
-          <button class="primary" @click="initialize">
+          <button class="primary" @click="initialize()">
             <BoostIcon name="rotate-ccw" :size="16" />重新连接
           </button>
         </div>
@@ -173,14 +170,14 @@ onMounted(initialize);
         <h2>Boost <small>{{ appVersion }}</small></h2>
         <p>轻巧、专注的 AI 服务管理工具</p>
       </div>
-      <div class="hint">统一管理账号、聚合 API、平台密钥与模型。</div>
+      <div class="about-links"><GitHubLink /><HelpHint label="Boost" text="统一管理账号、聚合 API、平台密钥与模型。" /></div>
       <button class="primary full-width" @click="about = false">
         开始使用
       </button></BoostDialog
     >
   </div>
-  <BoostStartup v-if="!startupReady && !route.path.startsWith('/bot') && !route.path.startsWith('/tray-preview')" :error="!boost.loading ? boost.error : ''" @retry="initialize" />
-  <AppUpdateNotice v-if="!route.path.startsWith('/tray-preview')" />
+  <BoostStartup v-if="!closePrompt && !startupReady && !route.path.startsWith('/bot') && !route.path.startsWith('/tray-preview')" :error="!boost.loading ? boost.error : ''" @retry="initialize()" />
+  <AppUpdateNotice v-if="!closePrompt && !route.path.startsWith('/tray-preview')" />
 </template>
 <style>
 .app-booting { visibility: hidden; }

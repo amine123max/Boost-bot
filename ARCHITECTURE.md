@@ -2,13 +2,13 @@
 
 [English overview](README.md) · [中文首页](README.zh-CN.md) · [Module index](docs/README.md)
 
-Boost has three source boundaries: **frontend**, **backend**, and **Bot**. The normal local/hosted Web entry is **12580**.
+Boost has three source boundaries: **frontend**, **backend**, and **Bot**. The normal local/hosted Web entry is **12000**.
 
 ## Process boundaries / 进程边界
 
 ```mermaid
 flowchart LR
-  Browser[Browser :12580] --> Web[boost-web: sessions and static UI]
+  Browser[Browser :12000] --> Web[boost-web: sessions and static UI]
   Desktop[Tauri desktop] --> IPC[Native IPC]
   IPC --> Service[boost-service]
   Web --> Service

@@ -1,14 +1,27 @@
 <script setup lang="ts">
 import BoostBotAvatar from "./BoostBotAvatar.vue";
 import type { BotActivity } from "@/lib/bot-activity";
-defineProps<{ activity: BotActivity; label: string; active?: boolean }>();
+withDefaults(
+  defineProps<{
+    activity: BotActivity;
+    label: string;
+    active?: boolean;
+    compact?: boolean;
+    showValue?: boolean;
+  }>(),
+  { showValue: false },
+);
 </script>
 <template>
   <span
     class="bot-task-progress"
     :class="[
       activity.state,
-      { pending: activity.state === 'working' && activity.percent == null },
+      { compact },
+      {
+        pending: activity.state === 'working' && activity.percent == null,
+        stale: activity.stale,
+      },
     ]"
     role="progressbar"
     :aria-label="label"
@@ -33,14 +46,33 @@ defineProps<{ activity: BotActivity; label: string; active?: boolean }>();
         "
       />
     </svg>
+    <strong
+      v-if="showValue && activity.percent != null"
+      class="bot-task-number"
+      >{{ activity.percent }}</strong
+    >
     <BoostBotAvatar
-      :size="34"
+      v-else
+      :size="compact ? 18 : 34"
       :active="active || activity.state === 'working'"
       :thinking="activity.state === 'working'"
     />
   </span>
 </template>
 <style scoped>
+.bot-task-progress.compact {
+  width: 28px;
+  height: 28px;
+}
+.bot-task-number {
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.bot-task-progress.stale .bot-task-arc {
+  opacity: 0.4;
+}
 .bot-task-progress {
   position: relative;
   display: grid;

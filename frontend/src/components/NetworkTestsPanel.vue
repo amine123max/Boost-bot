@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HelpHint from "@/components/HelpHint.vue";
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import BoostIcon from "./BoostIcon.vue";
 import BoostMenu, { type MenuItem } from "./BoostMenu.vue";
@@ -397,9 +398,7 @@ onBeforeUnmount(() => clearInterval(timer));
             v-model="replace"
             type="checkbox"
             :disabled="busy"
-          />替换现有节点列表</label
-        ><small class="muted"
-          >默认追加并去重。被移除节点的账号绑定会保留并阻断请求，请重新指定节点。</small
+          />替换现有节点列表<HelpHint label="替换节点" text="默认追加并去重。被移除节点的账号绑定会保留并阻断请求，请重新指定节点。" /></label
         ><DialogActions
           ><button
             type="button"
@@ -427,13 +426,9 @@ onBeforeUnmount(() => clearInterval(timer));
           ><strong>{{ snapshot?.kernel.installedVersion || "未安装" }}</strong>
         </div>
         <div class="form-field" v-if="snapshot?.kernel.localPath">
-          <span>本地内核</span
+          <span>本地内核<HelpHint label="本地内核" :text="snapshot.kernel.source === 'managed' ? 'Boost 托管内核' : '优先复用已安装的本地内核'" /></span
           ><code class="kernel-path">{{ snapshot.kernel.localPath }}</code
-          ><small>{{
-            snapshot.kernel.source === "managed"
-              ? "Boost 托管内核"
-              : "优先复用已安装的本地内核"
-          }}</small>
+          >
         </div>
         <div class="setting-row">
           <span>最新版本</span
@@ -441,9 +436,7 @@ onBeforeUnmount(() => clearInterval(timer));
         </div>
         <div class="setting-row">
           <span
-            >自动更新<small class="muted"
-              >每日检查并更新官方稳定版本</small
-            ></span
+            >自动更新<HelpHint label="内核自动更新" text="每日检查并更新官方稳定版本。" /></span
           ><input
             type="checkbox"
             role="switch"
@@ -457,11 +450,7 @@ onBeforeUnmount(() => clearInterval(timer));
             "
           />
         </div>
-        <p class="muted">
-          优先搜索并复用本地
-          sing-box，未找到可用内核才下载安装。手动更新或启用自动更新后可下载新版，校验
-          SHA-256 和节点配置后启用。
-        </p>
+        <span>内核管理<HelpHint label="内核管理" text="优先复用本地 sing-box；手动或自动更新下载新版后，校验 SHA-256 和节点配置再启用。" /></span>
         <p v-if="snapshot?.kernel.error" class="network-error" role="alert">
           {{ snapshot.kernel.error }}
         </p>
@@ -527,10 +516,7 @@ onBeforeUnmount(() => clearInterval(timer));
               :disabled="busy"
           /></label>
         </div>
-        <small class="muted"
-          >本地指 Boost
-          服务端所在机器。添加后通过该代理查询真实出口国家，成功后自动显示国旗；查询失败显示待检测。</small
-        >
+        <span>本地代理<HelpHint label="本地代理" text="本地指 Boost 服务端所在机器。添加后查询真实出口国家，成功后显示国旗；失败时显示待检测。" /></span>
         <DialogActions
           ><button
             class="secondary"

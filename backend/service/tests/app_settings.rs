@@ -11,6 +11,35 @@ use support::test_env_guard;
 const CODEX_IMAGE_AUTO_INJECT_TOOL_ENV: &str =
     "BOOST_CODEX_IMAGE_GENERATION_AUTO_INJECT_TOOL";
 
+#[test]
+fn main_window_close_action_defaults_persists_and_validates() {
+    with_temp_db(|_| {
+        assert_eq!(boost_service::current_main_window_close_action(), "ask");
+        for action in ["exit", "floating", "minimize", "ask"] {
+            let result = boost_service::app_settings_set(Some(&json!({"mainWindowCloseAction": action}))).unwrap();
+            assert_eq!(result["mainWindowCloseAction"], action);
+            assert_eq!(boost_service::current_main_window_close_action(), action);
+        }
+        assert!(boost_service::app_settings_set(Some(&json!({"mainWindowCloseAction": "invalid"}))).is_err());
+        assert_eq!(boost_service::current_main_window_close_action(), "ask");
+    });
+}
+
+#[test]
+fn legacy_local_service_address_migrates_without_overriding_explicit_environment() {
+    with_temp_db(|_| {
+        boost_service::set_saved_service_addr(Some("localhost:48760")).unwrap();
+        assert_eq!(boost_service::current_saved_service_addr(), "localhost:12580");
+        assert_eq!(boost_service::default_web_listener_addr(), "localhost:12000");
+        boost_service::set_saved_service_addr(Some("remote.example:48760")).unwrap();
+        assert_eq!(boost_service::current_saved_service_addr(), "remote.example:48760");
+        boost_service::set_saved_service_addr(Some("localhost:23456")).unwrap();
+        assert_eq!(boost_service::current_saved_service_addr(), "localhost:23456");
+        let _env = override_env_vars(&[("BOOST_SERVICE_ADDR", Some("localhost:48760"))]);
+        assert_eq!(boost_service::current_saved_service_addr(), "localhost:48760");
+    });
+}
+
 const ISOLATED_RUNTIME_ENV_KEYS: &[&str] = &[
     CODEX_IMAGE_AUTO_INJECT_TOOL_ENV,
     "BOOST_SERVICE_ADDR",

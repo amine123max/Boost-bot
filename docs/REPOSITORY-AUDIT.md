@@ -37,7 +37,7 @@ Runtime skills, personas, templates, dependency lockfiles, database migrations, 
 
 ## Documentation / 文档
 
-- Root English and Chinese READMEs now share feature scope, Release source, screenshots, image spacing, Star history and the normal **12580** Web entry.
+- Root English and Chinese READMEs now share feature scope, Release source, screenshots, image spacing, Star history and the normal **12000** Web entry.
 - Frontend, backend and Bot have focused English/Chinese guides. Build, testing, architecture and deployment details have dedicated entrypoints.
 - Manual indexes and broken local links were repaired. Missing upstream screenshots were removed from older manuals rather than presented as available.
 - README screenshots come from the running UI with isolated fixture data; the Bot screenshot comes from the actual hosted workspace against a local mock endpoint.

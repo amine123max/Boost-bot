@@ -67,6 +67,11 @@ function prettyArgs(args: string): string {
 export class ActivityLog {
   readonly steps: ActivityStep[] = [];
   progress: number | null = null;
+  outputTps(now = Date.now()): number | null {
+    const step = this.steps.findLast(s => s.kind === "model" && s.status === "ok" && s.tokens?.output && s.ms && s.ms >= 100);
+    if (!step || !step.ms || !step.tokens || now - step.at - step.ms > 30000) return null;
+    return (step.tokens.output ?? 0) * 1000 / step.ms;
+  }
 
   /**
    * model：这一轮用的模型（DSH 只在会话第一次请求时报 request/context，之后的回合靠它起名）。

@@ -1,6 +1,6 @@
 # Testing / 测试说明
 
-Run from the repository root. Use task-specific temporary storage and isolated test databases. The application Web entry is **12580**; the regression server is separate.
+Run from the repository root. Use task-specific temporary storage and isolated test databases. The application Web entry is **12000**; the regression server is separate.
 
 ## Frontend and structure
 

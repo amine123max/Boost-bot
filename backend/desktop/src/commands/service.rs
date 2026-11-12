@@ -11,6 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 const SERVICE_READY_RETRIES: usize = 40;
+static SERVICE_START_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[tauri::command]
 pub async fn service_bot_activity(addr: Option<String>) -> Result<serde_json::Value, String> {
@@ -450,12 +451,19 @@ pub async fn service_initialize(
 /// # 返回
 /// 返回函数执行结果
 #[tauri::command]
-pub async fn service_start(app: tauri::AppHandle, addr: String) -> Result<(), String> {
+pub async fn service_start(app: tauri::AppHandle, window: tauri::Window, addr: String) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("仅主窗口可启动服务，悬浮窗共用现有服务".to_string());
+    }
     let connect_addr = normalize_addr(&addr)?;
     apply_runtime_storage_env(&app);
     let bind_mode = boost_service::current_service_bind_mode();
     let bind_addr = boost_service::listener_bind_addr_for_mode(&connect_addr, &bind_mode);
     tauri::async_runtime::spawn_blocking(move || {
+        let _start_guard = SERVICE_START_LOCK.lock().map_err(|_| "service start lock poisoned")?;
+        if crate::service_runtime::service_is_running_at(&connect_addr) {
+            return wait_for_service_ready(&connect_addr, SERVICE_READY_RETRIES, SERVICE_READY_RETRY_DELAY);
+        }
         log::info!(
             "service_start requested connect_addr={} bind_addr={}",
             connect_addr,
@@ -750,7 +758,7 @@ trust_level = "trusted"
             existing,
             "boost",
             "Boost Local",
-            "http://localhost:48760/v1",
+            "http://localhost:12580/v1",
             "BOOST_API_KEY",
         );
 
@@ -759,7 +767,7 @@ trust_level = "trusted"
         assert!(merged.contains("review_model = \"gpt-5.5\""));
         assert!(merged.contains("[model_providers.boost]"));
         assert!(merged.contains("name = \"Boost Local\""));
-        assert!(merged.contains("base_url = \"http://localhost:48760/v1\""));
+        assert!(merged.contains("base_url = \"http://localhost:12580/v1\""));
         assert!(merged.contains("wire_api = \"responses\""));
         assert!(merged.contains("env_key = \"BOOST_API_KEY\""));
         assert!(merged.contains("[model_providers.other]"));
@@ -792,7 +800,7 @@ model_provider = "openai"
             &config_path,
             "boost",
             "Boost Local",
-            "http://localhost:48760/v1",
+            "http://localhost:12580/v1",
             "BOOST_API_KEY",
         )
         .expect("write provider config");

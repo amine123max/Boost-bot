@@ -8,7 +8,7 @@ async function client(response) {
   const source = (await fs.readFile(new URL('../src/lib/api/quota-client.ts', import.meta.url), 'utf8'))
     .replace('import { invoke, withAddr } from "@/lib/api/transport";', `
       const invoke = async (...args) => { calls.push(args); if (response instanceof Error) throw response; return response; };
-      const withAddr = () => ({ addr: "127.0.0.1:48760" });`);
+      const withAddr = () => ({ addr: "127.0.0.1:12580" });`);
   const compiled = ts.transpileModule(source, { compilerOptions: { module:ts.ModuleKind.ES2022, target:ts.ScriptTarget.ES2022 } });
   const { quotaClient } = new Function('calls', 'response', compiled.outputText.replace('export const quotaClient', 'const quotaClient') + '; return { quotaClient };')(calls, response);
   return { quotaClient, calls };
@@ -20,7 +20,7 @@ test('sync API uses typed transport with service address and enough timeout, wit
   assert.equal(result.modelCount,37);
   assert.equal(result.ruleCount,83);
   assert.equal(result.syncedAt,1793059200);
-  assert.deepEqual(calls, [['service_quota_model_prices_sync_openai', { addr:'127.0.0.1:48760' }, { timeoutMs:45000, retries:0 }]]);
+  assert.deepEqual(calls, [['service_quota_model_prices_sync_openai', { addr:'127.0.0.1:12580' }, { timeoutMs:45000, retries:0 }]]);
 });
 
 test('sync API surfaces upstream errors to the caller', async () => {

@@ -1,6 +1,6 @@
 # App Updates and GitHub Releases
 
-The public repository is `amine123max/Boost-bot`. Desktop clients read its GitHub Releases without a token. The release workflow embeds the actual `github.repository` through `BOOST_UPDATE_REPO`; an explicit runtime value can override it. The updater never falls back to another project's repository.
+The public repository is `amine123max/Boost-bot`. Desktop clients read its GitHub Releases without a token. The release workflow embeds the actual `github.repository` through `BOOST_UPDATE_REPO`; runtime environment variables and saved settings cannot override it. The update dialog displays the actual repository. The updater never falls back to another project's repository.
 
 Automatic checking defaults to enabled through the existing persisted `app.update.auto_check` setting. The main desktop window checks after initialization and every 24 hours. Disabling the setting stops polling. Tray previews and Web/Docker clients do not run desktop update checks.
 

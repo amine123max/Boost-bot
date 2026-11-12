@@ -19,6 +19,6 @@ Run from the repository root. These scripts use `frontend/`, `backend/desktop/`,
 | `run-curl-cffi-chatgpt-proxy.sh`, `curl_cffi_chatgpt_proxy.py` | Optional proxy troubleshooting helper / 可选代理排障 |
 | `setup-cloudflare-warp-proxy.sh` | Optional host proxy setup / 可选宿主代理配置 |
 
-Normal application Web access uses **12580**. Developer-only listeners are documented in [BUILDING.md](../docs/BUILDING.md). Read a system-configuration or cleanup script before running it; these are not part of ordinary application startup.
+Normal application Web access uses **12000**. Developer-only listeners are documented in [BUILDING.md](../docs/BUILDING.md). Read a system-configuration or cleanup script before running it; these are not part of ordinary application startup.
 
-正常 Web 访问使用 **12580**。开发端口见[构建指南](../docs/BUILDING.md)。修改系统配置或执行清理的脚本应先阅读源码，不属于日常启动步骤。
+正常 Web 访问使用 **12000**。开发端口见[构建指南](../docs/BUILDING.md)。修改系统配置或执行清理的脚本应先阅读源码，不属于日常启动步骤。
