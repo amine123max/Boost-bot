@@ -57,9 +57,7 @@ const primary = computed(() =>
 );
 const tps = computed(() => activity.value.tokensPerSecond);
 const tpsAnimationDuration = computed(() =>
-  tps.value == null || tps.value <= 0
-    ? "3s"
-    : `${60 / tps.value}s`,
+  tps.value == null ? "3s" : `${60 / Math.max(tps.value, 1)}s`,
 );
 const tpsColor = computed(() => {
   const speed = tps.value;
@@ -200,7 +198,6 @@ const metrics = computed(() =>
       <div
         v-if="trayPreferences.showTps"
         class="tray-tps-ring"
-        :class="{ 'is-stopped': tps == null || tps <= 0 }"
         :style="{ '--tps-duration': tpsAnimationDuration }"
         role="img"
         :aria-label="`TPS ${tps == null ? '暂无数据' : tps.toFixed(1) + ' TPS'}`"

@@ -339,7 +339,7 @@ test('tray display choices sync live and persist while keeping one visible item'
   await desktop(page, { auto: false, localTps: 32 });
   await page.setViewportSize({ width: 64, height: 157 });
   await page.goto('/tray-preview/');
-  await expect(page.locator('.tray-tps-ring')).toHaveAttribute('aria-label', 'TPS 32.0 t/s');
+  await expect(page.locator('.tray-tps-ring')).toHaveAttribute('aria-label', 'TPS 32.0 TPS');
   await expect(page.locator('.tray-tps-ring strong')).toHaveText('32');
   const settings = await context.newPage();
   await desktop(settings, { auto: false });
@@ -402,10 +402,24 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   }));
   expect(sideGeometry.rings).toEqual([32, 32, 32]);
   expect(sideGeometry.progress).toBe(32);
-  expect(sideGeometry.avatar).toBe(40);
+  expect(sideGeometry.avatar).toBe(26);
+  expect(sideGeometry.avatar).toBeLessThan(sideGeometry.progress);
   expect(sideGeometry.motion).toBe('gentle');
   expect(sideGeometry.duration).toBe('3s');
   expect(sideGeometry.progressColor).not.toBe('rgb(141, 146, 157)');
+
+  const valuesPage = await page.context().newPage();
+  await valuesPage.setViewportSize({ width: 64, height: 157 });
+  await desktop(valuesPage, { auto: false, localTps: 20, dockEdge: 'right' });
+  await valuesPage.addInitScript(() => {
+    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: true }));
+  });
+  await valuesPage.goto('/tray-preview/');
+  await expect(valuesPage.locator('.bot-task-number')).toHaveText('40');
+  await expect(valuesPage.locator('.tray-tps-ring strong')).toHaveText('20');
+  await expect(valuesPage.locator('.tray-tps-ring')).toHaveAttribute('aria-label', 'TPS 20.0 TPS');
+  await expect(valuesPage.locator('.tps-arc')).toHaveCSS('animation-duration', '3s');
+  await valuesPage.close();
 
   const topPage = await page.context().newPage();
   await topPage.setViewportSize({ width: 186, height: 38 });
@@ -431,12 +445,13 @@ test('tray rings keep one size on side and top, the animated agent fits, and TPS
   await donePage.setViewportSize({ width: 64, height: 157 });
   await desktop(donePage, { auto: false, activityState: 'done', dockEdge: 'right' });
   await donePage.addInitScript(() => {
-    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: false }));
+    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: true }));
   });
   await donePage.goto('/tray-preview/');
   const doneProgress = donePage.locator('.bot-task-progress');
   await expect(doneProgress).toHaveAttribute('aria-valuenow', '100');
   await expect(doneProgress).toHaveAttribute('data-task-state', 'done');
+  await expect(doneProgress.locator('.bot-task-number')).toHaveText('100');
   await expect(donePage.locator('.bot-task-complete-dot')).toBeVisible();
   await expect(donePage.locator('.bot-task-arc')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
   await donePage.close();

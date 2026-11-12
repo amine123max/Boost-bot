@@ -63,7 +63,7 @@ const ringProgress = computed(() =>
     >
     <BoostBotAvatar
       v-else
-      :size="compact ? 40 : 34"
+      :size="compact ? 26 : 34"
       :active="active || activity.state === 'working'"
       :thinking="activity.state === 'working'"
       :ambient="compact"

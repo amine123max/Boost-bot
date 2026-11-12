@@ -35,7 +35,6 @@
 .tray-tps-ring { color: var(--tray-text); }
 .tray-tps-ring circle { fill: none; stroke-width: 1.7; }
 .tray-tps-ring .tps-arc { stroke: var(--tps-color, var(--tray-muted)); stroke-linecap: round; transform-origin: center; animation: tray-tps-orbit var(--tps-duration, 3s) linear infinite; transition: stroke 500ms ease; }
-.tray-tps-ring.is-stopped .tps-arc { animation: none; }
 .tray-tps-ring > span { display: grid; place-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
 .tray-tps-ring strong { font-size: 9px; font-weight: 500; }
 .tray-tps-ring small { font-size: 6px; color: var(--tray-muted); }
