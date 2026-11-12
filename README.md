@@ -123,6 +123,12 @@ Desktop user data, logs, runtimes and updates are organized under `~/.boost`; Wi
 
 [![Boost Star History Chart](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)
 
+## Linux DO community and acknowledgements
+
+Boost is an independent open-source project shared with the [Linux DO](https://linux.do/) community. Community feedback and contributions are welcome. It is independently maintained and is not an official Linux DO project.
+
+Thanks to [Linux DO](https://linux.do/) for providing a place for technical discussion and open-source sharing. Community members are welcome to help improve Boost.
+
 ## License
 
 MIT. Preserve the [project license](LICENSE) and [third-party notices](bot/THIRD_PARTY_NOTICES.md) when redistributing.
