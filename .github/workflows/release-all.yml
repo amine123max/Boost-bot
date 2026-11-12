@@ -9,6 +9,11 @@ on:
         description: 'Existing version tag, for example v0.5.0'
         required: true
         type: string
+      reuse_run_id:
+        description: 'Reuse desktop artifacts from this run instead of rebuilding (same tag commit required)'
+        required: false
+        type: string
+        default: ''
       portable_only:
         description: 'Rebuild only the Windows portable EXE for an existing release'
         type: boolean
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ !inputs.reuse_run_id }}
     strategy:
       fail-fast: false
       matrix:
@@ -93,20 +99,30 @@ jobs:
 
   publish:
     needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.reuse_run_id != '')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       PORTABLE_ONLY: ${{ inputs.portable_only || false }}
+      ARTIFACT_RUN_ID: ${{ inputs.reuse_run_id || github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
+      - name: Verify artifact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/actions/runs/$ARTIFACT_RUN_ID" --jq '.head_sha')" = "$(git rev-parse HEAD)"
       - uses: actions/download-artifact@v4
         with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.ARTIFACT_RUN_ID }}
           pattern: desktop-*
           path: tmp/boost-release/artifacts
           merge-multiple: true
@@ -128,7 +144,8 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | map(select(.name | endswith(".exe") or endswith(".dmg"))) | length')" -eq 3
-          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$TEMP/release-assets.json"
+          release_api=$(gh release view "$RELEASE_TAG" --json apiUrl --jq '.apiUrl')
+          gh api "$release_api" > "$TEMP/release-assets.json"
           python - <<'PY_CHECKSUM'
           import json, os, pathlib, re
           directory = pathlib.Path(os.environ["TEMP"])
