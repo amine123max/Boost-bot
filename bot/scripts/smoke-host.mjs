@@ -41,7 +41,10 @@ async function host(tools) {
 }
 try {
   const member=await host(false);
-  assert.equal((await fetch(member.base+'/boost-bot/')).status,401);
+  const publicShell = await fetch(member.base+'/boost-bot/');
+  assert.equal(publicShell.status,200);
+  assert((await publicShell.text()).includes('<title>Boost</title>'));
+  assert.equal((await fetch(member.base+'/boost-bot/amb/api/tasks')).status,401);
   const html=await (await fetch(member.base+'/boost-bot/',{headers:{'x-amb-token':member.token}})).text();
   assert(html.includes('<title>Boost</title>'));
   const asset=await fetch(member.base+'/boost-bot/amb/static/boost-appearance/renderer.js',{headers:{'x-amb-token':member.token}});

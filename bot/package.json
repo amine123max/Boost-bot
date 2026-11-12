@@ -5,11 +5,15 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build-appearance.mjs",
     "start": "node dist/src/boost-host.js",
     "prepare:tools": "node ../scripts/prepare-boost-bot.mjs",
+    "bot": "tsx src/cli/amb-bot.ts",
+    "test:botkit": "vitest run test/botkit.unit.test.ts test/botkit.e2e.test.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -25,6 +29,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ws": "^8.18.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

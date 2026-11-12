@@ -210,7 +210,7 @@ export function ErrorNotice({ text, onRetry, onFixKey, source = "" }) {
     ${onRetry && html`<button type="button" class="btn" onClick=${onRetry}>${t("common.retry")}</button>`}`}>${auth ? (source ? t("chat.error.officialKeyInvalid", { name: source }) : t("chat.error.authInvalid")) : text}<//>`;
 }
 
-export function ChatScreen({ bot, models, modelsError, reloadModels, defaultModel, infoOpen, onToggleInfo, onWorking, onOpenSettings, onOpenBotSettings, onBotUpdated, onReady, pending = 0, serverBusy = false, account, onAccount }) {
+export function ChatScreen({ bot, models, modelsError, reloadModels, defaultModel, infoOpen, onToggleInfo, onWorking, onOpenSettings, onOpenBotSettings, onOpenApp, onBotUpdated, onReady, pending = 0, serverBusy = false, account, onAccount }) {
   const [items, setItems] = useState(null);
   const [convModel, setConvModel] = useState("");
   const [text, setText] = useState("");
@@ -724,6 +724,7 @@ export function ChatScreen({ bot, models, modelsError, reloadModels, defaultMode
   const permMap = perms();
   return html`<section class=${`chat${scrolled ? " scrolled" : ""}`} data-screen="chat" aria-label=${t("chat.aria", { name: bot.name })}>
     <header class="chat-head">
+      ${onOpenApp && html`<button type="button" class="btn" onClick=${onOpenApp}>${t("botapp.app.openApp")}</button>`}
       <button type="button" class="head-bot bot-hover" data-guide="info" aria-pressed=${infoOpen} title=${t("chat.infoPanel")} onClick=${onToggleInfo}>
         <${BotAvatar} bot=${bot} size=${22} state=${face} cue=${cue} />
         <span class="name">${bot.name}</span>

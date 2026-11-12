@@ -1,5 +1,5 @@
 // 界面只显示 app/state.json（useBot().state），改数据都交给 Bot（send）。
-import { html, mount, useBot, Page, Card, Stack, Empty } from "/amb/botapp/kit/kit.js";
+import { html, mount, useBot, Page, Card, Stack, Empty } from "/boost-bot/amb/botapp/kit/kit.js";
 
 function App() {
   const bot = useBot();

@@ -217,9 +217,6 @@ function App() {
   const panelOpen = route.view === "chat" && infoOpen && !!bot;
   // 目录 Bot 的主界面是专属界面；被安全原因下架的退回普通对话
   const isAppBot = (b) => !!b && b.origin === "catalog" && !b.app?.removed?.security;
-  useEffect(() => {
-    if (route.view === "chat" && isAppBot(bot)) go(`/app/${encodeURIComponent(bot.id)}`);
-  }, [route.view, bot && bot.id, bot && bot.origin]);
   const panelFx = usePresence(panelOpen, "--dur-slow");
   const lastPanel = useRef(null);
   if (panelOpen) lastPanel.current = bot;
@@ -237,7 +234,7 @@ function App() {
   useEffect(() => {
     if (firstReadySent.current || !gatewaySettled || !statusSettled || !settingsSettled) return;
     if (connected && (!(botsData || botsErr) || !(groupsData || groupsError) || !(modelsData || modelsLoadError))) return;
-    if (connected && route.view === "chat" && bot && !isAppBot(bot) && chatReady !== bot.id) return;
+    if (connected && route.view === "chat" && bot && chatReady !== bot.id) return;
     if (connected && route.view === "app" && bot?.app && chatReady !== `app:${bot.app.catalogId}`) return;
     firstReadySent.current = true;
     void ready();
@@ -315,6 +312,10 @@ function App() {
     go(`/${isAppBot((bots || []).find((b) => b.id === target)) ? "app" : "chat"}/${encodeURIComponent(target)}`);
   };
   const openDiscover = () => go("/discover");
+  const openDirectChat = (id) => {
+    setLastBot(id);
+    go(`/chat/${encodeURIComponent(id)}`);
+  };
   const openCatalog = (e) => (e.instanceId ? openChat(e.instanceId) : go(`/preview/${encodeURIComponent(e.id)}`));
   // 第一次发消息创建了实例：地址换成实例，界面不重新加载（BotAppScreen 按目录 id 复用）
   const onInstalled = async (b) => {
@@ -457,12 +458,13 @@ function App() {
     <${Splitter} class="split-side" size="--side-w" label=${t("app.resizeSide")} value=${sideW} room=${room("--panel-track")} onCommit=${(v) => setPrefs({ sideW: v })} />
     <main class="main">
       ${view === "chat" && bot && html`<${ChatScreen} key=${bot.id} bot=${bot} models=${models} modelsError=${modelsError} reloadModels=${reloadModels}
+        onOpenApp=${isAppBot(bot) ? () => openChat(bot.id) : undefined}
         defaultModel=${settings && settings.defaultModel} infoOpen=${infoOpen} onToggleInfo=${() => setInfoOpen((v) => !v)}
         onReady=${onChatReady} onWorking=${onWorking} pending=${pending[bot.id] || 0} serverBusy=${!!agentWorking[bot.id]} onOpenSettings=${openSettings} onOpenBotSettings=${openBotSettings} onBotUpdated=${onBotUpdated}
         account=${managed ? account : null} onAccount=${setAccount} />`}
       ${view === "discover" && html`<${DiscoverScreen} catalog=${catalog} onOpen=${openCatalog} />`}
       ${(view === "preview" || (view === "app" && bot && bot.app)) && html`<${BotAppScreen} key=${view === "preview" ? route.catalogId : bot.app.catalogId} catalogId=${view === "preview" ? route.catalogId : bot.app.catalogId} bot=${view === "preview" ? (bots || []).find((b) => b.app?.catalogId === route.catalogId) || null : bot}
-        onInstalled=${onInstalled} onBotUpdated=${onBotUpdated} onOpenBotSettings=${openBotSettings} onOpenSettings=${openSettings}
+        onInstalled=${onInstalled} onDirectChat=${openDirectChat} onBotUpdated=${onBotUpdated} onOpenBotSettings=${openBotSettings} onOpenSettings=${openSettings}
         onReady=${onChatReady} chatProps=${{ models, modelsError, reloadModels, defaultModel: settings && settings.defaultModel, onWorking, onReady: onChatReady, pending: (bot && pending[bot.id]) || 0, serverBusy: !!(bot && agentWorking[bot.id]), onOpenSettings: openSettings, onOpenBotSettings: openBotSettings, onBotUpdated, account: managed ? account : null, onAccount: setAccount }} />`}
       ${view === "group" && routedGroup && bots && html`<${GroupScreen} key=${routedGroup.id} group=${routedGroup} bots=${bots} onEdit=${() => setGroupSheet({ group: routedGroup })} onOpenSettings=${openSettings} onChanged=${reloadGroups} />`}
       ${view === "group" && groupsData && !routedGroup && html`<div class="empty-state"><b>${t("app.groupMissing")}</b><button type="button" class="text" onClick=${() => openChat()}>${t("app.backToChat")}</button></div>`}

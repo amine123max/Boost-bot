@@ -10,16 +10,17 @@
     "ru": "Анализ акций США"
   },
   "summary": {
-    "zh-CN": "查美股财报和申报文件，写出每个数字都能追溯的研究报告",
-    "en": "Research US-listed companies from SEC filings, with every number traceable",
+    "zh-CN": "基于 SEC 申报文件分析财务指标，生成附数据来源的美股研究报告",
+    "en": "Analyze SEC filings and financial metrics to produce sourced equity research",
     "ja": "米国上場企業の決算と SEC 提出書類を調べ、すべての数字をたどれるレポートを作成",
     "ko": "미국 상장사의 재무제표와 SEC 공시를 조사해 모든 숫자를 추적할 수 있는 보고서를 작성",
     "ru": "Изучает компании США по документам SEC, каждое число в отчёте можно проверить"
   },
   "about": {
     "zh-CN": [
-      "取数记录和原始数据都留在你的工作区；没有股价、PE 和筛选器",
-      "研究流程灵感来自开源项目 Dexter，不含其代码，也无关联。仅供参考，不构成投资建议"
+      "支持财务趋势分析、公司指标对比及风险因素梳理，保留原始数据与查询记录",
+      "研究范围为公开财务与申报信息，不提供实时行情、估值倍数或选股筛选",
+      "研究流程参考开源项目 Dexter，不包含其代码且无关联关系；研究结果不构成投资建议"
     ],
     "en": [
       "Fetch logs and raw data stay in your workspace. It has no prices, PE ratios or stock screener",
@@ -45,9 +46,9 @@
   ],
   "starters": {
     "zh-CN": [
-      "研究英伟达近五年的收入和毛利率趋势，生成报告",
-      "对比微软和 Alphabet 近三年的收入和营业利润率",
-      "读特斯拉最新 10-K 的风险因素，总结最重要的五条"
+      "分析英伟达近五年的收入与毛利率趋势，生成研究报告",
+      "对比微软与 Alphabet 近三年的收入及营业利润率",
+      "梳理特斯拉最新 10-K 的风险因素，归纳五项主要风险"
     ],
     "en": [
       "Research NVIDIA's revenue and gross margin trends over five years into a report",

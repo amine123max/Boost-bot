@@ -4,6 +4,8 @@
 
 Boost Bot 提供受管智能体工作台，包含对话、记忆、任务、审批、消息渠道、文件交付及专用 Bot。身份认证和模型路由由 Boost 现有网关提供。
 
+尽调助手、PPT 大师和美股研报提供可交互的功能演示，仅预览不会安装智能体。点击 **与智能体对话** 可创建或打开对应会话，支持历史记录、流式回复与停止生成；点击 **返回工作台** 可回到专属界面。工作台输入区与完整对话页共用同一会话。
+
 ![Boost Bot 工作台](../docs/images/bot-workspace.png)
 
 ## 组成
@@ -50,7 +52,9 @@ node scripts/stage-boost-bot.mjs <package-directory>
 
 ```bash
 npm --prefix bot run build
+npm --prefix bot run test:botkit
 node bot/scripts/smoke-host.mjs --browser
+node scripts/verify-bot-preview.mjs
 npm --prefix bot test -- test/boost-integration.test.ts test/e2e.test.ts test/tasks.unit.test.ts test/rules.unit.test.ts test/channel-accounts.e2e.test.ts
 ```
 

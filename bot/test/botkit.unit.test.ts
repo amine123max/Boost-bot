@@ -4,6 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import { dirHash, packFiles, readBundle, safeRelPath, sha256, unpackTo } from "../src/botkit/bundle.js";
 import { BotCatalog } from "../src/botkit/catalog.js";
@@ -105,8 +106,14 @@ describe("包", () => {
   });
   it("目录哈希拒绝符号链接", () => {
     const d = path.join(tmp, "s");
+    const outside = path.join(tmp, "outside");
     fs.mkdirSync(d);
-    fs.symlinkSync("/etc/passwd", path.join(d, "x"));
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, "secret.txt"), "outside bundle");
+    // Junctions exercise the same link rejection on Windows without requiring
+    // administrator privileges or Developer Mode for file symlinks.
+    fs.symlinkSync(outside, path.join(d, "x"), process.platform === "win32" ? "junction" : "dir");
+    expect(fs.lstatSync(path.join(d, "x")).isSymbolicLink()).toBe(true);
     expect(() => dirHash(d)).toThrow(/symlink/);
   });
 });
@@ -327,13 +334,16 @@ describe("目录", () => {
   });
   afterEach(() => site.close());
 
-  it("默认连线上的目录；AMB_CATALOG=off 时不联网，目录是空的", async () => {
-    const on = catalogConfig({});
-    expect(on.url).toBe("https://anymodel.bot/catalog/index.json");
-    expect(on.publicKey).toMatch(/^[A-Za-z0-9+/]+=*$/);
+  it("默认关闭外部目录；显式配置地址和公钥后启用；AMB_CATALOG=off 优先关闭", () => {
+    expect(catalogConfig({})).toEqual({ url: "", publicKey: "" });
+    expect(new BotCatalog({ dataDir: tmp, appVersion: "0.1.0", ...catalogConfig({}) }).remoteEnabled).toBe(false);
+    const configured = { AMB_CATALOG_URL: `${site.url}/index.json`, AMB_CATALOG_PUBKEY: keys.publicKey };
+    const on = catalogConfig(configured);
+    expect(on).toEqual({ url: configured.AMB_CATALOG_URL, publicKey: keys.publicKey });
+    expect(new BotCatalog({ dataDir: tmp, appVersion: "0.1.0", ...on }).remoteEnabled).toBe(true);
     const data = Buffer.from("x");
     expect(verifyCatalog(data, signCatalog(data, generateCatalogKeys().privateKey), on.publicKey)).toBe(false);
-    expect(catalogConfig({ AMB_CATALOG: "off" })).toEqual({ url: "", publicKey: "" });
+    expect(catalogConfig({ ...configured, AMB_CATALOG: "off" })).toEqual({ url: "", publicKey: "" });
     expect(new BotCatalog({ dataDir: tmp, appVersion: "0.1.0", ...catalogConfig({ AMB_CATALOG: "off" }) }).remoteEnabled).toBe(false);
   });
   it("没配置地址或公钥时不联网，目录是空的", async () => {
@@ -485,8 +495,11 @@ describe("目录", () => {
       fs.writeFileSync(ws("secret.txt"), "x");
       expect(await inst.readFile(bot, "secret.txt")).toBeUndefined();
       expect(await inst.readFile(bot, "app/../secret.txt")).toBeUndefined();
-      fs.symlinkSync(ws("secret.txt"), ws("app", "link.txt"));
-      expect(await inst.readFile(bot, "app/link.txt")).toBeUndefined();
+      const outside = path.join(data, "outside-app");
+      fs.mkdirSync(outside);
+      fs.writeFileSync(path.join(outside, "secret.txt"), "outside app");
+      fs.symlinkSync(outside, ws("app", "link"), process.platform === "win32" ? "junction" : "dir");
+      expect(await inst.readFile(bot, "app/link/secret.txt")).toBeUndefined();
       fs.writeFileSync(ws("app", "state.json"), JSON.stringify({ title: "ok", items: [{ id: "1", text: "a" }, { id: 2 }] }));
       const f = await inst.readFile(bot, "app/state.json");
       expect(f!.json).toEqual({ title: "ok", items: [{ id: "1", text: "a" }] });
@@ -557,7 +570,12 @@ describe("目录", () => {
     });
     it("目录 Bot 的字段写进数据库后读得回来，用户自建的不受影响", async () => {
       await inst.install("fixture-bot", "zh-CN");
-      expect(new Store(path.join(data, "anymodel.db")).getBot(id)!.app!.catalogId).toBe("fixture-bot");
+      const reopened = new Store(path.join(data, "anymodel.db"));
+      try {
+        expect(reopened.getBot(id)!.app!.catalogId).toBe("fixture-bot");
+      } finally {
+        reopened.close();
+      }
       expect(store.createBot({ name: "mine" })).toMatchObject({ origin: "user", app: null });
     });
   });
@@ -661,7 +679,7 @@ describe("界面的静态路由", () => {
   beforeEach(async () => {
     dir = makeBot(path.join(tmp, "bot"));
     const uiDir = path.join(import.meta.dirname, "..", "ui");
-    const preact = path.dirname(import.meta.resolve("preact").replace("file://", ""));
+    const preact = path.dirname(createRequire(import.meta.url).resolve("preact"));
     const root = path.dirname(preact);
     const vendor = { "preact.mjs": path.join(root, "dist", "preact.mjs"), "hooks.mjs": path.join(root, "hooks", "dist", "hooks.mjs") };
     const catalog = { get: (id: string) => (id === "fixture-bot" ? { dev: dir } : undefined), uiDirIfPresent: () => undefined, thumb: async () => undefined } as any;
@@ -680,6 +698,7 @@ describe("界面的静态路由", () => {
     const csp = res.headers.get("content-security-policy")!;
     expect(csp).toContain("connect-src 'none'");
     expect(csp).toContain("sandbox allow-scripts allow-forms");
+    expect(csp).toContain("http://tauri.localhost https://tauri.localhost tauri://localhost http://127.0.0.1:3005");
     expect(csp).not.toContain("allow-same-origin");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(botAppCsp("http://h")).toContain("default-src 'none'");

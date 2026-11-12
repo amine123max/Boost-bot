@@ -77,8 +77,8 @@ export default {
   empty: {
     guideTitle: "嗨，我是{name}",
     guideBody: "花 5 分钟，跟着清单认识一下我能做什么。",
-    title: "和 {name} 开始对话",
-    body: "在这里直接测试机器人；微信、飞书、Telegram、Slack、Discord 在信息面板里接入。",
+    title: "与 {name} 开始对话",
+    body: "描述任务目标、背景信息和交付要求。对话记录将自动保存，便于后续查看与继续处理。外部消息渠道可在信息面板中配置。",
     /** 点一下就发给机器人的示例问题 */
     sample: "你能帮我做什么？",
     helpChip: "/help 查看命令",
@@ -87,7 +87,7 @@ export default {
     steer: "补充给正在进行的回复",
     steerTitle: "补充给正在进行的回复（{key}）",
     stopping: "正在停止…",
-    placeholder: "给「{name}」发消息，/ 查看命令",
+    placeholder: "向「{name}」发送消息，输入 / 查看可用命令",
     label: "消息",
     currentModel: "当前模型：{model}",
     pickModel: "选择模型",

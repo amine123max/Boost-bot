@@ -44,7 +44,9 @@ export function botAppCsp(origin: string): string {
     "connect-src 'none'",
     "form-action 'none'",
     "base-uri 'none'",
-    `frame-ancestors ${self}`,
+    // CSP checks every ancestor: the Bot shell itself is embedded in Boost's
+    // Tauri window (or the fixed Vite development origin).
+    `frame-ancestors ${self} http://tauri.localhost https://tauri.localhost tauri://localhost http://127.0.0.1:3005`,
     "sandbox allow-scripts allow-forms",
   ].join("; ");
 }

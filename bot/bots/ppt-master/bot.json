@@ -10,19 +10,19 @@
     "ru": "Мастер PPT"
   },
   "summary": {
-    "zh-CN": "把文档或主题做成可编辑的 PPTX，也能做模板、改现有的 PPT",
-    "en": "Turn documents or topics into editable PPTX decks, or edit decks you have",
+    "zh-CN": "根据文档或主题制作可编辑演示文稿，支持模板设计与现有 PPT 优化",
+    "en": "Create editable presentations, design templates and refine existing decks",
     "ja": "文書やテーマから編集可能な PPTX を作成。テンプレート作成や既存の PPT の編集も",
     "ko": "문서나 주제를 편집 가능한 PPTX로 만들고, 템플릿 제작과 기존 PPT 수정도 합니다",
     "ru": "Делает редактируемые PPTX из документов и тем, создаёт шаблоны, правит слайды"
   },
   "about": {
     "zh-CN": [
-      "工程文件和 PPTX 都留在你的设备上，文档内容会发给你选的模型",
-      "导出的是原生形状，能在 PowerPoint 里继续改；效果取决于所选模型"
+      "支持内容组织、页面设计、模板制作与演示文稿修改，交付可编辑的 PPTX 文件",
+      "项目文件保存在智能体工作区；文档内容由所选模型处理，生成质量取决于模型能力"
     ],
     "en": [
-      "Project files and decks stay on your device; document content is sent to the model you choose",
+      "Project files and decks stay in the agent workspace; document content is sent to the model you choose",
       "Slides export as native shapes you can keep editing in PowerPoint; quality depends on the chosen model"
     ],
     "ja": [
@@ -46,9 +46,9 @@
   ],
   "starters": {
     "zh-CN": [
-      "快速做一份 5 页 16:9 的 PPT，主题是如何开好远程周会，不用确认",
-      "帮我做一份 8 页的新品发布 PPT，先给我看方案",
-      "做一套可以反复用的季度复盘模板，风格简洁"
+      "按默认设置制作 5 页 16:9 演示文稿，主题为高效远程周会",
+      "规划 8 页新品发布演示文稿，先提供内容大纲与设计方案",
+      "设计可复用的季度业务复盘模板，采用简洁的商务风格"
     ],
     "en": [
       "Quickly make a 5-page 16:9 deck on running better remote weekly meetings, no need to confirm",

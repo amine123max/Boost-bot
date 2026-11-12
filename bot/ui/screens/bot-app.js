@@ -1,5 +1,5 @@
 // 专属界面容器：主区是 Bot 的界面（沙箱 iframe），底部一行输入框，最新回复显示在输入框上方；
-// 完整对话和 Bot 信息在右边一列。还没有实例时界面显示示例数据：不创建实例、不装技能、不起进程，第一次发消息才创建。
+// 完整对话和 Bot 信息在右边一列。预览不创建实例；开始对话或第一次发消息时创建。
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { html, Button, IconButton, Notice, Spinner } from "../components/ui.js";
 import { BotAvatar } from "../components/avatar.js";
@@ -30,12 +30,13 @@ function BotInfo({ entry, lang, onSettings }) {
   </div>`;
 }
 
-export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpenBotSettings, onOpenSettings, onReady, chatProps }) {
+export function BotAppScreen({ catalogId, bot, onInstalled, onDirectChat, onBotUpdated, onOpenBotSettings, onOpenSettings, onReady, chatProps }) {
   const lang = useLang();
   const [entry, setEntry] = useState(null);
   const [base, setBase] = useState("");
   const [loadErr, setLoadErr] = useState("");
   const [uiFailed, setUiFailed] = useState(false);
+  const [frameAttempt, setFrameAttempt] = useState(0);
   const [messages, setMessages] = useState(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -118,14 +119,27 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
     return { ...currentEnv(), sample: !b, desktop: !!d, messages: m || {}, bot: { id: b?.id || null, name: b?.name || tr(e?.name, lang) || "", avatar: e?.avatar || "" } };
   };
 
-  /** 第一次发消息才创建实例 */
+  /** 开始对话或第一次发消息时创建实例 */
   const ensureInstance = async () => {
     if (live.current.bot) return live.current.bot;
     const d = await api(`/catalog/${encodeURIComponent(catalogId)}/install`, { method: "POST", body: {} });
     live.current.bot = d.bot;
-    onInstalled?.(d.bot);
+    await onInstalled?.(d.bot);
     if (guide.get().trim) markSeen("first-bot");
     return d.bot;
+  };
+
+  const directChat = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const b = await ensureInstance();
+      onDirectChat?.(b.id);
+    } catch (e) {
+      setLoadErr(errorText(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const send = async (text) => {
@@ -172,6 +186,7 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
   useLayoutEffect(() => {
     const el = frame.current;
     if (!el || !base || uiFailed) return;
+    const timeout = setTimeout(() => { setUiFailed(true); markReady(); }, 15_000);
     const fileApi = (path) => {
       const b = live.current.bot;
       const q = `file?path=${encodeURIComponent(path)}`;
@@ -226,20 +241,22 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
       },
       openChannels: () => onOpenSettings?.("connections"),
       reportError: ({ message }) => {
+        clearTimeout(timeout);
         console.error("bot ui error", catalogId, message);
         setUiFailed(true);
         markReady();
       },
-      rendered: () => { markReady(); return true; },
+      rendered: () => { clearTimeout(timeout); markReady(); return true; },
     });
     bridge.current = br;
     const offEnv = watchEnv(() => br.post("env", envOf()));
     return () => {
+      clearTimeout(timeout);
       br.close();
       offEnv();
       bridge.current = null;
     };
-  }, [base, uiFailed]);
+  }, [base, uiFailed, frameAttempt]);
 
   useEffect(() => {
     if (loadErr || uiFailed || (!base && entry)) markReady();
@@ -287,6 +304,7 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
         <span class="head-bot static">${entry && html`<${BotAvatar} bot=${bot} char=${bot ? undefined : entry.avatar} size=${22} />`}<span class="name">${name}</span></span>
         ${!bot && entry && html`<span class="botapp-sample">${t("botapp.app.sample")}</span>`}
         <span class="grow"></span>
+        <${Button} disabled=${busy || !entry} onClick=${directChat}>${t("botapp.app.directChat")}<//>
         ${bot && html`<${IconButton} icon="chat" iconSize="md" label=${t("botapp.app.conversation")} on=${side === "chat"} onClick=${() => setSide((s) => (s === "chat" ? null : "chat"))} />`}
         <${IconButton} icon="info" iconSize="md" label=${t("botapp.app.info")} on=${side === "info"} onClick=${() => setSide((s) => (s === "info" ? null : "info"))} />
       </header>
@@ -294,9 +312,10 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
       ${uiFailed && !removed && html`<${Notice} tone="amber">${t("botapp.app.uiFailed")}<//>`}
       ${loadErr && html`<${Notice} tone="red">${loadErr}<//>`}
       <div class="botapp-stage">
+        ${uiFailed && !bot && html`<div class="botapp-loading"><${Button} onClick=${() => { setUiFailed(false); setFrameAttempt((n) => n + 1); }}>${t("common.retry")}<//></div>`}
         ${uiFailed && bot
           ? html`<${ChatScreen} key=${bot.id} bot=${bot} ...${chatProps} infoOpen=${false} onToggleInfo=${() => setSide("info")} />`
-          : base && !uiFailed && html`<iframe ref=${frame} class="botapp-frame" title=${name} src=${`${base}index.html`} sandbox="allow-scripts allow-forms"></iframe>`}
+          : base && !uiFailed && html`<iframe key=${frameAttempt} ref=${frame} class="botapp-frame" title=${name} src=${`${base}index.html`} sandbox="allow-scripts allow-forms" onError=${() => setUiFailed(true)}></iframe>`}
         ${!base && !loadErr && !uiFailed && html`<div class="botapp-loading"><${Spinner} /></div>`}
       </div>
       ${!(uiFailed && bot) && html`<div class="composer-dock botapp-dock">

@@ -4,6 +4,8 @@
 
 Boost Bot is the hosted agent workspace: conversations, memory, tasks, approvals, messaging channels, file delivery and specialist bots. Boost supplies authentication and model routing through the existing gateway.
 
+The Company Research, PPT Master and US Stock Research workspaces include interactive previews. Previewing does not install an agent. Select **Message agent** to create or open its conversation, with saved history, streaming replies and generation controls. Select **Back to workspace** to return to its dedicated interface; both views share the same conversation.
+
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 
 ## Components
@@ -50,7 +52,9 @@ See [integration boundaries](INTEGRATION.md) and [runtime configuration](../docs
 
 ```bash
 npm --prefix bot run build
+npm --prefix bot run test:botkit
 node bot/scripts/smoke-host.mjs --browser
+node scripts/verify-bot-preview.mjs
 npm --prefix bot test -- test/boost-integration.test.ts test/e2e.test.ts test/tasks.unit.test.ts test/rules.unit.test.ts test/channel-accounts.e2e.test.ts
 ```
 

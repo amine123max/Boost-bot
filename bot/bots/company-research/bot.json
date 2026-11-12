@@ -10,19 +10,21 @@
     "ru": "Исследование компаний"
   },
   "summary": {
-    "zh-CN": "本机公司尽调：四路研究、策展、简报与可溯源报告/PDF",
-    "en": "Local company diligence with parallel research, curation, and sourced reports",
+    "zh-CN": "整合财务、新闻、行业与业务信息，生成附来源引用的尽调报告",
+    "en": "Sourced company diligence covering financials, news, industry and operations",
     "ja": "手元のデバイスで企業を調査：4 方面のリサーチ、選別、要約、出典付きレポートと PDF",
     "ko": "내 기기에서 기업 실사: 네 방향 조사, 선별, 브리핑, 출처 있는 보고서와 PDF",
     "ru": "Изучает компании на вашем устройстве и пишет отчёт со ссылками на источники"
   },
   "about": {
     "zh-CN": [
-      "报告和来源留在你的设备上；在聊天渠道里发起，结果也发回那里",
-      "仅供信息与学习参考，不构成投资建议"
+      "围绕目标公司开展多维度研究，筛选来源、识别信息缺口并汇总研究结论",
+      "报告与来源保存在智能体工作区，支持导出 PDF；可通过已接入的消息渠道发起任务",
+      "研究结果仅供信息与学习参考，不构成投资建议"
     ],
     "en": [
-      "Reports and sources stay on your device; start it in a chat channel and the result comes back there",
+      "Research the company across multiple areas, evaluate sources and identify information gaps",
+      "Reports and sources stay in the agent workspace, with PDF export and connected messaging channels",
       "For information and learning only, not investment advice"
     ],
     "ja": [
@@ -45,9 +47,9 @@
   ],
   "starters": {
     "zh-CN": [
-      "对 Stripe 做完整尽调并生成报告",
-      "打开上一份报告的来源与策展列表",
-      "把当前报告导出为 PDF"
+      "对 Stripe 开展公司尽调，生成附来源引用的研究报告",
+      "查看最近一份报告的来源与筛选记录",
+      "将当前研究报告导出为 PDF"
     ],
     "en": [
       "Run full diligence on Stripe and generate a report",
