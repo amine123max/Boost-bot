@@ -13,6 +13,23 @@ pub(crate) const ENV_DB_PATH: &str = "BOOST_DB_PATH";
 pub(crate) const ENV_RPC_TOKEN: &str = "BOOST_RPC_TOKEN";
 pub(crate) const ENV_RPC_TOKEN_FILE: &str = "BOOST_RPC_TOKEN_FILE";
 
+static DESKTOP_LOG_DIRECTORY: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// The desktop host owns its storage layout; standalone service paths remain unchanged.
+pub fn configure_desktop_log_directory(path: PathBuf) {
+    let _ = DESKTOP_LOG_DIRECTORY.set(path);
+}
+
+pub(crate) fn diagnostic_log_path(filename: &str) -> PathBuf {
+    if let Some(directory) = DESKTOP_LOG_DIRECTORY.get() {
+        return directory.join(filename);
+    }
+    std::env::var_os(ENV_DB_PATH)
+        .and_then(|path| PathBuf::from(path).parent().map(Path::to_path_buf))
+        .unwrap_or_default()
+        .join(filename)
+}
+
 /// 函数 `exe_dir`
 ///
 ///

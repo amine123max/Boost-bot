@@ -38,6 +38,18 @@ struct UsageRefreshCompletedPayload {
 /// 无
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    load_env_from_exe_dir();
+    let mut context = tauri::generate_context!();
+    let storage = app_storage::DesktopStorage::resolve(&context.config().identifier)
+        .expect("cannot resolve Boost storage directory");
+    // Migrate the profile in setup, after the single-instance check and before any WebView opens.
+    let mut startup_windows = Vec::new();
+    for window in &mut context.config_mut().app.windows {
+        if window.create {
+            startup_windows.push(window.clone());
+            window.create = false;
+        }
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             log::info!(
@@ -48,28 +60,40 @@ pub fn run() {
             show_main_window(app);
             notify_existing_instance_focused();
         }))
-        .setup(|app| {
-            load_env_from_exe_dir();
+        .setup(move |app| {
+            storage.prepare(app.handle())?;
+            app.manage(storage.clone());
+            app_storage::initialize_runtime_storage_env(app.handle())?;
+            boost_service::process_env::configure_desktop_log_directory(storage.logs());
             #[cfg(feature = "portable-runtime")]
             {
-                let runtime = embedded_bot::prepare(&app.path().app_cache_dir()?)?;
+                let runtime = embedded_bot::prepare(&storage.runtime())?;
                 boost_service::configure_bot_runtime(runtime);
             }
             #[cfg(not(feature = "portable-runtime"))]
             if let Ok(resources) = app.path().resource_dir() {
                 boost_service::configure_bot_runtime(resources.join("boost-bot"));
             }
-            app_storage::apply_runtime_storage_env(app.handle());
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
                     .level(log::LevelFilter::Info)
                     .targets([tauri_plugin_log::Target::new(
-                        tauri_plugin_log::TargetKind::LogDir { file_name: None },
+                        tauri_plugin_log::TargetKind::Folder {
+                            path: storage.logs(),
+                            file_name: None,
+                        },
                     )])
                     .build(),
             )?;
-            if let Ok(log_dir) = app.path().app_log_dir() {
-                log::info!("log dir: {}", log_dir.display());
+            log::info!(
+                "storage root: {}; logs: {}",
+                storage.root.display(),
+                storage.logs().display()
+            );
+            for window in &startup_windows {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), window)?
+                    .data_directory(storage.webview())
+                    .build()?;
             }
             let usage_refresh_event_app = app.handle().clone();
             boost_service::set_usage_refresh_completed_handler(move |event| {
@@ -98,7 +122,7 @@ pub fn run() {
             handle_main_window_event(window, event);
         })
         .invoke_handler(commands::invoke_handler!())
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application");
 
     app.run(|app_handle, event| {

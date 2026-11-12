@@ -73,9 +73,11 @@ jobs:
           pnpm -C frontend run build:desktop
       - name: Prepare embedded Bot runtime
         run: node scripts/prepare-boost-bot.mjs
-      - name: Verify updater regressions
+      - name: Verify desktop storage and updater regressions
         if: ${{ !inputs.portable_only }}
-        run: cargo test --manifest-path backend/desktop/Cargo.toml --lib commands::updater
+        run: |
+          cargo test --manifest-path backend/desktop/Cargo.toml --lib app_storage -- --test-threads=1
+          cargo test --manifest-path backend/desktop/Cargo.toml --lib commands::updater
       - name: Prepare packaging config
         run: node -e "require('fs').writeFileSync(process.env.TMPDIR + '/tauri-release.json', JSON.stringify({build:{beforeBuildCommand:''}}))"
       - name: Package desktop

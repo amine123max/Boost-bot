@@ -262,13 +262,7 @@ impl TraceFileWriter {
 /// # 返回
 /// 返回函数执行结果
 fn trace_file_path_from_env() -> PathBuf {
-    if let Ok(db_path) = std::env::var("BOOST_DB_PATH") {
-        let path = PathBuf::from(db_path);
-        if let Some(parent) = path.parent() {
-            return parent.join("gateway-trace.log");
-        }
-    }
-    PathBuf::from("gateway-trace.log")
+    crate::process_env::diagnostic_log_path("gateway-trace.log")
 }
 
 /// 函数 `sanitize_text`

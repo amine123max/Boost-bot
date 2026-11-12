@@ -48,6 +48,28 @@ cargo tauri build
 
 Windows helpers: `scripts/rebuild.ps1`; macOS: `scripts/rebuild-macos.sh`; Linux: `scripts/rebuild-linux.sh`. Use their dry-run options before cleanup-oriented rebuilds. See the scripts themselves for supported arguments.
 
+### Desktop user storage / 桌面用户存储
+
+Desktop builds use `~/.boost` (`C:\Users\<user>\.boost` on Windows). The installer and portable EXE share this directory. No additional environment variables are required.
+
+桌面版统一使用用户主目录下的 `.boost`；安装版与免安装版共用数据，无需新增环境变量。
+
+| Directory | Contents / 内容 |
+| --- | --- |
+| `data/` | `boost.db`, local RPC credential, installation identity, Bot conversations and owned proxy state / 数据库、RPC 凭据、安装标识、Bot 对话及代理状态 |
+| `cache/webview/` | Shared Windows/Linux WebView profile, UI preferences and browser cache / 多窗口共用的 WebView 配置、界面偏好和缓存 |
+| `logs/` | Desktop logs and gateway diagnostics / 桌面日志与网关诊断日志 |
+| `runtime/bot-runtime/` | Versioned Bot runtime extracted by the portable EXE / 免安装版解包的版本化 Bot 运行时 |
+| `updates/` | Downloaded update packages and update state / 更新包与更新状态 |
+
+The first upgraded launch imports existing AppData/XDG application data without initializing or pruning the source database. SQLite snapshots include uncheckpointed WAL transactions, including Bot messages. Existing destination files are not overwritten; a completion marker prevents repeated imports. Legacy database files remain in their original directory. WebView2 profiles, extracted runtimes, logs and update directories move when the destination is absent. Quit the old Boost process before upgrading; a locked profile causes a migration error rather than starting with empty UI preferences.
+
+首次升级会导入原 AppData/XDG 目录的数据，SQLite 快照包含尚未 checkpoint 的 WAL 记录；迁移过程不初始化或清理原数据库。已有目标文件不会覆盖，完成标记防止重复导入。旧数据库保留在原目录；目标不存在时迁移 WebView2 配置、运行时、日志与更新目录。升级前退出旧 Boost；配置目录被占用时会提示迁移失败，避免静默丢失界面偏好。
+
+`BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` still override database and RPC credential paths, with relative paths resolved against the executable. Non-primary desktop identifiers are isolated below `~/.boost/profiles/<identifier>/`. Standalone Service/Web/Docker storage defaults and configured volumes are unchanged. macOS WebKit's native website storage remains OS-managed because WKWebView does not support a custom data directory; Boost-owned data, logs, runtimes and updates use `.boost` on macOS as well.
+
+显式配置的 `BOOST_DB_PATH`、`BOOST_RPC_TOKEN_FILE` 继续生效；相对路径仍相对可执行文件解析。QA 等独立桌面标识使用 `.boost/profiles/<identifier>/`。Service/Web/Docker 的默认路径和持久卷不变。macOS 的 WebKit 原生站点存储由系统管理，其他 Boost 数据、日志、运行时和更新统一放在 `.boost`。
+
 ## Development-only ports
 
 | Purpose | Normal mode | Coordinated source development |

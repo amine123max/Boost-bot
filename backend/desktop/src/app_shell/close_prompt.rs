@@ -12,6 +12,7 @@ pub(crate) fn show(app: &tauri::AppHandle) -> Result<(), String> {
     }
     // Called from a blocking worker, never from the Windows event loop.
     WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("close-confirm/".into()))
+        .data_directory(crate::app_storage::storage(app).webview())
         .title("Boost")
         .inner_size(392.0, 212.0)
         .resizable(false)

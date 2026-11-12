@@ -79,7 +79,9 @@ fn ensure_main_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
         .or_else(|| app.config().app.windows.first().cloned())?;
     config.label = MAIN_WINDOW_LABEL.to_string();
 
-    match WebviewWindowBuilder::from_config(app, &config).and_then(|builder| builder.build()) {
+    match WebviewWindowBuilder::from_config(app, &config).and_then(|builder| {
+        builder.data_directory(crate::app_storage::storage(app).webview()).build()
+    }) {
         Ok(window) => Some(window),
         Err(err) => {
             if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
@@ -101,6 +103,7 @@ fn ensure_tray_preview_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWi
         TRAY_PREVIEW_WINDOW_LABEL,
         WebviewUrl::App("tray-preview/".into()),
     )
+    .data_directory(crate::app_storage::storage(app).webview())
     .title("Boost")
     .inner_size(TRAY_PREVIEW_WIDTH, TRAY_PREVIEW_HEIGHT)
     .min_inner_size(32.0, 32.0)

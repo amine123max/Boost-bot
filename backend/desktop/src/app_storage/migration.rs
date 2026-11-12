@@ -1,5 +1,4 @@
-use boost_core::storage::Storage;
-use rusqlite::{backup::Backup, Connection};
+use rusqlite::{backup::Backup, Connection, OpenFlags};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -38,18 +37,6 @@ pub(super) fn maybe_migrate_legacy_db(current_db: &Path) {
 
         if let Some(parent) = current_db.parent() {
             let _ = fs::create_dir_all(parent);
-        }
-
-        if current_db.is_file() {
-            let backup = current_db.with_extension("db.empty.bak");
-            if let Err(err) = fs::copy(current_db, &backup) {
-                log::warn!(
-                    "Failed to backup empty current db {} -> {}: {}",
-                    current_db.display(),
-                    backup.display(),
-                    err
-                );
-            }
         }
 
         match copy_db_snapshot(&legacy_db, current_db) {
@@ -176,23 +163,14 @@ fn db_has_user_data(path: &Path) -> bool {
     if !path.is_file() {
         return false;
     }
-    let storage = match Storage::open(path) {
-        Ok(storage) => storage,
+    let connection = match Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(connection) => connection,
         Err(_) => return false,
     };
-    let _ = storage.init();
-    storage
-        .list_accounts()
-        .map(|items| !items.is_empty())
-        .unwrap_or(false)
-        || storage
-            .list_tokens()
-            .map(|items| !items.is_empty())
+    ["accounts", "tokens", "api_keys"].iter().any(|table| {
+        connection.query_row(&format!("SELECT EXISTS(SELECT 1 FROM {table} LIMIT 1)"), [], |row| row.get::<_, bool>(0))
             .unwrap_or(false)
-        || storage
-            .list_api_keys()
-            .map(|items| !items.is_empty())
-            .unwrap_or(false)
+    })
 }
 
 /// 函数 `legacy_db_candidates`
@@ -404,6 +382,8 @@ mod tests {
         let _source_storage = create_populated_db(&primary_db);
 
         maybe_migrate_legacy_db(&qa_db);
+
+        assert!(!qa_db.with_extension("db.empty.bak").exists());
 
         let migrated = Storage::open(&qa_db).expect("open migrated qa storage");
         migrated.init().expect("init migrated qa storage");

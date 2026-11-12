@@ -9,6 +9,7 @@ dependencies = [
  "boost-core",
  "boost-service",
  "chrono",
+ "dirs",
  "log",
  "reqwest 0.12.28",
  "rfd",

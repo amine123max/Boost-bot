@@ -102,6 +102,8 @@ Open **[http://localhost:12000](http://localhost:12000)**. Both local use and ho
 
 For desktop installers, Docker, development hot reload, and persistent storage, see the [build guide](docs/BUILDING.md).
 
+Desktop user data, logs, runtimes and updates are organized under `~/.boost`; Windows/Linux WebView profiles use `~/.boost/cache/webview`. Upgrades migrate existing application data. See the [storage layout](docs/BUILDING.md#desktop-user-storage--桌面用户存储).
+
 ## Repository
 
 | Directory | Responsibility |

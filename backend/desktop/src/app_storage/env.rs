@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use tauri::Manager;
-
 use super::migration::maybe_migrate_legacy_db;
 
 const ENV_DB_PATH: &str = "BOOST_DB_PATH";
@@ -121,12 +119,7 @@ fn resolve_runtime_rpc_token_path(db_path: &Path) -> PathBuf {
 /// # 返回
 /// 返回函数执行结果
 fn default_app_data_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let mut data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| "app data dir not found".to_string())?;
-    data_dir.push("boost.db");
-    Ok(data_dir)
+    Ok(super::storage(app).data().join("boost.db"))
 }
 
 /// 函数 `apply_runtime_storage_env`
@@ -140,14 +133,20 @@ fn default_app_data_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// # 返回
 /// 无
 pub(crate) fn apply_runtime_storage_env(app: &tauri::AppHandle) {
-    if let Ok(data_path) = resolve_db_path_with_legacy_migration(app) {
-        std::env::set_var(ENV_DB_PATH, &data_path);
-        let token_path = resolve_runtime_rpc_token_path(&data_path);
-        std::env::set_var(ENV_RPC_TOKEN_FILE, &token_path);
-        maybe_seed_profile_service_addr(app);
-        log::info!("db path: {}", data_path.display());
-        log::info!("rpc token path: {}", token_path.display());
+    if let Err(error) = initialize_runtime_storage_env(app) {
+        log::error!("Cannot configure Boost storage: {error}");
     }
+}
+
+pub(crate) fn initialize_runtime_storage_env(app: &tauri::AppHandle) -> Result<(), String> {
+    let data_path = resolve_db_path_with_legacy_migration(app)?;
+    std::env::set_var(ENV_DB_PATH, &data_path);
+    let token_path = resolve_runtime_rpc_token_path(&data_path);
+    std::env::set_var(ENV_RPC_TOKEN_FILE, &token_path);
+    maybe_seed_profile_service_addr(app);
+    log::info!("db path: {}", data_path.display());
+    log::info!("rpc token path: {}", token_path.display());
+    Ok(())
 }
 
 /// 函数 `profile_default_service_addr`
@@ -247,11 +246,12 @@ pub(crate) fn resolve_db_path_with_legacy_migration(
 ) -> Result<PathBuf, String> {
     let data_path = resolve_env_db_path().unwrap_or(default_app_data_db_path(app)?);
     if let Some(parent) = data_path.parent() {
-        if let Err(err) = std::fs::create_dir_all(parent) {
-            log::warn!("Failed to create db dir {}: {}", parent.display(), err);
-        }
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("Cannot create database directory {}: {err}", parent.display()))?;
     }
-    maybe_migrate_legacy_db(&data_path);
+    if !data_path.is_file() {
+        maybe_migrate_legacy_db(&data_path);
+    }
     Ok(data_path)
 }
 

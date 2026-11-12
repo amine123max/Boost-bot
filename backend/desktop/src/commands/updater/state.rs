@@ -2,8 +2,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
-use tauri::Manager;
-
 use super::model::{PendingUpdate, UpdateCheckResponse};
 
 const PENDING_UPDATE_FILE: &str = "pending-update.json";
@@ -108,11 +106,7 @@ pub(super) fn snapshot_last_state() -> (Option<UpdateCheckResponse>, Option<Stri
 /// # 返回
 /// 返回函数执行结果
 pub(super) fn updates_root_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let mut root = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| "未找到应用数据目录".to_string())?;
-    root.push("updates");
+    let root = crate::app_storage::storage(app).updates();
     fs::create_dir_all(&root).map_err(|err| format!("创建更新目录失败：{err}"))?;
     Ok(root)
 }
