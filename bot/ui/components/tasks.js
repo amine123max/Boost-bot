@@ -11,6 +11,7 @@ import { html, Icon, Notice } from "./ui.js";
 import { ActivityLine } from "./activity.js";
 import { RuleRow } from "./rules.js";
 import { api } from "../lib/api.js";
+import { authToken } from "../lib/auth.js";
 import { confirmSheet, failed, toast } from "../lib/store.js";
 import { fmtClock, fmtDay, fmtDur, fmtSep, fmtSize } from "../lib/format.js";
 import { channelName } from "../lib/access.js";
@@ -79,7 +80,10 @@ export async function stopTask(task) {
 }
 
 /** 导出成 Markdown 的下载地址（下载链接带不了请求头，语言写在查询参数里） */
-export const exportUrl = (kind, id) => `/boost-bot/amb/api/${kind}/${encodeURIComponent(id)}/export?lang=${encodeURIComponent(getLang())}`;
+export const exportUrl = (kind, id) => {
+  const token = authToken();
+  return `/boost-bot/amb/api/${kind}/${encodeURIComponent(id)}/export?lang=${encodeURIComponent(getLang())}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+};
 
 /** 原话太长时只留开头 */
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);

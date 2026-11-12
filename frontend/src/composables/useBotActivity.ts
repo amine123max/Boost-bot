@@ -10,13 +10,21 @@ export function useBotActivity() {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
   let polling = false;
+  async function hostedActivity() {
+    const value = readBotActivity(await botClient.activity());
+    if (value.available && value.state !== "idle") {
+      value.sources = ["boost-bot"];
+      value.activeSources = ["boost-bot"];
+    }
+    return value;
+  }
   async function poll() {
     clearTimeout(timer);
     if (disposed || polling || document.hidden) return;
     polling = true;
     try {
       const results = await Promise.allSettled([
-        boost.connected ? botClient.activity() : Promise.resolve(readBotActivity(null)),
+        boost.connected ? hostedActivity() : Promise.resolve(readBotActivity(null)),
         isTauriRuntime() ? appClient.localAgentActivity().then(readBotActivity) : Promise.resolve(readBotActivity(null)),
       ]);
       const next = mergeActivities(results.map(r => r.status === "fulfilled" ? r.value : readBotActivity(null)));

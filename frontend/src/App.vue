@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import BoostIcon from "./components/BoostIcon.vue";
 import BoostBotAvatar from './components/BoostBotAvatar.vue';
 import BoostStartup from './components/BoostStartup.vue';
-import { prepareBotLaunch } from './composables/useBotLaunch';
+import { prepareBotLaunch, requestBotLaunch } from './composables/useBotLaunch';
 import BoostDialog from "./components/BoostDialog.vue";
 import NotificationCenter from "./components/NotificationCenter.vue";
 import AppUpdateNotice from "./components/AppUpdateNotice.vue";
@@ -29,6 +29,7 @@ import { useStartupReady, startupContentReady } from "./composables/useStartupRe
 useLiveUsage();
 const { telemetry, error: telemetryError, upload, download } = useTelemetry();
 const route = useRoute();
+const router = useRouter();
 const closePrompt = route.path.startsWith("/close-confirm");
 if (!closePrompt && !route.path.startsWith("/tray-preview")) { useAutomaticAppUpdates(); useMainWindowEvents(); }
 const startupReady = useStartupReady(() =>
@@ -38,6 +39,14 @@ const startupReady = useStartupReady(() =>
 );
 const about = ref(false);
 const refreshing = ref(false);
+function openBot(event: MouseEvent) {
+  prepareBotLaunch(event, route.fullPath);
+  void router.push('/bot/');
+}
+function openBotFromKeyboard() {
+  requestBotLaunch(route.fullPath);
+  void router.push('/bot/');
+}
 async function refresh() {
   refreshing.value = true;
   try {
@@ -58,8 +67,8 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
     :class="{ 'sidebar-collapsed': uiPreferences.compactSidebar, 'app-booting': !startupReady }"
   >
     <aside class="sidebar">
-      <RouterLink class="brand" to="/bot/" aria-label="Boost 智能体" @click="prepareBotLaunch($event, route.fullPath)"
-        ><BoostBotAvatar ambient /><span
+      <RouterLink class="brand" to="/bot/" aria-label="Boost 智能体" title="双击左上角动态智能体进入 Bot" @click.prevent @keydown.enter.prevent="openBotFromKeyboard"
+        ><span class="brand-avatar-trigger" aria-hidden="true" @click.stop.prevent @dblclick.stop.prevent="openBot"><BoostBotAvatar ambient /></span><span
           class="brand-word"
           >Boost</span
         ></RouterLink

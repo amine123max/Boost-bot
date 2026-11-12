@@ -12,6 +12,16 @@
     // 外观偏好的解析规则和 lib/prefs.js 的 apply() 一致，语言的和 lib/i18n.js 一致，改一处要两处一起改。
     (function () {
       var root = document.documentElement;
+      try {
+        var query = new URLSearchParams(location.search);
+        var token = query.get("token");
+        if (token) {
+          sessionStorage.setItem("amb-token", token);
+          query.delete("token");
+          var remaining = query.toString();
+          history.replaceState(null, "", location.pathname + (remaining ? "?" + remaining : "") + location.hash);
+        }
+      } catch (_) {}
       var mq = function (q) { return window.matchMedia(q).matches; };
       var m = "system";
       try { m = new URLSearchParams(location.search).get('boostTheme') || localStorage.getItem('boost.theme.v1') || localStorage.getItem("amb-theme") || "system"; } catch (_) {}

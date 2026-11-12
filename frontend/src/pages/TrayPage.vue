@@ -28,6 +28,21 @@ const accountName = computed(() =>
     ? currentAccount.value?.name || "自动选择账号"
     : "等待服务连接",
 );
+const activitySources = computed(() => {
+  const sources = activity.value.activeSources.length
+    ? activity.value.activeSources
+    : activity.value.sources ?? [];
+  if (!sources.length) return activity.value.state === "idle" ? "智能体待命" : "任务来源未知";
+  const labels = [...new Set(sources)].map((source) => {
+    if (source === "boost-bot") return `Boost 账号：${currentAccount.value?.name || "自动选择账号"}`;
+    if (source === "codex") return "Codex 本地任务";
+    if (source === "claude") return "Claude 本地任务";
+    if (source === "deepseek") return "DeepSeek 本地任务";
+    return `${source} 本地任务`;
+  });
+  return [...new Set(labels)].join(" · ");
+});
+const activityTitle = computed(() => `${taskLabel.value} · ${activitySources.value}`);
 function percent(value: number | null | undefined) {
   return value == null || !Number.isFinite(value)
     ? null
@@ -41,6 +56,17 @@ const primary = computed(() =>
   ),
 );
 const tps = computed(() => activity.value.tokensPerSecond);
+const tpsAnimationDuration = computed(() =>
+  tps.value == null || tps.value <= 0
+    ? "3s"
+    : `${60 / tps.value}s`,
+);
+const tpsColor = computed(() => {
+  const speed = tps.value;
+  if (speed == null || !Number.isFinite(speed)) return "var(--tray-muted)";
+  const hue = 120 * Math.min(1, Math.max(0, speed) / 40);
+  return `hsl(${hue} 78% 54%)`;
+});
 const tpsLabel = computed(() =>
   tps.value == null
     ? "—"
@@ -121,7 +147,7 @@ const metrics = computed(() =>
       <div
         v-if="trayPreferences.showProgress"
         class="tray-logo"
-        :title="taskLabel + ' · ' + accountName"
+        :title="activityTitle"
       >
         <BotTaskProgress
           :activity="activity"
@@ -174,26 +200,27 @@ const metrics = computed(() =>
       <div
         v-if="trayPreferences.showTps"
         class="tray-tps-ring"
+        :class="{ 'is-stopped': tps == null || tps <= 0 }"
+        :style="{ '--tps-duration': tpsAnimationDuration }"
         role="img"
-        :aria-label="`TPS ${tps == null ? '暂无数据' : tps.toFixed(1) + ' t/s'}`"
+        :aria-label="`TPS ${tps == null ? '暂无数据' : tps.toFixed(1) + ' TPS'}`"
         title="最近输出速率 · tokens/s"
-        :class="{ 'has-rate': tps != null }"
       >
         <svg viewBox="0 0 32 32" aria-hidden="true">
           <circle class="tps-track" cx="16" cy="16" r="14" />
           <circle
-            v-if="tps != null"
             class="tps-arc"
             cx="16"
             cy="16"
             r="14"
             pathLength="100"
             stroke-dasharray="24 76"
+            :style="{ '--tps-color': tpsColor }"
           />
         </svg>
         <span v-if="trayPreferences.showRingValues"
           ><strong>{{ tpsLabel }}</strong
-          ><small>t/s</small></span
+          ><small>TPS</small></span
         >
         <BoostIcon v-else name="zap" :size="12" />
       </div>

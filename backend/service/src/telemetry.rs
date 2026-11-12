@@ -1,7 +1,8 @@
 //! Service-port API payload traffic and resident memory for the status panel.
 //! Management RPC/event polling and HTTP/TLS framing are deliberately excluded.
+use chrono::{Datelike, Local, Utc};
 use serde::Serialize;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, System};
@@ -9,7 +10,76 @@ use sysinfo::{Pid, System};
 static UPLOADED: AtomicU64 = AtomicU64::new(0);
 static DOWNLOADED: AtomicU64 = AtomicU64::new(0);
 static ACTIVE: AtomicU64 = AtomicU64::new(0);
+static DAILY_CLEANUP_ENABLED: AtomicBool = AtomicBool::new(true);
+static DAILY_TOTALS_DAY: AtomicI64 = AtomicI64::new(i64::MIN);
+static LAST_DAILY_CHECK_UNIX: AtomicI64 = AtomicI64::new(0);
+static DAILY_TOTALS_LOCK: Mutex<()> = Mutex::new(());
 static ADDRESS: OnceLock<Mutex<String>> = OnceLock::new();
+const DAILY_CHECK_INTERVAL_SECS: i64 = 15;
+
+fn local_day_number() -> i64 {
+    Local::now().date_naive().num_days_from_ce() as i64
+}
+
+pub(crate) fn set_daily_traffic_cleanup_enabled(enabled: bool) {
+    let _guard = DAILY_TOTALS_LOCK
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let day = DAILY_TOTALS_DAY.load(Ordering::Relaxed);
+    if day == i64::MIN {
+        DAILY_TOTALS_DAY.store(local_day_number(), Ordering::Relaxed);
+    }
+    LAST_DAILY_CHECK_UNIX.store(Utc::now().timestamp(), Ordering::Relaxed);
+    DAILY_CLEANUP_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+fn reset_totals_for_day(
+    today: i64,
+    enabled: &AtomicBool,
+    totals_day: &AtomicI64,
+    uploaded: &AtomicU64,
+    downloaded: &AtomicU64,
+    lock: &Mutex<()>,
+) -> bool {
+    if !enabled.load(Ordering::Relaxed) || totals_day.load(Ordering::Relaxed) == today {
+        return false;
+    }
+    let _guard = lock.lock().unwrap_or_else(|error| error.into_inner());
+    if !enabled.load(Ordering::Relaxed) || totals_day.load(Ordering::Relaxed) == today {
+        return false;
+    }
+    uploaded.store(0, Ordering::Relaxed);
+    downloaded.store(0, Ordering::Relaxed);
+    totals_day.store(today, Ordering::Relaxed);
+    true
+}
+
+fn maybe_reset_daily_totals(force: bool) {
+    if !DAILY_CLEANUP_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+    let now = Utc::now().timestamp();
+    if force {
+        LAST_DAILY_CHECK_UNIX.store(now, Ordering::Relaxed);
+    } else {
+        let previous = LAST_DAILY_CHECK_UNIX.load(Ordering::Relaxed);
+        if now.saturating_sub(previous) < DAILY_CHECK_INTERVAL_SECS
+            || LAST_DAILY_CHECK_UNIX
+                .compare_exchange(previous, now, Ordering::Relaxed, Ordering::Relaxed)
+                .is_err()
+        {
+            return;
+        }
+    }
+    reset_totals_for_day(
+        local_day_number(),
+        &DAILY_CLEANUP_ENABLED,
+        &DAILY_TOTALS_DAY,
+        &UPLOADED,
+        &DOWNLOADED,
+        &DAILY_TOTALS_LOCK,
+    );
+}
 
 pub(crate) struct ActiveTransfer;
 impl ActiveTransfer {
@@ -31,9 +101,11 @@ pub(crate) fn set_address(addr: &str) {
         .unwrap_or_else(|e| e.into_inner()) = addr.to_string();
 }
 pub(crate) fn record_upload(bytes: usize) {
+    maybe_reset_daily_totals(false);
     UPLOADED.fetch_add(bytes as u64, Ordering::Relaxed);
 }
 pub(crate) fn record_download(bytes: usize) {
+    maybe_reset_daily_totals(false);
     DOWNLOADED.fetch_add(bytes as u64, Ordering::Relaxed);
 }
 
@@ -76,6 +148,7 @@ fn rate(current: u64, previous: u64, elapsed: Duration) -> f64 {
 }
 
 pub(crate) fn snapshot() -> ServiceTelemetry {
+    maybe_reset_daily_totals(true);
     static SAMPLER: OnceLock<Mutex<Sampler>> = OnceLock::new();
     let sampler = SAMPLER.get_or_init(|| {
         let mut system = System::new();
@@ -148,6 +221,47 @@ mod tests {
         assert_eq!(rate(4096, 2048, Duration::from_secs(2)), 1024.0);
         assert_eq!(rate(10, 20, Duration::from_secs(1)), 0.0);
         assert_eq!(rate(10, 0, Duration::ZERO), 0.0);
+    }
+    #[test]
+    fn daily_traffic_cleanup_resets_both_totals_only_when_enabled_and_the_day_changes() {
+        let enabled = AtomicBool::new(true);
+        let day = AtomicI64::new(10);
+        let uploaded = AtomicU64::new(1200);
+        let downloaded = AtomicU64::new(800);
+        let lock = Mutex::new(());
+
+        assert!(!reset_totals_for_day(
+            10,
+            &enabled,
+            &day,
+            &uploaded,
+            &downloaded,
+            &lock
+        ));
+        assert_eq!(uploaded.load(Ordering::Relaxed), 1200);
+        assert!(reset_totals_for_day(
+            11,
+            &enabled,
+            &day,
+            &uploaded,
+            &downloaded,
+            &lock
+        ));
+        assert_eq!(uploaded.load(Ordering::Relaxed), 0);
+        assert_eq!(downloaded.load(Ordering::Relaxed), 0);
+
+        uploaded.store(55, Ordering::Relaxed);
+        enabled.store(false, Ordering::Relaxed);
+        assert!(!reset_totals_for_day(
+            12,
+            &enabled,
+            &day,
+            &uploaded,
+            &downloaded,
+            &lock
+        ));
+        assert_eq!(uploaded.load(Ordering::Relaxed), 55);
+        assert_eq!(downloaded.load(Ordering::Relaxed), 0);
     }
     #[test]
     fn snapshot_uses_current_service_process_and_camel_case_fields() {

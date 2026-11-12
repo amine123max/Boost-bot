@@ -2,8 +2,9 @@ use crate::gateway;
 
 use super::{
     apply_env_overrides_to_process, list_app_settings_map, normalize_optional_text,
-    persisted_env_overrides_missing_process_env, reload_runtime_after_env_override_apply,
-    set_service_bind_mode, QuotaGuardInput, APP_SETTING_GATEWAY_ACCOUNT_MAX_INFLIGHT_KEY,
+    parse_bool_with_default, persisted_env_overrides_missing_process_env,
+    reload_runtime_after_env_override_apply, set_service_bind_mode, QuotaGuardInput,
+    APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY, APP_SETTING_GATEWAY_ACCOUNT_MAX_INFLIGHT_KEY,
     APP_SETTING_GATEWAY_COMPACT_MODEL_FORWARD_RULES_KEY,
     APP_SETTING_GATEWAY_FREE_ACCOUNT_MAX_MODEL_KEY, APP_SETTING_GATEWAY_MODEL_FORWARD_RULES_KEY,
     APP_SETTING_GATEWAY_ORIGINATOR_KEY, APP_SETTING_GATEWAY_QUOTA_GUARD_KEY,
@@ -59,6 +60,11 @@ pub fn sync_runtime_settings_from_storage() {
     crate::proxy_policy::load();
     crate::proxy_kernel::start_automatic();
     let settings = list_app_settings_map();
+    let daily_traffic_cleanup_enabled = settings
+        .get(APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY)
+        .map(|value| parse_bool_with_default(value, true))
+        .unwrap_or(true);
+    crate::telemetry::set_daily_traffic_cleanup_enabled(daily_traffic_cleanup_enabled);
     let env_overrides = persisted_env_overrides_missing_process_env();
     if !env_overrides.is_empty() {
         apply_env_overrides_to_process(&env_overrides, &env_overrides);

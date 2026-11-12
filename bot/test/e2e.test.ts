@@ -16,11 +16,12 @@ let app: App;
 let base: string;
 let dataDir: string;
 const feishu = new FakeFeishu();
+const UI_TOKEN = "e2e-ui-token";
 
 async function api(p: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) {
   const res = await fetch(base + "/boost-bot/amb/api" + p, {
     method: init.method ?? "GET",
-    headers: { ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...init.headers },
+    headers: { "x-amb-token": UI_TOKEN, ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...init.headers },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   return { status: res.status, json: (await res.json().catch(() => ({}))) as any };
@@ -34,6 +35,7 @@ beforeAll(async () => {
     dataDir,
     env: { AMB_MAGPIE_BASE_URL: llm.url + "/v1", AMB_MAGPIE_API_KEY: "gw-key", AMB_UI_PORT: "0", AMB_WEIXIN_API_BASE: ilink.url, AMB_WEIXIN_CDN_BASE: ilink.cdnBase, AMB_FEISHU_THROTTLE_MS: "30", AMB_AGENT: "off" },
   });
+  config.ui.token = UI_TOKEN;
   process.env.FEISHU_APP_ID = "cli_test";
   process.env.FEISHU_APP_SECRET = "secret_test";
   app = new App(config, { feishuTransport: () => feishu, weixinPollTimeoutMs: 2000, printQrToTerminal: false });
@@ -196,6 +198,24 @@ describe("微信 E2E", () => {
 });
 
 describe("Web 界面 / API", () => {
+  it("桌面 iframe 不依赖第三方 Cookie，静态界面开放但 API 仍需令牌", async () => {
+    const page = await fetch(`${base}/boost-bot/?token=${UI_TOKEN}`, { redirect: "manual" });
+    expect(page.status).toBe(200);
+    expect(page.headers.get("location")).toBeNull();
+    expect(await page.text()).toContain("amb-token");
+
+    const script = await fetch(`${base}/boost-bot/amb/static/main.js`);
+    expect(script.status).toBe(200);
+
+    const denied = await fetch(`${base}/boost-bot/amb/api/status`);
+    expect(denied.status).toBe(401);
+    expect((await api("/status")).status).toBe(200);
+    const queryRead = await fetch(`${base}/boost-bot/amb/api/status?token=${UI_TOKEN}`);
+    expect(queryRead.status).toBe(200);
+    const queryWrite = await fetch(`${base}/boost-bot/amb/api/bots?token=${UI_TOKEN}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    expect(queryWrite.status).toBe(401);
+  });
+
   it("页面与前端依赖可加载", async () => {
     const html = await (await fetch(base + "/")).text();
     expect(html).toContain("importmap");
@@ -250,9 +270,9 @@ describe("Web 界面 / API", () => {
     const port = new URL(base).port;
     const status = await new Promise<number>((r) => http.get({ host: "127.0.0.1", port, path: "/boost-bot/amb/api/status", headers: { host: "evil.example:80" } }, (res) => r(res.statusCode!)));
     expect(status).toBe(421);
-    const form = await fetch(base + "/boost-bot/amb/api/bots", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" });
+    const form = await fetch(base + "/boost-bot/amb/api/bots", { method: "POST", headers: { "x-amb-token": UI_TOKEN, "content-type": "text/plain" }, body: "{}" });
     expect(form.status).toBe(415);
-    for (const p of ["/magpie/", "/v1/models", "/api/providers"]) expect((await fetch(base + p)).status, p).toBe(404);
+    for (const p of ["/magpie/", "/v1/models", "/api/providers"]) expect((await fetch(base + p, { headers: { "x-amb-token": UI_TOKEN } })).status, p).toBe(404);
     expect((await api("/providers", { method: "POST", body: { preset: "deepseek", apiKey: "x" } })).status).toBe(404);
   });
   it("状态：版本号来自 package.json，不暴露网关端口与二进制路径", async () => {
@@ -319,7 +339,7 @@ describe("Web 界面 / API", () => {
 
 /** 读完一个 SSE 响应，返回 [事件, 数据] 列表 */
 async function sse(p: string, body: unknown, signal?: AbortSignal, onEvent?: (ev: string, data: any) => void) {
-  const res = await fetch(base + "/boost-bot/amb/api" + p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal });
+  const res = await fetch(base + "/boost-bot/amb/api" + p, { method: "POST", headers: { "x-amb-token": UI_TOKEN, "content-type": "application/json" }, body: JSON.stringify(body), signal });
   expect(res.headers.get("content-type")).toContain("text/event-stream");
   const events: Array<[string, any]> = [];
   let buf = "";

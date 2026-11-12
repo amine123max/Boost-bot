@@ -256,6 +256,17 @@ impl Observer {
         } else {
             selected.and_then(|l| l.task.percent)
         };
+        let mut active_sources = Vec::<&str>::new();
+        for log in &active {
+            if !active_sources.contains(&log.provider) {
+                active_sources.push(log.provider);
+            }
+        }
+        if active_sources.is_empty() {
+            if let Some(log) = selected {
+                active_sources.push(log.provider);
+            }
+        }
         let rates: Vec<_> = tasks
             .iter()
             .filter_map(|log| log.task.rate.value(now))
@@ -268,6 +279,7 @@ impl Observer {
         json!({"available":true,"state":selected.map(|l| l.task.state).unwrap_or("idle"),"percent":percent,
             "tokensPerSecond":tokens_per_second,
             "activeTasks":active.len(),"waitingTasks":waiting,"sources":self.sources,
+            "activeSources":active_sources,
             "stale":selected.is_some_and(|l| l.task.state == "working" && l.task.reported_at > 0 && now - l.task.reported_at > 120_000)})
     }
 }

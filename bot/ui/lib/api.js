@@ -1,6 +1,7 @@
 // 本机后端接口：JSON 请求 + 流式对话（POST + text/event-stream，EventSource 不支持 POST）。
 // 每个请求带 x-amb-lang（界面当前语言），服务端的报错和状态文字用同一种语言（src/i18n）。
 import { getLang } from "./i18n.js";
+import { authHeaders } from "./auth.js";
 export class ApiError extends Error {
   constructor(message, status, data) {
     super(message);
@@ -12,7 +13,7 @@ export class ApiError extends Error {
 export async function api(path, opts = {}) {
   const res = await fetch("/boost-bot/amb/api" + path, {
     method: opts.method || "GET",
-    headers: { "x-amb-lang": getLang(), ...(opts.body !== undefined ? { "content-type": "application/json" } : {}) },
+    headers: { "x-amb-lang": getLang(), ...authHeaders(), ...(opts.body !== undefined ? { "content-type": "application/json" } : {}) },
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
   });
@@ -101,7 +102,7 @@ export function streamChat(botId, text, handlers, signal) {
   return readEvents(
     fetch(`/boost-bot/amb/api/bots/${encodeURIComponent(botId)}/chat/stream`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-amb-lang": getLang() },
+      headers: { "content-type": "application/json", "x-amb-lang": getLang(), ...authHeaders() },
       body: JSON.stringify({ text }),
       signal,
     }),
@@ -111,15 +112,15 @@ export function streamChat(botId, text, handlers, signal) {
 
 /** 目录 Bot 的 app/ 文件变化：file（{ path }） */
 export function watchApp(botId, handlers, signal) {
-  return readEvents(fetch(`/boost-bot/amb/api/bots/${encodeURIComponent(botId)}/app/watch`, { headers: { "x-amb-lang": getLang() }, signal }), handlers);
+  return readEvents(fetch(`/boost-bot/amb/api/bots/${encodeURIComponent(botId)}/app/watch`, { headers: { "x-amb-lang": getLang(), ...authHeaders() }, signal }), handlers);
 }
 
 /** 接着一个群聊：turn（轮到谁）、同 streamChat 的事件、turnEnd（这一轮答完），都答完了结束 */
 export function attachGroup(groupId, handlers, signal) {
-  return readEvents(fetch(`/boost-bot/amb/api/groups/${encodeURIComponent(groupId)}/live`, { headers: { "x-amb-lang": getLang() }, signal }), handlers);
+  return readEvents(fetch(`/boost-bot/amb/api/groups/${encodeURIComponent(groupId)}/live`, { headers: { "x-amb-lang": getLang(), ...authHeaders() }, signal }), handlers);
 }
 
 /** 接上进行中的那条消息（切走再切回、刷新后）：先 snapshot（到目前为止的样子），之后的事件同 streamChat，最后 done */
 export function attachChat(botId, turnId, handlers, signal) {
-  return readEvents(fetch(`/boost-bot/amb/api/bots/${encodeURIComponent(botId)}/chat/live?turn=${encodeURIComponent(turnId)}`, { headers: { "x-amb-lang": getLang() }, signal }), handlers);
+  return readEvents(fetch(`/boost-bot/amb/api/bots/${encodeURIComponent(botId)}/chat/live?turn=${encodeURIComponent(turnId)}`, { headers: { "x-amb-lang": getLang(), ...authHeaders() }, signal }), handlers);
 }

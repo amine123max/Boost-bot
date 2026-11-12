@@ -1,4 +1,5 @@
 pub const APP_SETTING_UPDATE_AUTO_CHECK_KEY: &str = "app.update.auto_check";
+pub const APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY: &str = "app.daily_traffic_cleanup_enabled";
 pub const APP_SETTING_CLOSE_TO_TRAY_ON_CLOSE_KEY: &str = "app.close_to_tray_on_close";
 pub const APP_SETTING_LIGHTWEIGHT_MODE_ON_CLOSE_TO_TRAY_KEY: &str =
     "app.lightweight_mode_on_close_to_tray";

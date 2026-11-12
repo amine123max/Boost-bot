@@ -4,12 +4,16 @@
 import { useState } from "preact/hooks";
 import { html, Icon, IconButton } from "./ui.js";
 import { api } from "../lib/api.js";
+import { authToken } from "../lib/auth.js";
 import { failed } from "../lib/store.js";
 import { fmtSize } from "../lib/format.js";
 import { t } from "../lib/i18n.js";
 
 const enc = encodeURIComponent;
-export const fileUrl = (conv, path) => `/boost-bot/amb/api/conversations/${enc(conv)}/file?path=${enc(path)}`;
+export const fileUrl = (conv, path) => {
+  const token = authToken();
+  return `/boost-bot/amb/api/conversations/${enc(conv)}/file?path=${enc(path)}${token ? `&token=${enc(token)}` : ""}`;
+};
 
 /** 桌面版：open 用系统程序打开，reveal 在文件夹中显示 */
 function desktop(conv, path, action) {

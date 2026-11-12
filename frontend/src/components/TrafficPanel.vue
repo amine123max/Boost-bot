@@ -78,7 +78,6 @@ const stats = computed(() => [
     ><template #actions
       ><span
         class="toolbar-note"
-        title="服务端口的 API 数据流量，不含管理轮询、HTTP/TLS 开销；累计值从服务启动计算"
         >10 分钟</span
       ></template
     >

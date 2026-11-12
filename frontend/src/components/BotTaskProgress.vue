@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import BoostBotAvatar from "./BoostBotAvatar.vue";
 import type { BotActivity } from "@/lib/bot-activity";
-withDefaults(
+const props = withDefaults(
   defineProps<{
     activity: BotActivity;
     label: string;
@@ -11,25 +12,36 @@ withDefaults(
   }>(),
   { showValue: false },
 );
+const progress = computed(() =>
+  props.activity.state === "done" ? 100 : props.activity.percent,
+);
+const progressColor = computed(() => {
+  if (props.activity.state === "done") return "#22c55e";
+  if (props.activity.state === "failed") return "#ef4444";
+  if (props.activity.state === "waiting") return "#e9ac43";
+  if (progress.value == null) return "var(--tray-muted, #8d929d)";
+  const hue = 142 * Math.min(1, Math.max(0, progress.value) / 100);
+  return `hsl(${hue} 71% 45%)`;
+});
+const ringProgress = computed(() =>
+  progress.value === 0 ? 1.5 : progress.value,
+);
 </script>
 <template>
   <span
     class="bot-task-progress"
     :class="[
       activity.state,
-      { compact },
-      {
-        pending: activity.state === 'working' && activity.percent == null,
-        stale: activity.stale,
-      },
+      { compact, stale: activity.stale },
     ]"
     role="progressbar"
     :aria-label="label"
-    :aria-valuenow="activity.percent ?? undefined"
+    :aria-valuenow="progress ?? undefined"
     :aria-valuetext="label"
     :aria-valuemin="0"
     :aria-valuemax="100"
     :data-task-state="activity.state"
+    :style="{ color: progressColor }"
   >
     <svg class="bot-task-ring" viewBox="0 0 48 48" aria-hidden="true">
       <circle class="bot-task-track" cx="24" cy="24" r="21" />
@@ -40,22 +52,26 @@ withDefaults(
         cy="24"
         r="21"
         pathLength="100"
-        :stroke-dasharray="activity.percent == null ? '24 76' : '100'"
-        :stroke-dashoffset="
-          activity.percent == null ? 0 : 100 - activity.percent
-        "
+        :stroke-dasharray="ringProgress == null ? '24 76' : '100'"
+        :stroke-dashoffset="ringProgress == null ? 0 : 100 - ringProgress"
       />
     </svg>
     <strong
-      v-if="showValue && activity.percent != null"
+      v-if="showValue && progress != null"
       class="bot-task-number"
-      >{{ activity.percent }}</strong
+      >{{ progress }}</strong
     >
     <BoostBotAvatar
       v-else
-      :size="compact ? 18 : 34"
+      :size="compact ? 40 : 34"
       :active="active || activity.state === 'working'"
       :thinking="activity.state === 'working'"
+      :ambient="compact"
+    />
+    <span
+      v-if="compact && activity.state === 'done'"
+      class="bot-task-complete-dot"
+      aria-hidden="true"
     />
   </span>
 </template>
@@ -80,6 +96,7 @@ withDefaults(
   width: 48px;
   height: 48px;
   color: var(--tray-accent, #65bfa1);
+  transition: color 500ms ease;
 }
 .bot-task-ring {
   position: absolute;
@@ -100,14 +117,23 @@ withDefaults(
 .bot-task-arc {
   stroke: currentColor;
   stroke-linecap: round;
-  transition: stroke-dashoffset 500ms ease;
+  transition: stroke-dashoffset 500ms ease, stroke 500ms ease;
+}
+.bot-task-complete-dot {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--tray-bg, #111214);
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 1px #22c55e;
 }
 .idle .bot-task-track,
 .unavailable .bot-task-track {
   opacity: 0;
-}
-.pending .bot-task-ring {
-  animation: bot-task-orbit 2s linear infinite;
 }
 .waiting {
   color: #e9ac43;
@@ -119,26 +145,8 @@ withDefaults(
 .unavailable {
   color: var(--tray-muted, #8d929d);
 }
-.working:not(.pending) .bot-task-arc {
-  animation: bot-task-breathe 2.6s ease-in-out infinite;
-}
-.waiting .bot-task-arc {
-  animation: bot-task-breathe 4s ease-in-out infinite;
-}
-@keyframes bot-task-orbit {
-  to {
-    transform: rotate(270deg);
-  }
-}
-@keyframes bot-task-breathe {
-  50% {
-    opacity: 0.5;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .bot-task-ring,
   .bot-task-arc {
-    animation: none !important;
     transition: none;
   }
 }

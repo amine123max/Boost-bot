@@ -16,13 +16,15 @@ test("progress keeps unknown work indeterminate and only successful completion r
 });
 
 test("external tasks do not disappear when the built-in host is unavailable", () => {
-  const local = readBotActivity({ available: true, state: "working", percent: 42, activeTasks: 1, waitingTasks: 0, sources: ["codex"], stale: true });
+  const local = readBotActivity({ available: true, state: "working", percent: 42, activeTasks: 1, waitingTasks: 0, sources: ["codex"], activeSources: ["codex"], stale: true });
   assert.equal(mergeActivities([readBotActivity(null), local]).percent, 42);
   assert.equal(mergeActivities([readBotActivity(null), local]).stale, true);
-  const wait = readBotActivity({ available: true, state: "waiting", percent: null, activeTasks: 1, waitingTasks: 1 });
-  assert.equal(mergeActivities([local, wait]).state, "waiting");
-  assert.equal(mergeActivities([local, wait]).percent, null);
-  assert.equal(mergeActivities([local, wait]).activeTasks, 2);
+  const wait = readBotActivity({ available: true, state: "waiting", percent: null, activeTasks: 1, waitingTasks: 1, activeSources: ["boost-bot"] });
+  const merged = mergeActivities([local, wait]);
+  assert.equal(merged.state, "waiting");
+  assert.equal(merged.percent, null);
+  assert.equal(merged.activeTasks, 2);
+  assert.deepEqual(merged.activeSources, ["codex", "boost-bot"]);
 });
 
 test("TPS stays unknown without valid samples and aggregates independent sources", () => {

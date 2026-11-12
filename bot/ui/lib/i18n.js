@@ -14,6 +14,7 @@
 // 切换语言时 App 订阅 useLang() 整棵树重渲染：模块顶层不要缓存翻译后的字符串（写成函数，渲染时再取），
 // useMemo 的依赖里要带上 useLang() 的返回值。
 import { useEffect, useState } from "preact/hooks";
+import { authHeaders } from "./auth.js";
 import zhCN from "../locales/zh-CN/index.js";
 import en from "../locales/en/index.js";
 import manifest from "../locales/manifest.json" with { type: "json" };
@@ -96,7 +97,7 @@ export async function changeLang(next) {
   try {
     const res = await fetch("/boost-bot/amb/api/settings", {
       method: "PUT",
-      headers: { "content-type": "application/json", "x-amb-lang": current },
+      headers: { "content-type": "application/json", "x-amb-lang": current, ...authHeaders() },
       body: JSON.stringify({ lang: pref }),
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);

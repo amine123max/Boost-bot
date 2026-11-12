@@ -8,17 +8,15 @@ mod shared;
 mod store;
 mod ui;
 
-pub use api::{
-    app_settings_get, app_settings_get_with_overrides, app_settings_set, 
-};
+pub use api::{app_settings_get, app_settings_get_with_overrides, app_settings_set};
 pub(crate) use codex_latest_sync::ensure_codex_latest_version_sync;
 pub(crate) use env_overrides::{
     apply_env_overrides_to_process, persisted_env_overrides_missing_process_env,
     reload_runtime_after_env_override_apply,
 };
+pub(crate) use gateway::advance_warmup_interval;
 pub(crate) use gateway::sync_gateway_user_agent_version_from_codex_latest;
 pub(crate) use gateway::QuotaGuardInput;
-pub(crate) use gateway::advance_warmup_interval;
 #[allow(unused_imports)]
 pub use gateway::{
     current_gateway_account_max_inflight, current_gateway_compact_model_forward_rules,
@@ -46,9 +44,10 @@ pub use service::{
 };
 pub(crate) use shared::{normalize_optional_text, parse_bool_with_default};
 pub use shared::{
-    APP_SETTING_CLOSE_TO_TRAY_ON_CLOSE_KEY, APP_SETTING_DISTRIBUTION_ENABLED_KEY,
-    APP_SETTING_ENV_OVERRIDES_KEY, APP_SETTING_GATEWAY_ACCOUNT_MAX_INFLIGHT_KEY,
-    APP_SETTING_GATEWAY_BACKGROUND_TASKS_KEY, APP_SETTING_GATEWAY_COMPACT_MODEL_FORWARD_RULES_KEY,
+    APP_SETTING_CLOSE_TO_TRAY_ON_CLOSE_KEY, APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY,
+    APP_SETTING_DISTRIBUTION_ENABLED_KEY, APP_SETTING_ENV_OVERRIDES_KEY,
+    APP_SETTING_GATEWAY_ACCOUNT_MAX_INFLIGHT_KEY, APP_SETTING_GATEWAY_BACKGROUND_TASKS_KEY,
+    APP_SETTING_GATEWAY_COMPACT_MODEL_FORWARD_RULES_KEY,
     APP_SETTING_GATEWAY_FREE_ACCOUNT_MAX_MODEL_KEY, APP_SETTING_GATEWAY_MODEL_FORWARD_RULES_KEY,
     APP_SETTING_GATEWAY_ORIGINATOR_KEY, APP_SETTING_GATEWAY_QUOTA_GUARD_KEY,
     APP_SETTING_GATEWAY_REQUEST_COMPRESSION_ENABLED_KEY,
@@ -68,11 +67,11 @@ pub(crate) use store::{
     save_persisted_bool_setting,
 };
 pub use ui::{
-    current_main_window_close_action, set_main_window_close_action,
     current_close_to_tray_on_close_setting, current_codex_cli_guide_dismissed,
-    current_lightweight_mode_on_close_to_tray_setting, current_ui_appearance_preset,
-    current_ui_low_transparency_enabled, current_ui_theme, current_update_auto_check_enabled,
-    set_close_to_tray_on_close_setting, set_codex_cli_guide_dismissed,
-    set_lightweight_mode_on_close_to_tray_setting, set_ui_appearance_preset,
-    set_ui_low_transparency_enabled, set_ui_theme, set_update_auto_check_enabled,
+    current_lightweight_mode_on_close_to_tray_setting, current_main_window_close_action,
+    current_ui_appearance_preset, current_ui_low_transparency_enabled, current_ui_theme,
+    current_update_auto_check_enabled, set_close_to_tray_on_close_setting,
+    set_codex_cli_guide_dismissed, set_lightweight_mode_on_close_to_tray_setting,
+    set_main_window_close_action, set_ui_appearance_preset, set_ui_low_transparency_enabled,
+    set_ui_theme, set_update_auto_check_enabled,
 };

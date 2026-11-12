@@ -10,6 +10,7 @@ export interface BotActivity {
   available: boolean;
   stale?: boolean;
   sources?: string[];
+  activeSources: string[];
   tokensPerSecond?: number | null;
   state: BotActivityState;
   percent: number | null;
@@ -35,6 +36,7 @@ export function readBotActivity(value: unknown): BotActivity {
     stale: source.stale === true,
     tokensPerSecond: typeof source.tokensPerSecond === "number" && Number.isFinite(source.tokensPerSecond) && source.tokensPerSecond >= 0 ? source.tokensPerSecond : null,
     sources: Array.isArray(source.sources) ? source.sources.filter((v): v is string => typeof v === "string") : [],
+    activeSources: Array.isArray(source.activeSources) ? source.activeSources.filter((v): v is string => typeof v === "string") : [],
     state,
     percent:
       state === "done"
@@ -59,7 +61,10 @@ export function mergeActivities(values: BotActivity[]): BotActivity {
   const live = values.filter(v => v.available);
   const active = live.filter(v => v.state === "working" || v.state === "waiting");
   const selected = active.find(v => v.state === "waiting") || active[0] || live.find(v => ["done", "failed", "stopped"].includes(v.state)) || live[0];
+  const selectedActivity = readBotActivity(selected);
   const activeTasks = active.reduce((n, v) => n + v.activeTasks, 0);
+  const activeSources = [...new Set(active.flatMap(v => v.activeSources.length ? v.activeSources : v.sources ?? []))];
   const rates = live.map(v => v.tokensPerSecond).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0);
-  return { ...readBotActivity(selected), tokensPerSecond: rates.length ? rates.reduce((sum, value) => sum + value, 0) : null, activeTasks, waitingTasks: active.reduce((n, v) => n + v.waitingTasks, 0), percent: activeTasks > 1 ? null : selected?.percent ?? null };
+  const sources = active.length ? activeSources : selectedActivity.activeSources.length ? selectedActivity.activeSources : selectedActivity.sources ?? [];
+  return { ...selectedActivity, sources, activeSources: sources, tokensPerSecond: rates.length ? rates.reduce((sum, value) => sum + value, 0) : null, activeTasks, waitingTasks: active.reduce((n, v) => n + v.waitingTasks, 0), percent: activeTasks > 1 ? null : selectedActivity.state === "done" ? 100 : selectedActivity.percent };
 }

@@ -21,19 +21,20 @@ pub(crate) struct DockLayout {
 fn dimensions(horizontal: bool, rings: u32, metrics: u32) -> LogicalSize<f64> {
     let rings = rings.min(3);
     let metrics = metrics.min(3);
-    let ring_space = f64::from(rings * 28 + rings.saturating_sub(1) * 6);
+    let ring_gap = if horizontal { 4 } else { 6 };
+    let ring_space = f64::from(rings * 32 + rings.saturating_sub(1) * ring_gap);
     if horizontal {
         LogicalSize::new(
             (ring_space
-                + if metrics > 0 { 58.0 } else { 0.0 }
-                + if rings > 0 && metrics > 0 { 10.0 } else { 0.0 }
-                + 22.0)
+                + if metrics > 0 { 44.0 } else { 0.0 }
+                + if rings > 0 && metrics > 0 { 4.0 } else { 0.0 }
+                + 12.0)
                 .max(52.0),
-            38.0,
+            40.0,
         )
     } else {
         LogicalSize::new(
-            64.0,
+            58.0,
             (ring_space
                 + f64::from(metrics * 9)
                 + if rings > 0 && metrics > 0 { 10.0 } else { 0.0 }

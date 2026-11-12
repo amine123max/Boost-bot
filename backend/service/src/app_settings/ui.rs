@@ -1,9 +1,10 @@
 use super::parse_bool_with_default;
 use super::{
     get_persisted_app_setting, save_persisted_app_setting, save_persisted_bool_setting,
-    APP_SETTING_CLOSE_TO_TRAY_ON_CLOSE_KEY, APP_SETTING_LIGHTWEIGHT_MODE_ON_CLOSE_TO_TRAY_KEY,
-    APP_SETTING_UI_APPEARANCE_PRESET_KEY, APP_SETTING_UI_CODEX_CLI_GUIDE_DISMISSED_KEY,
-    APP_SETTING_UI_LOCALE_KEY, APP_SETTING_UI_LOW_TRANSPARENCY_KEY, APP_SETTING_UI_THEME_KEY,
+    APP_SETTING_CLOSE_TO_TRAY_ON_CLOSE_KEY, APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY,
+    APP_SETTING_LIGHTWEIGHT_MODE_ON_CLOSE_TO_TRAY_KEY, APP_SETTING_UI_APPEARANCE_PRESET_KEY,
+    APP_SETTING_UI_CODEX_CLI_GUIDE_DISMISSED_KEY, APP_SETTING_UI_LOCALE_KEY,
+    APP_SETTING_UI_LOW_TRANSPARENCY_KEY, APP_SETTING_UI_THEME_KEY,
     APP_SETTING_UPDATE_AUTO_CHECK_KEY,
 };
 
@@ -106,6 +107,20 @@ pub fn current_update_auto_check_enabled() -> bool {
 /// 返回函数执行结果
 pub fn set_update_auto_check_enabled(enabled: bool) -> Result<bool, String> {
     save_persisted_bool_setting(APP_SETTING_UPDATE_AUTO_CHECK_KEY, enabled)?;
+    Ok(enabled)
+}
+
+pub fn current_daily_traffic_cleanup_enabled() -> bool {
+    let enabled = get_persisted_app_setting(APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY)
+        .map(|value| parse_bool_with_default(&value, true))
+        .unwrap_or(true);
+    crate::telemetry::set_daily_traffic_cleanup_enabled(enabled);
+    enabled
+}
+
+pub fn set_daily_traffic_cleanup_enabled(enabled: bool) -> Result<bool, String> {
+    save_persisted_bool_setting(APP_SETTING_DAILY_TRAFFIC_CLEANUP_ENABLED_KEY, enabled)?;
+    crate::telemetry::set_daily_traffic_cleanup_enabled(enabled);
     Ok(enabled)
 }
 

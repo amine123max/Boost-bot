@@ -1,10 +1,11 @@
 // 专属界面容器：主区是 Bot 的界面（沙箱 iframe），底部一行输入框，最新回复显示在输入框上方；
 // 完整对话和 Bot 信息在右边一列。还没有实例时界面显示示例数据：不创建实例、不装技能、不起进程，第一次发消息才创建。
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { html, Button, IconButton, Notice, Spinner } from "../components/ui.js";
 import { BotAvatar } from "../components/avatar.js";
 import { ChatScreen, PromptCard } from "./chat.js";
 import { api, streamChat, watchApp } from "../lib/api.js";
+import { authToken } from "../lib/auth.js";
 import { attachBridge, currentEnv, pickFiles, safeExternalUrl, watchEnv } from "../lib/bot-bridge.js";
 import { markCatalogSeen, tr } from "../lib/catalog.js";
 import { guide, markSeen } from "../lib/guide.js";
@@ -168,7 +169,7 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
   };
 
   // 接上桥接
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = frame.current;
     if (!el || !base || uiFailed) return;
     const fileApi = (path) => {
@@ -191,7 +192,8 @@ export function BotAppScreen({ catalogId, bot, onInstalled, onBotUpdated, onOpen
         if (navigator.userActivation && !navigator.userActivation.isActive) throw new Error("needs_user_gesture");
         const id = encodeURIComponent(b.id);
         if (live.current.desktop) return api(`/bots/${id}/app/open`, { method: "POST", body: { path, reveal: !!reveal } });
-        window.open(`/boost-bot/amb/api/bots/${id}/app/download?path=${encodeURIComponent(path)}`, "_blank", "noopener");
+        const token = authToken();
+        window.open(`/boost-bot/amb/api/bots/${id}/app/download?path=${encodeURIComponent(path)}${token ? `&token=${encodeURIComponent(token)}` : ""}`, "_blank", "noopener");
         return { ok: true };
       },
       // 外部链接：地址可能来自网页内容，打开前让用户看清楚。同一时间只有一个确认框，界面刷不出一串弹窗

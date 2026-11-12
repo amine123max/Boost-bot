@@ -8,6 +8,7 @@ async function desktop(
     portable?: boolean;
     failure?: string;
     localTps?: number;
+    activityState?: 'idle' | 'working' | 'waiting' | 'done' | 'failed' | 'stopped';
     dockEdge?: "top" | "left" | "right";
   } = {},
 ) {
@@ -16,6 +17,8 @@ async function desktop(
       auto: options.auto ?? true,
       available: options.available ?? true,
       portable: options.portable ?? false,
+      dailyTrafficCleanupEnabled:
+        localStorage.getItem("test.dailyTrafficCleanupEnabled") !== "false",
       failure: options.failure || "",
       calls: [] as string[],
       requests: [] as { command: string; args: any }[],
@@ -28,6 +31,7 @@ async function desktop(
       theme: "dark",
       serviceAddr: "localhost:12580",
       updateAutoCheck: state.auto,
+      dailyTrafficCleanupEnabled: state.dailyTrafficCleanupEnabled,
     });
     const check = () => ({
       repo: "amine123max/Boost-bot",
@@ -53,8 +57,10 @@ async function desktop(
             return args.handler;
           case "app_tray_layout_sync":
             return { edge: options.dockEdge || "floating", horizontal: options.dockEdge === "top" };
-          case "app_local_agent_activity":
-            return { available: true, state: options.localTps == null ? "idle" : "working", percent: options.localTps == null ? null : 40, activeTasks: options.localTps == null ? 0 : 1, waitingTasks: 0, tokensPerSecond: options.localTps ?? null };
+          case "app_local_agent_activity": {
+            const activityState = options.activityState || (options.localTps == null ? "idle" : "working");
+            return { available: true, state: activityState, percent: activityState === "done" ? 100 : activityState === "idle" ? null : 40, activeTasks: activityState === "working" || activityState === "waiting" ? 1 : 0, waitingTasks: activityState === "waiting" ? 1 : 0, tokensPerSecond: options.localTps ?? null };
+          }
           case "app_main_window_close":
             (window as any).__closeChoice = args;
             if (args.remember) localStorage.setItem("test.closeAction", args.action);
@@ -65,6 +71,10 @@ async function desktop(
             if (args.patch.mainWindowCloseAction) localStorage.setItem("test.closeAction", args.patch.mainWindowCloseAction);
             if (args.patch.updateAutoCheck !== undefined)
               state.auto = args.patch.updateAutoCheck;
+            if (args.patch.dailyTrafficCleanupEnabled !== undefined) {
+              state.dailyTrafficCleanupEnabled = args.patch.dailyTrafficCleanupEnabled;
+              localStorage.setItem("test.dailyTrafficCleanupEnabled", String(state.dailyTrafficCleanupEnabled));
+            }
             return settings();
           case "service_account_manager_session_current":
             return { role: "system_admin", permissions: ["system:admin"] };
@@ -116,6 +126,19 @@ const calls = (page: Page, command: string) =>
       ).length,
     command,
   );
+
+test('daily traffic cleanup is enabled by default and its cache setting persists', async ({ page }) => {
+  await desktop(page, { auto: false });
+  await page.goto('/settings/');
+  const toggle = page.getByRole('switch', { name: '每日清理累计流量', exact: true });
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await expect.poll(() => page.evaluate(() => (window as any).__updateFixture.requests
+    .filter((request: any) => request.command === 'app_settings_set')
+    .at(-1)?.args.patch.dailyTrafficCleanupEnabled)).toBe(false);
+  await page.reload();
+  await expect(page.getByRole('switch', { name: '每日清理累计流量', exact: true })).not.toBeChecked();
+});
 
 test("automatic check only prompts, repeats every 24 hours, and respects disabling", async ({
   page,
@@ -351,4 +374,70 @@ test('top docking receives native edge state and moves the grip to the side', as
   await expect(page.locator('.tray-drag-handle')).toHaveCSS('width', '2px');
   await expect(page.locator('.tray-tps-ring strong')).toHaveText('285');
   await page.screenshot({ path: testInfo.outputPath('top-strip-dark.png'), animations: 'disabled' });
+});
+
+test('tray rings keep one size on side and top, the animated agent fits, and TPS scales rotation', async ({ page }) => {
+  await page.setViewportSize({ width: 64, height: 157 });
+  await desktop(page, { auto: false, localTps: 20, dockEdge: 'right' });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.addInitScript(() => {
+    localStorage.setItem('boost.bot.appearance.v1', JSON.stringify({
+      version: 1, animation: 'still', contour: 'squircle', palette: 'adaptive',
+      customColor: '#2563eb', speed: 1, size: 48, followPointer: true,
+    }));
+    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: false }));
+  });
+  await page.goto('/tray-preview/');
+  const side = page.locator('.tray-rail');
+  await expect(side).toHaveClass(/is-right/);
+  await expect(page.locator('[data-boost-bot-avatar]')).toHaveAttribute('data-bot-motion', 'gentle');
+  const sideGeometry = await page.evaluate(() => ({
+    rings: ['.tray-logo', '.tray-quota-ring', '.tray-tps-ring'].map(selector =>
+      document.querySelector(selector)!.getBoundingClientRect().width),
+    progress: document.querySelector('.bot-task-progress')!.getBoundingClientRect().width,
+    avatar: Number.parseFloat(getComputedStyle(document.querySelector('[data-boost-bot-avatar]')!).width),
+    motion: document.querySelector('[data-boost-bot-avatar]')!.getAttribute('data-bot-motion'),
+    duration: getComputedStyle(document.querySelector('.tps-arc')!).animationDuration,
+    progressColor: getComputedStyle(document.querySelector('.bot-task-arc')!).stroke,
+  }));
+  expect(sideGeometry.rings).toEqual([32, 32, 32]);
+  expect(sideGeometry.progress).toBe(32);
+  expect(sideGeometry.avatar).toBe(40);
+  expect(sideGeometry.motion).toBe('gentle');
+  expect(sideGeometry.duration).toBe('3s');
+  expect(sideGeometry.progressColor).not.toBe('rgb(141, 146, 157)');
+
+  const topPage = await page.context().newPage();
+  await topPage.setViewportSize({ width: 186, height: 38 });
+  await desktop(topPage, { auto: false, localTps: 40, dockEdge: 'top' });
+  await topPage.emulateMedia({ reducedMotion: 'no-preference' });
+  await topPage.addInitScript(() => {
+    localStorage.setItem('boost.bot.appearance.v1', JSON.stringify({
+      version: 1, animation: 'still', contour: 'squircle', palette: 'adaptive',
+      customColor: '#2563eb', speed: 1, size: 48, followPointer: true,
+    }));
+    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: false }));
+  });
+  await topPage.goto('/tray-preview/');
+  await expect(topPage.locator('.tray-rail')).toHaveClass(/is-top/);
+  await expect(topPage.locator('.tps-arc')).toHaveCSS('animation-duration', '1.5s');
+  const topSizes = await topPage.locator('.tray-logo, .tray-quota-ring, .tray-tps-ring').evaluateAll(elements =>
+    elements.map(element => element.getBoundingClientRect().width));
+  expect(topSizes).toEqual(sideGeometry.rings);
+  await expect(topPage.locator('[data-boost-bot-avatar]')).toHaveAttribute('data-bot-motion', 'gentle');
+  await topPage.close();
+
+  const donePage = await page.context().newPage();
+  await donePage.setViewportSize({ width: 64, height: 157 });
+  await desktop(donePage, { auto: false, activityState: 'done', dockEdge: 'right' });
+  await donePage.addInitScript(() => {
+    localStorage.setItem('boost.tray.v1', JSON.stringify({ showRingValues: false }));
+  });
+  await donePage.goto('/tray-preview/');
+  const doneProgress = donePage.locator('.bot-task-progress');
+  await expect(doneProgress).toHaveAttribute('aria-valuenow', '100');
+  await expect(doneProgress).toHaveAttribute('data-task-state', 'done');
+  await expect(donePage.locator('.bot-task-complete-dot')).toBeVisible();
+  await expect(donePage.locator('.bot-task-arc')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
+  await donePage.close();
 });

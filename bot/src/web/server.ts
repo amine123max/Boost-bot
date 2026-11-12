@@ -338,16 +338,28 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       return false;
     }
     if (!token) return true;
+    const readOnlyUiRequest = (req.method === "GET" || req.method === "HEAD") && (
+      ["/", "/index.html", "/boost-bot/", "/boost-bot/index.html"].includes(url.pathname) ||
+      url.pathname.startsWith("/boost-bot/amb/static/") ||
+      url.pathname.startsWith("/boost-bot/amb/vendor/") ||
+      url.pathname.startsWith("/boost-bot/amb/botapp/")
+    );
+    // The desktop workspace embeds this loopback UI cross-site. Static shell/assets contain no user data;
+    // keep API authorization separate so the iframe does not depend on third-party cookies.
+    if (readOnlyUiRequest) {
+      if (url.searchParams.get("token") === token) {
+        res.setHeader("set-cookie", `amb_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=34560000`);
+      }
+      return true;
+    }
     // 目录 Bot 的界面跑在不透明来源的沙箱里，带不上 Cookie；这条路径下只有静态文件，没有用户数据（web/botapp.ts）
     if (url.pathname.startsWith("/boost-bot/amb/botapp/") && (req.method === "GET" || req.method === "HEAD")) return true;
     const cookie = String(req.headers.cookie || "");
     const ok = cookie.split(/;\s*/).includes(`amb_token=${token}`) || req.headers["x-amb-token"] === token;
     if (ok) return true;
-    if (url.searchParams.get("token") === token) {
-      url.searchParams.delete("token");
-      res.writeHead(302, { "set-cookie": `amb_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=34560000`, location: url.pathname + url.search });
-      res.end();
-      return false;
+    if ((req.method === "GET" || req.method === "HEAD") && url.searchParams.get("token") === token) {
+      res.setHeader("set-cookie", `amb_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=34560000`);
+      return true;
     }
     res.writeHead(401, { "content-type": "text/plain; charset=utf-8" }).end(t("web.needToken"));
     return false;

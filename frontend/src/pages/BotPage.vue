@@ -6,21 +6,24 @@ import { botClient } from '@/lib/api/bot-client';
 import { getAppErrorMessage } from '@/lib/api/transport';
 import { botAppearance, setBotAppearance } from '@/composables/useBotAppearance';
 import { consumeBotLaunch } from '@/composables/useBotLaunch';
-import { markStartupContentReady, startupContentReady } from '@/composables/useStartupReady';
+import { markStartupContentReady } from '@/composables/useStartupReady';
 import { boost, initialize, saveSettings } from '@/composables/useBoost';
 const router = useRouter();
 const source = ref(''), error = ref(''), busy = ref(false), loaded = ref(false);
 const frame = ref<HTMLIFrameElement>();
 const surface = ref<HTMLElement>();
 const launch = consumeBotLaunch();
+const waitingForGesture = ref(!launch.requested);
+const pageContentReady = ref(false);
 const opening = { '--bot-origin-x': launch.x, '--bot-origin-y': launch.y };
 const revealing = ref(false), revealed = ref(false);
 let revealAnimation: Animation | undefined;
 let disposed = false;
+let contentReadyPending = false;
 let readyTimeout: ReturnType<typeof setTimeout> | undefined;
 async function connect() {
   if (busy.value) return;
-  busy.value = true; error.value = ''; loaded.value = false; revealed.value = false;
+  busy.value = true; pageContentReady.value = false; error.value = ''; loaded.value = false; revealed.value = false;
   source.value = '';
   try {
     if (!boost.connected) {
@@ -34,13 +37,22 @@ async function connect() {
     url.searchParams.set('boostTheme', document.documentElement.dataset.theme || 'system');
     source.value = url.href;
     clearTimeout(readyTimeout);
-    readyTimeout = setTimeout(() => { if (!startupContentReady.value && !disposed) error.value = '智能体页面加载超时，请重试连接'; }, 30_000);
+    readyTimeout = setTimeout(() => {
+      if (pageContentReady.value || disposed) return;
+      // A slow or missing ready handshake must not leave the workspace covered forever.
+      loaded.value = true;
+      void signalContentReady();
+    }, 30_000);
   } catch (e) { if (!disposed) { error.value = getAppErrorMessage(e); markStartupContentReady(); } }
   finally { busy.value = false; }
 }
 function sync() {
   if (!source.value) return;
   frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: document.documentElement.dataset.theme }, new URL(source.value).origin);
+}
+function onFrameLoad() {
+  loaded.value = true;
+  void signalContentReady();
 }
 function message(event: MessageEvent) {
   if (!source.value || event.source !== frame.value?.contentWindow || event.origin !== new URL(source.value).origin) return;
@@ -55,13 +67,19 @@ function message(event: MessageEvent) {
   }
 }
 async function signalContentReady() {
-  if (disposed || startupContentReady.value) return;
-  await reveal();
-  if (disposed) return;
-  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-  if (!disposed) {
-    clearTimeout(readyTimeout);
-    markStartupContentReady();
+  if (disposed || pageContentReady.value || contentReadyPending) return;
+  contentReadyPending = true;
+  try {
+    await reveal();
+    if (disposed) return;
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    if (!disposed) {
+      pageContentReady.value = true;
+      clearTimeout(readyTimeout);
+      markStartupContentReady();
+    }
+  } finally {
+    contentReadyPending = false;
   }
 }
 async function reveal() {
@@ -95,7 +113,7 @@ async function reveal() {
 function back() { return router.push('/'); }
 watch(botAppearance, sync, { deep: true });
 watch(() => boost.settings?.theme, sync);
-watch(() => boost.ready, ready => { if (ready && !source.value) void connect(); }, { immediate: true });
+watch(() => boost.ready, ready => { if (ready && launch.requested && !source.value) void connect(); }, { immediate: true });
 watch(() => boost.error, value => { if (!boost.connected && value) error.value = value; });
 onMounted(() => { window.addEventListener('message', message); });
 onBeforeUnmount(() => { disposed = true; revealAnimation?.cancel(); clearTimeout(readyTimeout); window.removeEventListener('message', message); });
@@ -104,10 +122,11 @@ watch(error, value => { if (value) markStartupContentReady(); });
 <template>
   <section class="bot-workspace" :style="opening" aria-label="Boost 智能体工作台" data-bot-workspace :data-bot-origin="launch.origin" :data-bot-revealing="revealing">
     <div ref="surface" class="bot-workspace-surface" :class="{ 'is-visible': revealing || revealed }" data-bot-surface>
-    <iframe v-if="source" ref="frame" :src="source" title="Boost Bot" class="bot-runtime-frame" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer" />
+    <iframe v-if="source" ref="frame" :src="source" title="Boost Bot" class="bot-runtime-frame" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer" @load="onFrameLoad" />
     </div>
-    <div v-if="(!loaded || (!revealed && launch.origin === 'center')) && !error" class="bot-connecting" role="status" aria-label="正在打开 Boost 智能体"><span class="boost-loading-ring bot-startup-mark" aria-hidden="true" /></div>
-    <div v-if="error" class="bot-connecting" role="alert"><BoostBotAvatar :size="90" /><h2>智能体暂时无法启动</h2><p>{{ error }}</p><button class="primary" @click="connect">重试连接</button></div>
+    <div v-if="waitingForGesture" class="bot-connecting" role="status"><BoostBotAvatar :size="90" /><h2>双击 Boost 动态智能体进入 Bot</h2><p>进入后，双击 Bot 左上角的 Boost 动态智能体即可返回。</p><button class="primary" @click="back">返回 Boost</button></div>
+    <div v-else-if="error" class="bot-connecting" role="alert"><BoostBotAvatar :size="90" /><h2>智能体暂时无法启动</h2><p>{{ error }}</p><button class="primary" @click="connect">重试连接</button></div>
+    <div v-else-if="!loaded || (!revealed && launch.origin === 'center')" class="bot-connecting" role="status" aria-label="正在打开 Boost 智能体"><span class="boost-loading-ring bot-startup-mark" aria-hidden="true" /></div>
   </section>
 </template>
 <style scoped>

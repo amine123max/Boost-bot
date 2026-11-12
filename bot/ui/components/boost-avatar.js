@@ -3,7 +3,8 @@ import { html } from './ui.js';
 import { mountBotAvatar } from '../boost-appearance/renderer.js';
 import { appearancePreferences, onAppearanceChange, returnToBoost } from '../lib/boost-host.js';
 export function BoostBrand() {
-  return html`<button type="button" class="side-brand boost-brand-return" aria-label="返回 Boost 首页" title="点击智能体返回 Boost 首页" onClick=${returnToBoost}><${BoostAvatar} size=${38} ambient /><span>Boost</span></button>`;
+  const onClick = (event) => { if (event.detail === 0) returnToBoost(); };
+  return html`<button type="button" class="side-brand boost-brand-return" aria-label="双击返回 Boost 首页" title="双击智能体返回 Boost 首页" onClick=${onClick} onDblClick=${returnToBoost}><${BoostAvatar} size=${38} ambient /><span>Boost</span></button>`;
 }
 export function BoostAvatar({ size = 34, state = 'idle', working = false, active = false, ambient = false }) {
   const svg = useRef(null);

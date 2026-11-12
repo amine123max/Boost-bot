@@ -4,10 +4,10 @@ use std::collections::HashMap;
 
 use super::{
     save_persisted_app_setting, set_close_to_tray_on_close_setting, set_codex_cli_guide_dismissed,
-    set_env_overrides, set_gateway_account_max_inflight, set_gateway_background_tasks,
-    set_gateway_compact_model_forward_rules, set_gateway_free_account_max_model,
-    set_gateway_model_forward_rules, set_gateway_originator, set_gateway_quota_guard,
-    set_gateway_residency_requirement, set_gateway_route_strategy,
+    set_daily_traffic_cleanup_enabled, set_env_overrides, set_gateway_account_max_inflight,
+    set_gateway_background_tasks, set_gateway_compact_model_forward_rules,
+    set_gateway_free_account_max_model, set_gateway_model_forward_rules, set_gateway_originator,
+    set_gateway_quota_guard, set_gateway_residency_requirement, set_gateway_route_strategy,
     set_gateway_sse_keepalive_interval_ms, set_gateway_upstream_proxy_url,
     set_gateway_upstream_stream_timeout_ms, set_gateway_upstream_total_timeout_ms,
     set_gateway_user_agent_version, set_lightweight_mode_on_close_to_tray_setting,
@@ -22,6 +22,7 @@ use super::{
 pub(super) struct AppSettingsPatch {
     main_window_close_action: Option<String>,
     update_auto_check: Option<bool>,
+    daily_traffic_cleanup_enabled: Option<bool>,
     close_to_tray_on_close: Option<bool>,
     lightweight_mode_on_close_to_tray: Option<bool>,
     codex_cli_guide_dismissed: Option<bool>,
@@ -87,6 +88,9 @@ pub(super) fn apply_app_settings_patch(patch: AppSettingsPatch) -> Result<(), St
     }
     if let Some(enabled) = patch.update_auto_check {
         set_update_auto_check_enabled(enabled)?;
+    }
+    if let Some(enabled) = patch.daily_traffic_cleanup_enabled {
+        set_daily_traffic_cleanup_enabled(enabled)?;
     }
     if let Some(enabled) = patch.close_to_tray_on_close {
         set_close_to_tray_on_close_setting(enabled)?;
@@ -192,4 +196,20 @@ pub(super) fn apply_app_settings_patch(patch: AppSettingsPatch) -> Result<(), St
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_app_settings_patch;
+    use serde_json::json;
+
+    #[test]
+    fn daily_traffic_cleanup_setting_accepts_the_frontend_field_name() {
+        let enabled = parse_app_settings_patch(Some(&json!({
+            "dailyTrafficCleanupEnabled": false
+        })))
+        .expect("valid app settings patch")
+        .daily_traffic_cleanup_enabled;
+        assert_eq!(enabled, Some(false));
+    }
 }

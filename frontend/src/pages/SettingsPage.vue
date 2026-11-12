@@ -156,6 +156,15 @@ async function saveAddress() {
           }}</span>
         </div>
       </PanelCard>
+      <PanelCard v-if="isAdmin" title="缓存清理" icon="trash-2">
+        <SettingsToggle
+          label="每日清理累计流量"
+          description="按服务所在时区每天 00:00 清零累计上传量和下载量，不影响实时速度与最近 10 分钟图表。"
+          :model-value="boost.settings.dailyTrafficCleanupEnabled"
+          :disabled="busy"
+          @update:model-value="patch({ dailyTrafficCleanupEnabled: $event })"
+        />
+      </PanelCard>
       <PanelCard title="悬浮窗" icon="monitor"
         ><SettingControl label="显示内容"
           ><TrayDisplaySettings /></SettingControl

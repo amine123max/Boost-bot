@@ -22,7 +22,7 @@ const count = computed(
     <span class="tray-display-note"
       >TPS<HelpHint
         label="TPS"
-        text="使用日志或内置 Bot 报告的输出 token 数与实际时间计算最近采样速率；没有有效采样时显示 —。圆环仅表示有速率数据，不代表额度或完成百分比。"
+        text="使用日志或内置 Bot 报告的输出 token 数与实际时间计算最近采样速率；圆环以固定速度旋转，颜色随 TPS 数值由红色平滑渐变到绿色，达到 40 TPS 时为绿色；速率未知时显示中性色。任务进度由智能体图标外侧的圆环单独显示。"
     /></span>
   </div>
 </template>

@@ -7,7 +7,8 @@ use std::collections::BTreeMap;
 
 use super::{
     current_background_tasks_snapshot_value, current_close_to_tray_on_close_setting,
-    current_codex_cli_guide_dismissed, current_env_overrides, current_gateway_account_max_inflight,
+    current_codex_cli_guide_dismissed, current_daily_traffic_cleanup_enabled,
+    current_env_overrides, current_gateway_account_max_inflight,
     current_gateway_compact_model_forward_rules, current_gateway_free_account_max_model,
     current_gateway_model_forward_rules, current_gateway_originator, current_gateway_quota_guard,
     current_gateway_residency_requirement, current_gateway_sse_keepalive_interval_ms,
@@ -192,6 +193,7 @@ pub(super) fn current_app_settings_value(
 
     let mut result = serde_json::json!({
         "updateAutoCheck": update_auto_check,
+        "dailyTrafficCleanupEnabled": current_daily_traffic_cleanup_enabled(),
         "mainWindowCloseAction": crate::app_settings::current_main_window_close_action(),
         "closeToTrayOnClose": close_to_tray,
         "closeToTraySupported": close_to_tray_supported,

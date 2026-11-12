@@ -2011,6 +2011,7 @@ export function normalizeAppSettings(payload: unknown): AppSettings {
   const source = asObject(payload);
   return {
     updateAutoCheck: asBoolean(source.updateAutoCheck, true),
+    dailyTrafficCleanupEnabled: asBoolean(source.dailyTrafficCleanupEnabled, true),
     mainWindowCloseAction: (["exit", "floating", "minimize"].includes(asString(source.mainWindowCloseAction)) ? source.mainWindowCloseAction : "ask") as AppSettings["mainWindowCloseAction"],
     closeToTrayOnClose: asBoolean(source.closeToTrayOnClose, false),
     closeToTraySupported: asBoolean(source.closeToTraySupported, false),
