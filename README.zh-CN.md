@@ -111,6 +111,13 @@ cargo run --locked -p boost-start
 
 [![Boost Star 增长曲线](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)
 
+## Linux DO 社区致谢
+
+Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开源项目，欢迎社区朋友体验、反馈问题和参与贡献。项目由独立开发者维护，非 Linux DO 官方项目。
+
+感谢 [Linux DO](https://linux.do/) 提供技术交流与开源分享的平台，欢迎佬友们一起交流、完善 Boost。
+
+
 ## 许可
 
 MIT。分发时请保留[项目许可](LICENSE)和[第三方声明](bot/THIRD_PARTY_NOTICES.md)。
