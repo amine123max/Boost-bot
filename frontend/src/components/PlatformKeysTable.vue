@@ -17,7 +17,7 @@ import RecordSwitch from "./RecordSwitch.vue";
 const props = defineProps<{
   keys: ApiKey[];
   usage: ApiKeyUsageStat[] | null;
-  busy: boolean;
+  isPending: (key: string) => boolean;
   showOwners?: boolean;
   owners?: Record<string, string>;
   distributionEnabled?: boolean;
@@ -90,7 +90,6 @@ function menu(key: ApiKey, action: string) {
               :label="row.key.name || row.key.id"
               :placeholder="row.key.id"
               :read="() => accountClient.readApiKeySecret(row.key.id)"
-              :disabled="busy"
             />
           </td>
           <td data-label="名称">
@@ -198,7 +197,7 @@ function menu(key: ApiKey, action: string) {
             <RecordSwitch
               :label="`${row.key.name || row.key.id} 状态`"
               :enabled="row.key.status !== 'disabled'"
-              :disabled="busy"
+              :disabled="isPending(`${row.key.id}:toggle`)"
               @toggle="emit('toggle', row.key)"
             />
           </td>
@@ -206,7 +205,6 @@ function menu(key: ApiKey, action: string) {
             <div class="record-actions">
               <button
                 class="icon-button"
-                :disabled="busy"
                 :aria-label="`编辑 ${row.key.name || row.key.id}`"
                 @click="emit('edit', row.key)"
               >
@@ -215,7 +213,6 @@ function menu(key: ApiKey, action: string) {
                 :label="`${row.key.name || row.key.id} 的操作`"
                 icon="ellipsis"
                 icon-only
-                :disabled="busy"
                 :items="[
                   { value: 'edit', label: '设置模型与推理', icon: 'settings' },
                   { value: 'guide', label: '配置方法', icon: 'file' },

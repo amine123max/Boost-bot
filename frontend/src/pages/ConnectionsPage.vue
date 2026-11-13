@@ -13,6 +13,7 @@ import AggregateApiTable from "@/components/AggregateApiTable.vue";
 import BoostMenu from "@/components/BoostMenu.vue";
 import { quotaClient } from "@/lib/api/quota-client";
 import { useAggregateOptions } from "@/composables/useAggregateOptions";
+import { usePendingActions } from "@/composables/usePendingActions";
 import { getAppErrorMessage } from "@/lib/api/transport";
 import {
   boost,
@@ -25,7 +26,9 @@ import { accountClient } from "@/lib/api/account-client";
 const query = ref("");
 const status = ref("all");
 const busy = ref(false);
-const working = ref("");
+const { isPending, run } = usePendingActions();
+let reloadVersion = 0;
+let appliedReload = 0;
 const pools = ref<QuotaModelPoolItem[]>([]);
 let active = false;
 onActivated(() => {
@@ -107,17 +110,18 @@ const visible = computed(() =>
   ),
 );
 async function reload() {
-  await Promise.all([
-    accountClient.listAggregateApis().then((items) => {
-      boost.connections = items;
+  const version = ++reloadVersion;
+  const [items, result] = await Promise.all([
+    accountClient.listAggregateApis(),
+    quotaClient.modelPools().catch((e) => {
+      notify(`读取模型额度失败: ${getAppErrorMessage(e)}`, true);
+      return null;
     }),
-    quotaClient
-      .modelPools()
-      .then((result) => {
-        pools.value = result.items;
-      })
-      .catch((e) => notify(`读取模型额度失败: ${getAppErrorMessage(e)}`, true)),
   ]);
+  if (version < appliedReload) return;
+  appliedReload = version;
+  boost.connections = items;
+  if (result) pools.value = result.items;
 }
 function open(a?: AggregateApi) {
   options.reset(a);
@@ -134,6 +138,7 @@ function open(a?: AggregateApi) {
   dialog.value = true;
 }
 async function save() {
+  if (busy.value) return;
   busy.value = true;
   await perform(async () => {
     const payload = {
@@ -186,18 +191,15 @@ async function runAction(
   task: () => Promise<void>,
   refresh = true,
 ) {
-  if (busy.value) return;
-  busy.value = true;
-  working.value = operation;
-  try {
-    await task();
-  } catch (e) {
-    notify(`${errorPrefix}: ${getAppErrorMessage(e)}`, true);
-  } finally {
-    if (refresh) await perform(reload);
-    busy.value = false;
-    working.value = "";
-  }
+  return run(operation, async () => {
+    try {
+      await task();
+    } catch (e) {
+      notify(`${errorPrefix}: ${getAppErrorMessage(e)}`, true);
+    } finally {
+      if (refresh) await perform(reload);
+    }
+  });
 }
 async function test(a: AggregateApi) {
   await runAction(`${a.id}:test`, "测试失败", async () => {
@@ -225,9 +227,9 @@ async function toggle(a: AggregateApi) {
 async function remove() {
   if (!deleting.value) return;
   const id = deleting.value.id;
+  deleting.value = null;
   await runAction(`${id}:delete`, "删除失败", async () => {
     await accountClient.deleteAggregateApi(id);
-    deleting.value = null;
     notify("聚合 API 已删除");
     await perform(async () => {
       boost.keys = await accountClient.listApiKeys();
@@ -265,7 +267,8 @@ async function refreshBalance(a: AggregateApi) {
 }
 async function batch(mode: "test" | "balance") {
   const apis = visible.value.filter(
-    (api) => api.status === "active" && (mode === "test" || api.balanceQueryEnabled),
+    (api) =>
+      api.status === "active" && (mode === "test" || api.balanceQueryEnabled),
   );
   if (!apis.length) {
     notify(
@@ -327,23 +330,26 @@ function rowAction(api: AggregateApi, action: string) {
       <div class="toolbar-group">
         <button
           class="secondary"
-          :disabled="busy || !visible.length"
+          :disabled="isPending('batch:test') || !visible.length"
           @click="batch('test')"
         >
           <BoostIcon
             name="rotate-ccw"
             :size="15"
-            :class="{ spinning: working === 'batch:test' }"
+            :class="{ spinning: isPending('batch:test') }"
           />测试全部</button
         ><button
           class="secondary"
-          :disabled="busy || !visible.some((a) => a.balanceQueryEnabled)"
+          :disabled="
+            isPending('batch:balance') ||
+            !visible.some((a) => a.balanceQueryEnabled)
+          "
           @click="batch('balance')"
         >
           <BoostIcon
             name="rotate-ccw"
             :size="15"
-            :class="{ spinning: working === 'batch:balance' }"
+            :class="{ spinning: isPending('batch:balance') }"
           />刷新余额</button
         ><button class="primary" @click="open()">
           <BoostIcon name="plus" :size="15" />添加聚合API
@@ -402,8 +408,7 @@ function rowAction(api: AggregateApi, action: string) {
     <AggregateApiTable
       v-if="visible.length"
       :apis="visible"
-      :busy="busy"
-      :working="working"
+      :is-pending="isPending"
       :latency="latency"
       :pools="pools"
       :imported-counts="importedCounts"
@@ -513,19 +518,13 @@ function rowAction(api: AggregateApi, action: string) {
         </button></DialogActions
       ></BoostDialog
     >
-    <BoostDialog
-      v-if="deleting"
-      title="删除聚合API"
-      @close="!busy && (deleting = null)"
+    <BoostDialog v-if="deleting" title="删除聚合API" @close="deleting = null"
       ><p style="margin-bottom: 20px">
         确认删除 {{ deleting.supplierName || deleting.url }}？
       </p>
       <DialogActions>
-        <button class="secondary" :disabled="busy" @click="deleting = null">
-          取消</button
-        ><button class="danger-button" :disabled="busy" @click="remove">
-          删除聚合API
-        </button>
+        <button class="secondary" @click="deleting = null">取消</button
+        ><button class="danger-button" @click="remove">删除聚合API</button>
       </DialogActions></BoostDialog
     >
   </div>

@@ -7,6 +7,7 @@ defineProps<{
   wide?: boolean;
   editor?: boolean;
   expanded?: boolean;
+  confirmation?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const titleId = useId();
@@ -27,7 +28,7 @@ onBeforeUnmount(() => {
       ref="dialog"
       :aria-labelledby="titleId"
       class="modal"
-      :class="{ wide, editor, expanded }"
+      :class="{ wide, editor, expanded, confirmation }"
       @cancel.prevent="emit('close')"
       @click="$event.target === dialog && emit('close')"
     >
@@ -53,3 +54,37 @@ onBeforeUnmount(() => {
       </footer></dialog
   ></Teleport>
 </template>
+<style scoped>
+.modal.confirmation {
+  width: min(440px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px #0003;
+  overflow: hidden;
+}
+.confirmation .modal-heading {
+  gap: 11px;
+  padding: 19px 20px 13px;
+  align-items: center;
+}
+.confirmation .modal-heading h2 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+.confirmation .modal-heading > .icon-button {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+.confirmation .modal-content {
+  padding: 4px 22px 20px;
+}
+.confirmation .modal-footer {
+  padding: 14px 20px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  background: color-mix(in srgb, var(--text) 1.5%, var(--dialog));
+}
+</style>

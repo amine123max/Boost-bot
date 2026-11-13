@@ -100,7 +100,7 @@ impl Observer {
     fn read(&mut self) -> Value {
         if self
             .scanned
-            .is_none_or(|at| at.elapsed() >= Duration::from_secs(10))
+            .is_none_or(|at| at.elapsed() >= Duration::from_secs(2))
         {
             let home = std::env::var_os("USERPROFILE")
                 .or_else(|| std::env::var_os("HOME"))
@@ -146,7 +146,9 @@ impl Observer {
         }
         let mut budget = READ_BUDGET;
         let mut decoded_budget = 4 * READ_BUDGET;
-        for (path, log) in &mut self.logs {
+        let mut recent_logs: Vec<_> = self.logs.iter_mut().collect();
+        recent_logs.sort_by_key(|(_, log)| std::cmp::Reverse(log.task.at));
+        for (path, log) in recent_logs {
             if budget == 0 {
                 break;
             }
@@ -249,7 +251,7 @@ impl Observer {
             .iter()
             .find(|l| l.task.state == "waiting")
             .copied()
-            .or_else(|| active.first().copied())
+            .or_else(|| active.iter().max_by_key(|l| l.task.at).copied())
             .or_else(|| tasks.iter().max_by_key(|l| l.task.at));
         let percent = if active.len() > 1 {
             None
@@ -267,8 +269,14 @@ impl Observer {
                 active_sources.push(log.provider);
             }
         }
-        let rates: Vec<_> = tasks
+        let rate_tasks: Vec<_> = if active.is_empty() {
+            tasks.iter().filter(|l| l.task.state == "done").collect()
+        } else {
+            active.iter().copied().collect()
+        };
+        let rates: Vec<_> = rate_tasks
             .iter()
+            .filter(|log| log.task.state != "waiting")
             .filter_map(|log| log.task.rate.value(now))
             .collect();
         let tokens_per_second = if rates.is_empty() {
@@ -277,7 +285,7 @@ impl Observer {
             Some(rates.iter().sum::<f64>())
         };
         json!({"available":true,"state":selected.map(|l| l.task.state).unwrap_or("idle"),"percent":percent,
-            "tokensPerSecond":tokens_per_second,
+            "tokensPerSecond":tokens_per_second,"updatedAt":now,
             "activeTasks":active.len(),"waitingTasks":waiting,"sources":self.sources,
             "activeSources":active_sources,
             "stale":selected.is_some_and(|l| l.task.state == "working" && l.task.reported_at > 0 && now - l.task.reported_at > 120_000)})

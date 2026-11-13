@@ -346,8 +346,13 @@ export const appClient = {
   getCodexLatestVersion: () =>
     invoke<CodexLatestVersionInfo>("service_gateway_codex_latest_version_get"),
 
-  localAgentActivity: () => invoke<unknown>("app_local_agent_activity"),
-  syncTrayLayout: (rings: number, metrics: number) => invoke<{ edge: "floating" | "top" | "left" | "right"; horizontal: boolean }>("app_tray_layout_sync", { rings, metrics }),
+  localAgentActivity: () => invoke<unknown>("app_local_agent_activity", {}, { timeoutMs: 2500, retries: 0 }),
+  syncTrayLayout: (rings: number, metrics: number, layout?: {
+    horizontalWidth: number; horizontalHeight: number;
+    verticalWidth: number; verticalHeight: number;
+    orientation: "auto" | "horizontal" | "vertical";
+    snap: boolean; position?: { x: number; y: number } | null;
+  }) => invoke<{ edge: "floating" | "top" | "left" | "right"; horizontal: boolean; x: number; y: number }>("app_tray_layout_sync", { rings, metrics, layout }),
   closePromptReady: () => invoke<void>("app_close_prompt_ready"),
   closeMainWindow: (action: "exit" | "floating" | "minimize", remember: boolean) =>
     invoke<boolean>("app_main_window_close", { action, remember }),

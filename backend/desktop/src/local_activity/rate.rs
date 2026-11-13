@@ -25,8 +25,12 @@ impl OutputRate {
     }
     pub fn value(&self, now: i64) -> Option<f64> {
         self.latest
-            .filter(|(_, at)| (0..30_000).contains(&(now - at)))
+            .filter(|(_, at)| (0..5_000).contains(&(now - at)))
             .map(|(value, _)| value)
+    }
+    pub fn reset(&mut self) {
+        self.baseline = None;
+        self.latest = None;
     }
 }
 #[cfg(test)]
@@ -40,9 +44,21 @@ mod tests {
         rate.cumulative(160, 3000);
         assert_eq!(rate.value(3000), Some(30.0));
         rate.cumulative(160, 4000);
+        assert_eq!(rate.value(7999), Some(30.0));
+        assert_eq!(rate.value(8000), None);
         assert_eq!(rate.value(33_000), None);
         rate.cumulative(10, 5000);
         assert_eq!(rate.value(5000), None);
+    }
+    #[test]
+    fn new_turn_drops_the_previous_rate_and_baseline() {
+        let mut rate = OutputRate::default();
+        rate.response(50, 1000, 2000);
+        assert_eq!(rate.value(2000), Some(50.0));
+        rate.reset();
+        assert_eq!(rate.value(2001), None);
+        rate.cumulative(9000, 2100);
+        assert_eq!(rate.value(2100), None);
     }
     #[test]
     fn missing_or_zero_time_does_not_fabricate_rate() {

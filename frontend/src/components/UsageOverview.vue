@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import HelpHint from "./HelpHint.vue";
-import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
+import {
+  computed,
+  ref,
+  watch,
+  nextTick,
+  onBeforeUnmount,
+  onDeactivated,
+} from "vue";
 import BoostIcon from "./BoostIcon.vue";
 import { useUsageHistory } from "@/composables/useUsageHistory";
 import {
@@ -13,45 +20,71 @@ import {
   type UsageMetric,
 } from "@/lib/usage-heatmap";
 import type { DashboardTokenUsage } from "@/types";
+import { usageGrowth } from "@/lib/usage-growth";
 const props = defineProps<{ daily?: boolean }>();
 const { history, loading, error, reload } = useUsageHistory(!props.daily);
 defineExpose({ reload });
 const selected = ref<UsageMetric>("tokens"),
-  expanded = ref(true);
+  expanded = ref(false);
 const usage = computed(() =>
   props.daily ? history.value?.todayUsage : history.value?.totals,
 );
-const metrics = computed(() => [
-  {
-    id: "cost" as const,
-    label: props.daily ? "今日成本" : "总成本",
-    value: usage.value ? usd(usage.value.estimatedCostUsd) : "—",
-    hint: "按实际记录的模型计价估算，单位为美元（USD）；不等同于账单扣款。",
-  },
-  {
-    id: "requests" as const,
-    label: props.daily ? "今日请求数" : "总请求数",
-    value: usage.value
-      ? `${!props.daily && history.value?.hasUndatedHistory ? "≥ " : ""}${fullNumber(usage.value.requestCount)}`
-      : "—",
-    hint:
-      !props.daily && history.value?.hasUndatedHistory
-        ? "早期明细已归档，显示可确认的累计请求数下限。"
-        : "包含已记录的成功与失败请求。",
-  },
-  {
-    id: "tokens" as const,
-    label: "真实消耗 Tokens",
-    value: usage.value ? compactTokens(usage.value.totalTokens) : "—",
-    hint: "上游实际返回的总 Token，包含缓存输入；推理 Token 已计入输出，不重复累加。",
-  },
-  {
-    id: "cache" as const,
-    label: "缓存命中率",
-    value: usage.value ? cacheHitRate(usage.value) : "—",
-    hint: "缓存命中的输入 Token ÷ 总输入 Token；没有输入用量时不计算命中率。",
-  },
-]);
+const comparisonHint = computed(() =>
+  props.daily
+    ? "今日截至当前与前1日全天比较，显示绝对增量；缓存命中率显示百分点（pp）变化。无增长或缺少可比数据时显示 --。"
+    : "当前累计值与截至前1日的累计值比较，显示绝对增量；缓存命中率显示百分点（pp）变化。无增长或缺少可比数据时显示 --。",
+);
+function growthLabel(metric: UsageMetric, growth: number | null) {
+  if (growth == null) return "--";
+  if (metric === "cost") return growth < 0.01 ? "< $0.01" : `+${usd(growth)}`;
+  if (metric === "requests") return `+${fullNumber(growth)} 次`;
+  if (metric === "tokens") return `+${compactTokens(growth)}`;
+  return growth < 0.1 ? "< 0.1 pp" : `+${growth.toFixed(1)} pp`;
+}
+const metrics = computed(() =>
+  [
+    {
+      id: "cost" as const,
+      icon: "dollar-sign",
+      unit: "USD",
+      label: props.daily ? "今日成本" : "总成本",
+      value: usage.value ? usd(usage.value.estimatedCostUsd) : "—",
+      hint: "按实际记录的模型计价估算，单位为美元（USD）；不等同于账单扣款。",
+    },
+    {
+      id: "requests" as const,
+      icon: "activity",
+      unit: "次",
+      label: props.daily ? "今日请求数" : "总请求数",
+      value: usage.value
+        ? `${!props.daily && history.value?.hasUndatedHistory ? "≥ " : ""}${fullNumber(usage.value.requestCount)}`
+        : "—",
+      hint:
+        !props.daily && history.value?.hasUndatedHistory
+          ? "早期明细已归档，显示可确认的累计请求数下限。"
+          : "包含已记录的成功与失败请求。",
+    },
+    {
+      id: "tokens" as const,
+      icon: "database",
+      unit: "Tokens",
+      label: "真实消耗 Tokens",
+      value: usage.value ? compactTokens(usage.value.totalTokens) : "—",
+      hint: "上游实际返回的总 Token，包含缓存输入；推理 Token 已计入输出，不重复累加。",
+    },
+    {
+      id: "cache" as const,
+      icon: "zap",
+      unit: "",
+      label: "缓存命中率",
+      value: usage.value ? cacheHitRate(usage.value) : "—",
+      hint: "缓存命中的输入 Token ÷ 总输入 Token；没有输入用量时不计算命中率。",
+    },
+  ].map((metric) => {
+    const growth = usageGrowth(history.value, !!props.daily, metric.id);
+    return { ...metric, growth, growthLabel: growthLabel(metric.id, growth) };
+  }),
+);
 const timeline = computed(() =>
   history.value
     ? calendarTimeline(history.value.today, history.value.days, selected.value)
@@ -99,6 +132,10 @@ watch(
   () => void nextTick(measureCalendar),
 );
 onBeforeUnmount(() => resizeObserver?.disconnect());
+onDeactivated(() => {
+  expanded.value = false;
+  tooltip.value = null;
+});
 function calendarScrolled() {
   const element = calendarScroller.value;
   if (!element) return;
@@ -207,20 +244,54 @@ function moveCell(event: KeyboardEvent) {
     :aria-busy="loading"
   >
     <div class="usage-summary-row">
-      <button
+      <article
         v-for="metric in metrics"
         :key="metric.id"
-        type="button"
         class="usage-summary-metric"
-        :class="{ selected: selected === metric.id }"
-        :aria-pressed="selected === metric.id"
-        @click="selected = metric.id"
+        :class="{ selected: !daily && expanded && selected === metric.id }"
+        :data-metric="metric.id"
+        :aria-label="metric.label"
       >
-        <span class="usage-summary-label"
-          >{{ metric.label
-          }}<HelpHint :label="metric.label" :text="metric.hint" /></span>
-        <strong>{{ metric.value }}</strong>
-      </button>
+        <div class="usage-card-heading">
+          <span class="usage-summary-label"
+            ><span class="usage-label-text">{{ metric.label }}</span
+            ><HelpHint
+              :label="metric.label"
+              :text="`${metric.hint} ${comparisonHint}`"
+          /></span>
+          <span class="usage-metric-icon"
+            ><BoostIcon :name="metric.icon" :size="16"
+          /></span>
+        </div>
+        <component
+          :is="daily ? 'div' : 'button'"
+          class="usage-metric-value"
+          :type="daily ? undefined : 'button'"
+          :aria-label="daily ? undefined : `查看${metric.label}用量明细`"
+          :aria-pressed="daily ? undefined : selected === metric.id"
+          @click="selected = metric.id"
+        >
+          <strong>{{ metric.value }}</strong
+          ><span v-if="metric.unit" class="usage-metric-unit">{{
+            metric.unit
+          }}</span>
+        </component>
+        <div class="usage-growth-row" :title="comparisonHint">
+          <span>较前1日</span>
+          <b
+            class="usage-growth-value"
+            :class="{
+              positive: metric.growth != null,
+            }"
+          >
+            <BoostIcon
+              v-if="metric.growth != null"
+              name="arrow-up-right"
+              :size="13"
+            />{{ metric.growthLabel }}
+          </b>
+        </div>
+      </article>
     </div>
     <div v-if="error" class="usage-read-error" role="alert">
       {{ error }}<button class="text-button" @click="reload">重试</button>
@@ -236,6 +307,7 @@ function moveCell(event: KeyboardEvent) {
             tooltip = null;
           "
         >
+          用量明细
           <BoostIcon
             :name="expanded ? 'chevron-up' : 'chevron-down'"
             :size="16"
@@ -362,9 +434,6 @@ function moveCell(event: KeyboardEvent) {
   --heat-2: #216b3b;
   --heat-3: #2e974f;
   --heat-4: #4ade80;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
   min-width: 0;
   position: relative;
   margin-bottom: 22px;
@@ -382,45 +451,86 @@ function moveCell(event: KeyboardEvent) {
 .usage-summary-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 .usage-summary-metric {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
   text-align: left;
-  padding: 20px 22px 21px;
+  padding: 17px 18px 13px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
+  gap: 17px;
   min-width: 0;
   position: relative;
-  color: var(--muted);
-}
-.usage-summary-metric:hover {
-  background: color-mix(in srgb, var(--hover) 35%, transparent);
-}
-.usage-summary-metric.selected {
   color: var(--text);
+  transition: border-color 0.15s;
 }
-.usage-summary-metric.selected:after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--text);
-}
-.usage-summary-label {
-  font-size: calc(14px * var(--font-scale));
+.usage-card-heading {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.usage-metric-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--blue) 12%, var(--border));
+  border-radius: 8px;
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+.usage-summary-metric.selected {
+  border-color: color-mix(in srgb, var(--blue) 60%, var(--border));
+}
+.usage-summary-label {
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 500;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+.usage-label-text {
   white-space: nowrap;
 }
+.usage-metric-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  min-width: 0;
+}
+button.usage-metric-value:hover {
+  color: var(--blue);
+  background: transparent;
+}
+button.usage-metric-value:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 5px;
+}
+.usage-metric-unit {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--muted);
+  font-weight: 400;
+}
 .usage-summary-metric strong {
-  font-size: clamp(24px, 2.5vw, 34px);
+  font-size: clamp(24px, 2.25vw, 32px);
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.6px;
@@ -428,29 +538,59 @@ function moveCell(event: KeyboardEvent) {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
-.usage-expand-line {
-  border-top: 1px solid var(--border);
-  height: 0;
-  position: relative;
-  z-index: 1;
-}
-.usage-expand-button {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translate(-50%, -50%);
-  width: 27px;
-  height: 27px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  background: var(--card);
+.usage-growth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 5px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  padding-top: 11px;
+  margin-top: auto;
+  font-size: calc(11px * var(--font-scale));
   color: var(--muted);
 }
+.usage-growth-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.usage-growth-value.positive {
+  color: var(--red);
+}
+.usage-summary-metric[data-metric="cache"] .usage-growth-value.positive {
+  color: var(--green);
+}
+.usage-expand-line {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+.usage-expand-button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(11px * var(--font-scale));
+}
+.usage-expand-button:hover {
+  color: var(--text);
+  background: var(--surface);
+}
 .usage-history-content {
-  padding: 25px 22px 17px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 20px 22px 17px;
   min-width: 0;
 }
 .usage-heatmap-title {
@@ -594,6 +734,10 @@ button.usage-cell:focus-visible {
   gap: 12px;
   color: var(--red);
   font-size: 13px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
 }
 .usage-day-tooltip {
   position: fixed;
@@ -627,15 +771,30 @@ button.usage-cell:focus-visible {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 700px) {
+@media (max-width: 1100px) {
+  .usage-summary-row {
+    gap: 10px;
+  }
+  .usage-summary-metric {
+    padding: 15px 14px 12px;
+  }
+  .usage-metric-icon {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
   .usage-summary-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .usage-summary-metric {
-    padding: 17px 16px;
+    padding: 17px 16px 13px;
+    gap: 15px;
   }
   .usage-summary-metric strong {
-    font-size: 26px;
+    font-size: 24px;
+  }
+  .usage-metric-icon {
+    display: grid;
   }
   .usage-history-content {
     padding: 25px 16px 16px;
@@ -651,6 +810,29 @@ button.usage-cell:focus-visible {
   }
   .usage-history-heading p {
     max-width: 32em;
+  }
+}
+@media (max-width: 420px) {
+  .usage-metric-icon {
+    display: none;
+  }
+  .usage-summary-metric {
+    padding: 14px 12px 11px;
+  }
+  .usage-summary-label {
+    font-size: 11px;
+  }
+  .usage-summary-label :deep(.help-hint) {
+    margin-inline-start: 2px;
+  }
+  .usage-summary-label :deep(.help-hint-trigger) {
+    width: 16px;
+  }
+  .usage-summary-metric strong {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+  .usage-growth-row {
+    column-gap: 4px;
   }
 }
 </style>

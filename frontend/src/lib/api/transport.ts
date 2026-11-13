@@ -11,6 +11,7 @@ export { getAppErrorMessage, isCommandMissingError } from "./transport-errors";
 import { createWebCommandMap } from "./transport-web-commands";
 import type { InvokeParams, WebCommandDescriptor } from "./transport-web-commands";
 import { postJsonRpc } from "./rpc-http";
+import { managementRequestQueue } from "../utils/request-queue";
 import {
   getCachedRuntimeCapabilities,
   isTauriRuntime,
@@ -174,10 +175,16 @@ export async function invoke<T>(
     return invokeWebRpc(method, params, options);
   }
 
-  const response = await runWithControl<unknown>(
-    () => tauriInvoke(method, params || {}),
+  // IPC arguments must describe the submitted operation even if its form changes while queued.
+  const requestParams = JSON.parse(JSON.stringify(params || {})) as InvokeParams;
+  const execute = () => runWithControl<unknown>(
+    () => tauriInvoke(method, requestParams),
     options
   );
+  // Window gestures and read-only local sampling must remain responsive while
+  // management RPCs wait for the service. They never mutate service state.
+  const localMonitorCommand = ["app_local_agent_activity", "app_tray_layout_sync"].includes(method);
+  const response = await (localMonitorCommand ? execute() : managementRequestQueue.run(execute, options.signal));
   return unwrapRpcPayload<T>(response);
 }
 

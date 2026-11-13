@@ -8,7 +8,7 @@ pub(super) struct Task {
     pub at: i64,
     pub reported_at: i64,
     turn: String,
-    pending: HashMap<String, u64>,
+    pending: HashMap<String, (u64, bool)>,
     pub rate: super::rate::OutputRate,
     model_started: i64,
 }
@@ -45,6 +45,7 @@ impl Task {
             self.percent = None;
             self.reported_at = 0;
             self.pending.clear();
+            self.rate.reset();
         }
         self.turn = turn.into();
         self.state = "working";
@@ -65,13 +66,9 @@ impl Task {
         } else {
             self.state = "working";
         }
-        if name.strip_prefix("functions.").unwrap_or(name) != "mcp__pacer_progress__report_progress"
-        {
-            return;
-        }
         let parsed;
         let args = if let Some(raw) = args.as_str() {
-            if raw.len() > 128 {
+            if raw.len() > 32768 {
                 return;
             }
             parsed = serde_json::from_str::<Value>(raw).unwrap_or(Value::Null);
@@ -79,10 +76,27 @@ impl Task {
         } else {
             args
         };
-        if args.as_object().is_some_and(|a| a.len() == 1) {
+        let name = name.strip_prefix("functions.").unwrap_or(name);
+        if matches!(name, "update_plan" | "TodoWrite" | "todo_write") {
+            let steps = args["plan"].as_array().or_else(|| args["todos"].as_array());
+            if let Some(steps) = steps.filter(|steps| !steps.is_empty() && steps.len() <= 256) {
+                let done = steps
+                    .iter()
+                    .filter(|step| step["status"] == "completed")
+                    .count();
+                if self.pending.len() < 32 {
+                    self.pending.insert(
+                        id.into(),
+                        ((done as u64 * 100 / steps.len() as u64).min(99), false),
+                    );
+                }
+            }
+        } else if name == "mcp__pacer_progress__report_progress"
+            && args.as_object().is_some_and(|a| a.len() == 1)
+        {
             if let Some(percent) = args["percent"].as_u64().filter(|p| *p <= 100) {
                 if self.pending.len() < 32 {
-                    self.pending.insert(id.into(), percent.min(99));
+                    self.pending.insert(id.into(), (percent.min(99), true));
                 }
             }
         }
@@ -91,8 +105,14 @@ impl Task {
         self.at = at;
         self.state = "working";
         self.model_started = at;
-        if let Some(percent) = self.pending.remove(id) {
-            if !failed && text(output).trim() == "pacer-progress:accepted" {
+        if let Some((percent, exact_ack)) = self.pending.remove(id) {
+            let result = text(output);
+            let ok = if exact_ack {
+                result.trim() == "pacer-progress:accepted"
+            } else {
+                !result.is_empty() && !result.to_lowercase().contains("error")
+            };
+            if !failed && ok {
                 self.percent = Some(percent);
                 self.reported_at = at;
             }
@@ -135,6 +155,11 @@ impl Task {
                     }
                     "token_count" => {
                         self.at = at;
+                        if let Some(tokens) =
+                            p["info"]["last_token_usage"]["output_tokens"].as_u64()
+                        {
+                            self.rate.response(tokens, self.model_started, at);
+                        }
                         if let Some(tokens) =
                             p["info"]["total_token_usage"]["output_tokens"].as_u64()
                         {
@@ -266,6 +291,23 @@ impl Task {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn successful_plan_updates_drive_progress_without_completing_the_turn() {
+        let mut task = Task::default();
+        task.consume(
+            "codex",
+            &json!({"type":"event_msg","payload":{"type":"task_started","turn_id":"plan"}}),
+            1000,
+        );
+        task.consume("codex", &json!({"type":"response_item","payload":{"type":"function_call","name":"functions.update_plan","call_id":"plan-1","arguments":"{\"plan\":[{\"step\":\"a\",\"status\":\"completed\"},{\"step\":\"b\",\"status\":\"in_progress\"}]}"}}), 2000);
+        assert_eq!(task.percent, None);
+        task.consume("codex", &json!({"type":"response_item","payload":{"type":"function_call_output","call_id":"plan-1","output":"Plan updated"}}), 2100);
+        assert_eq!(task.percent, Some(50));
+        assert_eq!(task.state, "working");
+        task.consume("codex", &json!({"type":"response_item","payload":{"type":"function_call","name":"update_plan","call_id":"plan-2","arguments":"{\"plan\":[{\"status\":\"completed\"}]}"}}), 2200);
+        task.consume("codex", &json!({"type":"response_item","payload":{"type":"function_call_output","call_id":"plan-2","output":"error: rejected"}}), 2300);
+        assert_eq!(task.percent, Some(50));
+    }
     #[test]
     fn codex_requires_successful_report_and_resets_per_turn() {
         let mut t = Task::default();

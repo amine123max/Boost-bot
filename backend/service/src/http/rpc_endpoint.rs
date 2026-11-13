@@ -1,3 +1,4 @@
+use super::rpc_queue::{self, QueueError};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response as AxumResponse};
 use boost_core::rpc::types::{
@@ -7,6 +8,25 @@ use std::panic::AssertUnwindSafe;
 use tiny_http::Request;
 use tiny_http::Response;
 use url::Url;
+
+fn queue_error_response(body: &str, error: QueueError) -> (u16, String) {
+    let (status, message) = match error {
+        QueueError::Full => (429, "管理请求队列已满，请稍后重试"),
+        QueueError::Timeout => (504, "管理请求排队超时，操作未执行，请稍后重试"),
+    };
+    let id = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| value.get("id").cloned())
+        .unwrap_or(serde_json::Value::Null);
+    (
+        status,
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32000, "message": message }
+        })
+        .to_string(),
+    )
+}
 
 /// 函数 `rpc_response_failed`
 ///
@@ -306,22 +326,34 @@ pub(crate) async fn handle_rpc_http(headers: HeaderMap, body: String) -> AxumRes
         return response;
     }
     let actor = rpc_actor_from_axum_headers(&headers);
+    let permit = match rpc_queue::global().acquire().await {
+        Ok(permit) => permit,
+        Err(error) => {
+            let (status, body) = queue_error_response(&body, error);
+            return (StatusCode::from_u16(status).unwrap(), body).into_response();
+        }
+    };
     let body_for_task = body;
-    let (status, response_body, success) =
-        match tokio::task::spawn_blocking(move || handle_rpc_body(&body_for_task, actor)).await {
-            Ok(result) => result,
-            Err(err) => {
-                log::error!("rpc http blocking task failed: {}", err);
-                let fallback = JsonRpcResponse {
-                    id: 0.into(),
-                    result: crate::error_codes::rpc_error_payload(
-                        "internal_error: rpc task failed".to_string(),
-                    ),
-                };
-                let body = serde_json::to_string(&fallback).unwrap_or_else(|_| "{}".to_string());
-                (200, body, false)
-            }
-        };
+    let (status, response_body, success) = match tokio::task::spawn_blocking(move || {
+        // Keep the slot until the blocking operation ends, even if its HTTP client disconnects.
+        let _permit = permit;
+        handle_rpc_body(&body_for_task, actor)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            log::error!("rpc http blocking task failed: {}", err);
+            let fallback = JsonRpcResponse {
+                id: 0.into(),
+                result: crate::error_codes::rpc_error_payload(
+                    "internal_error: rpc task failed".to_string(),
+                ),
+            };
+            let body = serde_json::to_string(&fallback).unwrap_or_else(|_| "{}".to_string());
+            (200, body, false)
+        }
+    };
     if success {
         rpc_metrics_guard.mark_success();
     }
@@ -390,6 +422,14 @@ pub fn handle_rpc(mut request: Request) {
         return;
     }
 
+    let _permit = match rpc_queue::global().acquire_blocking() {
+        Ok(permit) => permit,
+        Err(error) => {
+            let (status, body) = queue_error_response(&body, error);
+            let _ = request.respond(Response::from_string(body).with_status_code(status));
+            return;
+        }
+    };
     let (status, response_body, success) = handle_rpc_body(&body, actor);
     if success {
         rpc_metrics_guard.mark_success();
@@ -403,6 +443,83 @@ mod tests {
     use boost_core::rpc::types::{
         JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
     };
+
+    #[test]
+    fn queue_rejection_keeps_the_request_id_and_distinguishes_timeout_from_overload() {
+        let request = r#"{"jsonrpc":"2.0","id":"queued-42","method":"account/usage/resetQuota"}"#;
+        for (error, expected_status) in [
+            (super::QueueError::Full, 429),
+            (super::QueueError::Timeout, 504),
+        ] {
+            let (status, body) = super::queue_error_response(request, error);
+            assert_eq!(status, expected_status);
+            let payload: serde_json::Value = serde_json::from_str(&body).unwrap();
+            assert_eq!(payload["id"], "queued-42");
+            assert_eq!(payload["error"]["code"], -32000);
+            assert!(payload.get("result").is_none());
+        }
+    }
+
+    #[test]
+    fn authenticated_http_users_share_the_queue_and_unauthenticated_requests_do_not_enter() {
+        use futures_util::FutureExt;
+        let _guard = crate::test_env_guard();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let mut held = Vec::new();
+            for _ in 0..6 {
+                held.push(super::rpc_queue::global().acquire().await.unwrap());
+            }
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert("content-type", "application/json".parse().unwrap());
+            let response = tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                super::handle_rpc_http(headers.clone(), "{}".into()),
+            )
+            .await
+            .expect("unauthenticated traffic must not wait for management slots");
+            assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+            headers.insert(
+                "x-boost-rpc-token",
+                crate::rpc_auth_token().parse().unwrap(),
+            );
+            headers.insert("x-boost-rpc-actor-role", "system_admin".parse().unwrap());
+            headers.insert(
+                "x-boost-rpc-actor-user-id",
+                "isolated-user-a".parse().unwrap(),
+            );
+            let mut first = Box::pin(super::handle_rpc_http(
+                headers.clone(),
+                r#"{"jsonrpc":"2.0","id":"user-a","method":"isolated/unknown","params":{}}"#.into(),
+            ));
+            headers.insert(
+                "x-boost-rpc-actor-user-id",
+                "isolated-user-b".parse().unwrap(),
+            );
+            let mut second = Box::pin(super::handle_rpc_http(
+                headers,
+                r#"{"jsonrpc":"2.0","id":"user-b","method":"isolated/unknown","params":{}}"#.into(),
+            ));
+            assert!(first.as_mut().now_or_never().is_none());
+            assert!(second.as_mut().now_or_never().is_none());
+            drop(held.pop());
+            assert!(
+                second.as_mut().now_or_never().is_none(),
+                "user B cannot bypass queued user A"
+            );
+            for (response, id) in [(first.await, "user-a"), (second.await, "user-b")] {
+                assert_eq!(response.status(), axum::http::StatusCode::OK);
+                let bytes = axum::body::to_bytes(response.into_body(), 4096)
+                    .await
+                    .unwrap();
+                let payload: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(payload["id"], id);
+            }
+        });
+    }
 
     /// 函数 `panicking_rpc_handler_returns_structured_json_error`
     ///

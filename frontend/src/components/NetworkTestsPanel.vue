@@ -12,7 +12,8 @@ import { useProxyNetwork } from "@/composables/useProxyNetwork";
 import { perform, notify, formatTime } from "@/composables/useBoost";
 import type { ProxyAction } from "@/lib/api/proxy-client";
 
-const { snapshot, busy, error, refresh, action } = useProxyNetwork();
+const { snapshot, isPending, error, refresh, action } = useProxyNetwork();
+const busy = computed(() => isPending("import:"));
 const query = ref("");
 const importing = ref(false),
   importText = ref(""),
@@ -26,9 +27,7 @@ const addingLocal = ref(false),
 let timer: ReturnType<typeof setInterval>;
 const blocked = computed(
   () =>
-    busy.value ||
-    !!snapshot.value?.testRunning ||
-    !!snapshot.value?.kernel.busy,
+    !snapshot.value,
 );
 const nodes = computed(() => snapshot.value?.nodes || []);
 const visible = computed(() =>
@@ -114,7 +113,7 @@ async function run(
 ) {
   return perform(async () => {
     const value = await action(name, options);
-    if (message) notify(message);
+    if (value && message) notify(message);
     return value;
   });
 }
@@ -234,7 +233,7 @@ onBeforeUnmount(() => clearInterval(timer));
           icon="route"
           :items="strategyItems"
           :selected="snapshot?.strategy"
-          :disabled="blocked || !nodes.length"
+          :disabled="blocked || isPending('strategy:') || !nodes.length"
           @select="setStrategy"
         />
         <BoostMenu
@@ -315,14 +314,14 @@ onBeforeUnmount(() => clearInterval(timer));
         ><button
           v-if="snapshot?.testRunning"
           class="secondary"
-          :disabled="busy"
+          :disabled="isPending('cancelTest:')"
           @click="run('cancelTest')"
         >
           <BoostIcon name="square" :size="14" />停止测速</button
         ><button
           v-else
           class="primary"
-          :disabled="blocked || !nodes.length"
+          :disabled="blocked || isPending('test:') || !nodes.length"
           @click="run('test')"
         >
           <BoostIcon name="gauge" :size="16" />测速全部
@@ -347,6 +346,9 @@ onBeforeUnmount(() => clearInterval(timer));
         :key="node.id"
         :node="node"
         :blocked="blocked"
+        :testing="!!snapshot?.testRunning || isPending(`test:${node.id}`)"
+        :removing="isPending(`remove:${node.id}`)"
+        :choosing="isPending('strategy:')"
         :manual="snapshot?.strategy === 'manual'"
         @test="run('test', { nodeId: node.id })"
         @choose="
@@ -442,7 +444,7 @@ onBeforeUnmount(() => clearInterval(timer));
             role="switch"
             aria-label="自动更新 sing-box 内核"
             :checked="snapshot?.kernel.autoUpdate"
-            :disabled="busy"
+            :disabled="isPending('coreAuto:')"
             @change="
               run('coreAuto', {
                 enabled: ($event.target as HTMLInputElement).checked,
@@ -458,19 +460,19 @@ onBeforeUnmount(() => clearInterval(timer));
         <DialogActions
           ><button
             class="secondary"
-            :disabled="blocked"
+            :disabled="blocked || isPending('coreScan:')"
             @click="run('coreScan')"
           >
             <BoostIcon name="search" :size="15" />扫描本地</button
           ><button
             class="secondary"
-            :disabled="blocked"
+            :disabled="blocked || isPending('coreCheck:')"
             @click="run('coreCheck')"
           >
             <BoostIcon name="rotate-ccw" :size="15" />检查更新</button
           ><button
             class="primary"
-            :disabled="blocked"
+            :disabled="blocked || !!snapshot?.kernel.busy || isPending('coreUpdate:') || isPending('coreInstall:')"
             @click="
               run(
                 snapshot?.kernel.installedVersion

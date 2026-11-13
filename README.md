@@ -24,6 +24,12 @@ Boost unifies AI accounts, model routing, API keys, usage monitoring, and an emb
 
 ![Boost dashboard](docs/images/dashboard-dark.png)
 
+## Linux DO community and acknowledgements
+
+Boost is an independent open-source project shared with the [Linux DO](https://linux.do/) community. Community feedback and contributions are welcome. It is independently maintained and is not an official Linux DO project.
+
+Thanks to [Linux DO](https://linux.do/) for providing a place for technical discussion and open-source sharing. Community members are welcome to help improve Boost.
+
 ## Releases
 
 **[Download the latest release](https://github.com/amine123max/Boost-bot/releases/latest)** · [All releases](https://github.com/amine123max/Boost-bot/releases)
@@ -32,7 +38,7 @@ The Release badge reads the latest published version directly from GitHub. Versi
 
 | Platform | Release format |
 | --- | --- |
-| Windows x64 | Desktop portable EXE (`Boost_0.5.0_x64.exe`) / NSIS installer (`-setup.exe`) |
+| Windows x64 | Desktop portable EXE (`Boost_0.5.1_x64.exe`) / NSIS installer (`-setup.exe`) |
 | macOS Apple Silicon | Disk image (`.dmg`) |
 
 These are the packaging targets defined by the release workflow. Download availability follows the published release.
@@ -49,6 +55,12 @@ These are the packaging targets defined by the release workflow. Download availa
 | Desktop and appearance | Tray integration, user-controlled updates, light/dark modes, and 17 accent colors. |
 
 Protocol capabilities depend on the configured upstream and model. See the [documentation](docs/README.md) for deployment and authorization boundaries.
+
+Management controls track pending operations independently. Each service process shares one FIFO management RPC queue across all browsers and users: six active requests, up to 256 waiting, and a 60-second queue wait limit. Local packages use the same queue in their local service. Each client also limits outstanding RPCs to six; waiting does not lock unrelated controls. Usage history details start collapsed. These limits are separate from gateway inference limits; Nginx forwards RPCs with a longer timeout and no automatic replay.
+
+Home and Keys display separate usage cards with absolute growth over the previous day. Cache hit rate growth uses percentage points (pp); no growth or missing comparison data displays `--`. Usage details start collapsed, including when returning to the page.
+
+Settings → Text display offers independent Chinese, English, and numeric fonts, including Times New Roman for English and numbers, with a live preview. Choices are saved locally and applied before the page loads. Fonts use local installations with system fallbacks.
 
 ## Screenshots
 
@@ -122,12 +134,6 @@ Desktop user data, logs, runtimes and updates are organized under `~/.boost`; Wi
 ## Star history
 
 [![Boost Star History Chart](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)
-
-## Linux DO community and acknowledgements
-
-Boost is an independent open-source project shared with the [Linux DO](https://linux.do/) community. Community feedback and contributions are welcome. It is independently maintained and is not an official Linux DO project.
-
-Thanks to [Linux DO](https://linux.do/) for providing a place for technical discussion and open-source sharing. Community members are welcome to help improve Boost.
 
 ## License
 

@@ -17,7 +17,7 @@ ed25519-dalek = { version = "2.1", features = ["pkcs8"] }
 crypto_box = { version = "0.9", features = ["seal"] }
 tiny_http = "0.12"
 axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1", features = ["rt-multi-thread", "net", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync"] }
 futures-util = "0.3"
 eventsource-stream = "0.2.3"
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }

@@ -114,6 +114,12 @@ export interface Task {
   status: string;
   stage?: { key: string; label: string; group: string };
   summary?: string;
+  latest?: string;
+  progress?: number | null;
+  createdAt?: number;
+  updatedAt?: number;
+  question?: { text: string; note?: string };
+  live?: { runId: string; since?: number; steps?: number; current?: Activity };
 }
 export interface CatalogEntry {
   id: string;

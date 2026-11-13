@@ -10,14 +10,16 @@ import { accountClient } from "@/lib/api/account-client";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
 import BoostIcon from "./BoostIcon.vue";
+import { usePendingActions } from "@/composables/usePendingActions";
+const actions = usePendingActions();
+const { isPending } = actions;
 const props = defineProps<{
   model: ManagedModelInfo;
   routing: ManagedModelRouting;
   readOnly?: boolean;
 }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
-const busy = ref(false),
-  kind = ref("aggregate_api"),
+const kind = ref("aggregate_api"),
   sourceId = ref(""),
   upstream = ref(""),
   priority = ref(0),
@@ -68,63 +70,80 @@ function sourceName(row: ManagedModelSourceMapping) {
     : boost.connections.find((a) => a.id === row.sourceId)?.supplierName ||
         row.sourceId;
 }
-async function run(action: () => Promise<unknown>, message: string) {
-  busy.value = true;
-  await perform(async () => {
-    await action();
-    emit("changed");
-    notify(message);
-  });
-  busy.value = false;
+async function run(
+  key: string,
+  action: () => Promise<unknown>,
+  message: string,
+) {
+  await actions.run(key, () =>
+    perform(async () => {
+      await action();
+      emit("changed");
+      notify(message);
+    }),
+  );
 }
 async function save(row: ManagedModelSourceMapping) {
-  await run(() => {
-    if (
-      !Number.isSafeInteger(Number(row.priority)) ||
-      !Number.isSafeInteger(Number(row.weight)) ||
-      Number(row.weight) < 1
-    )
-      throw new Error("优先级必须为整数，权重必须为正整数");
-    return accountClient.saveManagedModelSourceMapping({
-      ...row,
-      priority: Number(row.priority),
-      weight: Number(row.weight),
-      billingModelSlug: row.billingModelSlug?.trim() || null,
-    });
-  }, "调用绑定已保存");
+  await run(
+    `save:${row.id}`,
+    () => {
+      if (
+        !Number.isSafeInteger(Number(row.priority)) ||
+        !Number.isSafeInteger(Number(row.weight)) ||
+        Number(row.weight) < 1
+      )
+        throw new Error("优先级必须为整数，权重必须为正整数");
+      return accountClient.saveManagedModelSourceMapping({
+        ...row,
+        priority: Number(row.priority),
+        weight: Number(row.weight),
+        billingModelSlug: row.billingModelSlug?.trim() || null,
+      });
+    },
+    "调用绑定已保存",
+  );
 }
 async function remove(id: string) {
-  await run(async () => {
-    await accountClient.deleteManagedModelSourceMapping(id);
-    pendingDelete.value = "";
-  }, "调用绑定已删除");
+  await run(
+    `delete:${id}`,
+    async () => {
+      await accountClient.deleteManagedModelSourceMapping(id);
+      if (pendingDelete.value === id) pendingDelete.value = "";
+    },
+    "调用绑定已删除",
+  );
 }
 async function add() {
-  await run(async () => {
-    const model = upstream.value.trim();
-    if (!sourceId.value || !model) throw new Error("请选择来源并填写上游模型");
-    if (!available.value.some((m) => m.upstreamModel === model))
-      await accountClient.saveManagedModelSourceModel({
-        sourceKind: kind.value,
-        sourceId: sourceId.value,
-        upstreamModel: model,
-      });
-    await accountClient.saveManagedModelSourceMapping({
-      platformModelSlug: props.model.slug,
-      sourceKind: kind.value,
-      sourceId: sourceId.value,
-      upstreamModel: model,
-      enabled: true,
-      priority: Number(priority.value),
-      weight: Number(weight.value),
-      billingModelSlug: billing.value.trim() || null,
-    });
-    upstream.value = "";
-  }, "模型已关联");
+  const source = { sourceKind: kind.value, sourceId: sourceId.value };
+  const mapping = {
+    ...source,
+    platformModelSlug: props.model.slug,
+    upstreamModel: upstream.value.trim(),
+    enabled: true,
+    priority: Number(priority.value),
+    weight: Number(weight.value),
+    billingModelSlug: billing.value.trim() || null,
+  };
+  await run(
+    "add",
+    async () => {
+      const model = mapping.upstreamModel;
+      if (!source.sourceId || !model)
+        throw new Error("请选择来源并填写上游模型");
+      if (!available.value.some((m) => m.upstreamModel === model))
+        await accountClient.saveManagedModelSourceModel({
+          ...source,
+          upstreamModel: model,
+        });
+      await accountClient.saveManagedModelSourceMapping(mapping);
+      if (upstream.value.trim() === model) upstream.value = "";
+    },
+    "模型已关联",
+  );
 }
 </script>
 <template>
-  <BoostDialog title="调用绑定" wide @close="!busy && emit('close')">
+  <BoostDialog title="调用绑定" wide @close="emit('close')">
     <div class="binding-model-heading">
       <h3>{{ model.displayName || model.slug }}</h3>
       <code>{{ model.slug }}</code
@@ -171,12 +190,16 @@ async function add() {
             ><input v-model="row.enabled" type="checkbox" />启用绑定</label
           >
           <div class="toolbar-group">
-            <button class="text-button" :disabled="busy" @click="save(row)">
+            <button
+              class="text-button"
+              :disabled="isPending(`save:${row.id}`)"
+              @click="save(row)"
+            >
               保存绑定</button
             ><button
               class="icon-button"
               :aria-label="'删除绑定 ' + row.id"
-              :disabled="busy"
+              :disabled="isPending(`delete:${row.id}`)"
               @click="pendingDelete = row.id"
             >
               <BoostIcon name="trash-2" :size="16" />
@@ -185,15 +208,10 @@ async function add() {
         </div>
         <div v-if="pendingDelete === row.id" class="inline-confirm">
           <span>确认删除此调用绑定？</span
-          ><button
-            class="text-button"
-            :disabled="busy"
-            @click="pendingDelete = ''"
-          >
-            取消</button
+          ><button class="text-button" @click="pendingDelete = ''">取消</button
           ><button
             class="danger-button"
-            :disabled="busy"
+            :disabled="isPending(`delete:${row.id}`)"
             @click="remove(row.id)"
           >
             确认删除
@@ -262,14 +280,14 @@ async function add() {
       <div class="form-actions">
         <button
           class="primary"
-          :disabled="busy || !sourceId || !upstream.trim()"
+          :disabled="isPending('add') || !sourceId || !upstream.trim()"
         >
           <BoostIcon name="plug" :size="16" />保存并关联
         </button>
       </div>
     </form>
     <DialogActions
-      ><button class="secondary" :disabled="busy" @click="emit('close')">
+      ><button class="secondary" @click="emit('close')">
         关闭
       </button></DialogActions
     >

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Boost",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "identifier": "com.boost.desktop",
   "build": {
     "beforeDevCommand": "node ./desktop/scripts/before-build.mjs dev:desktop",

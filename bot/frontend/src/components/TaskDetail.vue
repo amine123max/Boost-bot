@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { Activity, Task } from "../types";
 import { api, enc, download } from "../api";
 import Modal from "./Modal.vue";
 import Markdown from "./Markdown.vue";
 import ActivityTrace from "./ActivityTrace.vue";
+import TaskPlanChecklist from "./TaskPlanChecklist.vue";
+import { taskPlan } from "../lib/task-plan";
 const props = defineProps<{ task: Task; configure: boolean }>();
 defineEmits<{ close: [] }>();
 interface Run {
@@ -24,12 +26,20 @@ const detail = ref<{
   activity = ref<Record<string, Activity[]>>({});
 let disposed = false,
   timer: ReturnType<typeof setTimeout> | undefined;
+const plan = computed(() =>
+  taskPlan(activity.value[detail.value?.runs[0]?.id || ""] || []),
+);
+const loadingRuns = new Set<string>();
 async function load() {
   try {
     const d = await api<NonNullable<typeof detail.value>>(
       `/tasks/${enc(props.task.id)}`,
     );
-    if (!disposed) detail.value = d;
+    if (!disposed) {
+      detail.value = d;
+      error.value = "";
+      if (d.runs[0]) await loadSteps(d.runs[0]);
+    }
   } catch (e) {
     if (!disposed) error.value = (e as Error).message;
   } finally {
@@ -37,16 +47,27 @@ async function load() {
   }
 }
 async function steps(run: Run, event: Event) {
-  if (!(event.target as HTMLDetailsElement).open || activity.value[run.id])
+  if (!(event.target as HTMLDetailsElement).open) return;
+  await loadSteps(run);
+}
+async function loadSteps(run: Run) {
+  if (
+    loadingRuns.has(run.id) ||
+    (activity.value[run.id] && run.state !== "running")
+  )
     return;
+  loadingRuns.add(run.id);
   try {
-    activity.value[run.id] = (
+    const result = (
       await api<{ steps: Activity[] }>(
         `/tasks/${enc(props.task.id)}/runs/${enc(run.id)}/activity`,
       )
     ).steps;
+    if (!disposed) activity.value[run.id] = result;
   } catch (e) {
     error.value = (e as Error).message;
+  } finally {
+    loadingRuns.delete(run.id);
   }
 }
 async function stop() {
@@ -90,11 +111,13 @@ onBeforeUnmount(() => {
       ><Markdown
         :text="
           detail?.task.message ||
+          detail?.task.latest ||
           detail?.task.summary ||
           detail?.task.instruction ||
           ''
         "
       />
+      <TaskPlanChecklist v-if="detail" :plan="plan" :limit="1000" />
       <details
         v-for="run in detail?.runs"
         :key="run.id"
@@ -108,7 +131,11 @@ onBeforeUnmount(() => {
           }}
           · {{ run.outcome || run.state }}
         </summary>
-        <ActivityTrace v-if="activity[run.id]" :steps="activity[run.id]" />
+        <ActivityTrace
+          v-if="activity[run.id]"
+          :steps="activity[run.id]"
+          :overview="false"
+        />
       </details>
       <footer class="dialog-actions">
         <button class="quiet-button" @click="exportTask">导出记录</button

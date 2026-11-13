@@ -22,6 +22,8 @@ const icons: Record<string, string> = {
   back: "m12 19-7-7 7-7M5 12h14",
   menu: "M4 6h16M4 12h16M4 18h16",
   clock: "M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
+  download: "M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4",
+  expand: "M14 3h7v7M21 3l-7 7M10 21H3v-7m0 7 7-7",
 };
 export default defineComponent({
   props: { name: String, size: { default: 18 } },

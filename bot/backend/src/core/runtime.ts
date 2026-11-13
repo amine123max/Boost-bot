@@ -21,6 +21,7 @@ import type { AccessControl } from "./access.js";
 import { takeTaskNotes } from "../tasks/service.js";
 import { t } from "../i18n/index.js";
 import { localProxyFailureHint } from "../network-error.js";
+import type { TaskProgress } from "../agent/progress.js";
 
 const log = logger("runtime");
 
@@ -196,6 +197,21 @@ const REPLY_TO = "reply-to:";
 
 /** 渠道无关的对话运行时：命令处理、上下文拼装、流式调用模型、持久化。 */
 export class BotRuntime {
+  private directActivity = new Map<string, { botId: string; state: TaskProgress['state']; step: ActivityStep; sampledAt: number; updatedAt: number }>();
+
+  monitorActivity(): TaskProgress[] {
+    const now = Date.now();
+    for (const [id, task] of this.directActivity) {
+      if (task.state !== 'working' && now - task.updatedAt >= 60_000) this.directActivity.delete(id);
+    }
+    return [...this.directActivity.values()].map(task => {
+      const elapsed = task.sampledAt - task.step.at;
+      const output = task.step.tokens?.output;
+      return { id: task.botId, state: task.state, percent: task.state === 'done' ? 100 : null,
+        tokensPerSecond: output != null && elapsed >= 100 && now - task.sampledAt < 5000 && ['working', 'done'].includes(task.state) ? output * 1000 / elapsed : null,
+        updatedAt: task.state === 'working' ? now : task.updatedAt };
+    });
+  }
   private modelCache: { at: number; list: string[] } | undefined;
   /** 会话 → 正在处理的消息 */
   private inflight = new Map<string, Set<Inflight>>();
@@ -430,6 +446,13 @@ export class BotRuntime {
     await out.apply({ type: "stream.start" });
     let acc = "";
     const modelStep: ActivityStep = { id: `model-${crypto.randomUUID()}`, kind: 'model', title: model, status: 'running', at: Date.now() };
+    const monitored = { botId: bot.id, state: 'working' as TaskProgress['state'], step: modelStep, sampledAt: 0, updatedAt: Date.now() };
+    this.monitorActivity();
+    if (this.directActivity.size >= 256) {
+      const ended = [...this.directActivity].find(([, task]) => task.state !== 'working');
+      if (ended) this.directActivity.delete(ended[0]);
+    }
+    this.directActivity.set(conv.id, monitored);
     await out.apply({ type: 'activity', step: { ...modelStep } });
     const reasoningEffort = await this.opts.reasoningEffort?.(routed).catch(() => undefined);
     const call = () =>
@@ -437,6 +460,7 @@ export class BotRuntime {
         onTrace: trace => {
           if (trace.summary !== undefined) modelStep.output = trace.summary;
           modelStep.tokens = { ...modelStep.tokens, ...(trace.inputTokens !== undefined ? { input: trace.inputTokens } : {}), ...(trace.outputTokens !== undefined ? { output: trace.outputTokens } : {}) };
+          if (trace.outputTokens !== undefined) monitored.sampledAt = Date.now();
           void out.apply({ type: 'activity', step: { ...modelStep } });
         },
       }, (delta) => {
@@ -451,12 +475,14 @@ export class BotRuntime {
       });
       const finalText = full || acc || t("runtime.emptyReply");
       modelStep.status = 'ok'; modelStep.ms = Date.now() - modelStep.at;
+      monitored.state = 'done'; monitored.updatedAt = Date.now();
       await out.apply({ type: 'activity', step: { ...modelStep } });
       store.addMessage(conv.id, "assistant", finalText, [modelStep]);
       await out.apply({ type: "stream.finish", text: note ? `${note}\n\n${finalText}` : finalText });
     } catch (e) {
       const err = e as Error & { status?: number };
       modelStep.status = 'error'; modelStep.ms = Date.now() - modelStep.at;
+      monitored.state = signal.aborted ? 'stopped' : 'failed'; monitored.updatedAt = Date.now();
       await out.apply({ type: 'activity', step: { ...modelStep } });
       if (signal.aborted) {
         // 停止：已生成的部分保留，末尾注明；还没出字就只说已中止

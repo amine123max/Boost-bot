@@ -10,10 +10,12 @@ import { notify, perform } from "@/composables/useBoost";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
 import BoostIcon from "./BoostIcon.vue";
+import { usePendingActions } from "@/composables/usePendingActions";
+const actions = usePendingActions();
+const { isPending } = actions;
 const props = defineProps<{ api: AggregateApi }>();
 const emit = defineEmits<{ close: []; changed: [count: number] }>();
 const tab = ref("pool"),
-  busy = ref(false),
   loading = ref(true),
   query = ref(""),
   upstream = ref(""),
@@ -59,18 +61,18 @@ onMounted(async () => {
   await perform(load);
   loading.value = false;
 });
-async function run(action: () => Promise<string>) {
-  busy.value = true;
-  await perform(async () => {
-    const message = await action();
-    await load();
-    emit("changed", pool.value.length);
-    notify(message);
-  });
-  busy.value = false;
+async function run(key: string, action: () => Promise<string>) {
+  await actions.run(key, () =>
+    perform(async () => {
+      const message = await action();
+      await load();
+      emit("changed", pool.value.length);
+      notify(message);
+    }),
+  );
 }
 async function sync() {
-  await run(async () => {
+  await run("sync", async () => {
     await accountClient.syncManagedModelSourceModels({
       sourceKind: "aggregate_api",
       sourceId: props.api.id,
@@ -79,7 +81,7 @@ async function sync() {
   });
 }
 async function importTemplates() {
-  await run(async () => {
+  await run("import", async () => {
     const result = await accountClient.importAggregateApiSupplierModels({
       apiId: props.api.id,
       supplierKey: supplierKey.value,
@@ -89,31 +91,33 @@ async function importTemplates() {
   });
 }
 async function add() {
-  await run(async () => {
-    const id = upstream.value.trim();
-    if (tab.value === "pool") {
+  const currentTab = tab.value;
+  const label = displayName.value.trim();
+  const id = upstream.value.trim();
+  await run("add", async () => {
+    if (currentTab === "pool") {
       await accountClient.saveManagedModelSourceModel({
         sourceKind: "aggregate_api",
         sourceId: props.api.id,
         upstreamModel: id,
-        displayName: displayName.value.trim() || null,
+        displayName: label || null,
       });
     } else {
       await accountClient.saveAggregateApiSupplierModel({
         supplierKey: supplierKey.value,
         providerType: props.api.providerType,
         upstreamModel: id,
-        displayName: displayName.value.trim() || null,
+        displayName: label || null,
         status: "available",
       });
     }
-    upstream.value = "";
-    displayName.value = "";
-    return tab.value === "pool" ? "来源模型已添加" : "供应商模板已保存";
+    if (upstream.value.trim() === id) upstream.value = "";
+    if (displayName.value.trim() === label) displayName.value = "";
+    return currentTab === "pool" ? "来源模型已添加" : "供应商模板已保存";
   });
 }
 async function toggle(row: AggregateApiSupplierModel) {
-  await run(async () => {
+  await run(`toggle:${row.upstreamModel}`, async () => {
     await accountClient.saveAggregateApiSupplierModel({
       ...row,
       status: row.status === "available" ? "disabled" : "available",
@@ -123,14 +127,15 @@ async function toggle(row: AggregateApiSupplierModel) {
 }
 async function remove() {
   if (!pendingDelete.value) return;
-  await run(async () => {
-    await accountClient.deleteAggregateApiSupplierModel(pendingDelete.value!);
-    pendingDelete.value = null;
+  const row = pendingDelete.value;
+  pendingDelete.value = null;
+  await run(`delete:${row.upstreamModel}`, async () => {
+    await accountClient.deleteAggregateApiSupplierModel(row);
     return "供应商模板已删除";
   });
 }
 async function importOne(row: AggregateApiSupplierModel) {
-  await run(async () => {
+  await run(`import:${row.upstreamModel}`, async () => {
     await accountClient.saveManagedModelSourceModel({
       sourceKind: "aggregate_api",
       sourceId: props.api.id,
@@ -151,7 +156,7 @@ function bound(model: string) {
 }
 </script>
 <template>
-  <BoostDialog title="聚合 API 模型" wide @close="!busy && emit('close')">
+  <BoostDialog title="聚合 API 模型" wide @close="emit('close')">
     <div class="binding-model-heading">
       <h3>{{ api.supplierName || api.url }}</h3>
       <span class="badge">{{
@@ -185,12 +190,18 @@ function bound(model: string) {
     </div>
     <div v-if="tab === 'pool'" class="page-toolbar">
       <div class="toolbar-group">
-        <button class="secondary" :disabled="busy || !active" @click="sync">
+        <button
+          class="secondary"
+          :disabled="isPending('sync') || !active"
+          @click="sync"
+        >
           <BoostIcon name="rotate-ccw" :size="16" />拉取远端模型</button
         ><button
           class="secondary"
           :disabled="
-            busy || !active || !templates.some((t) => t.status === 'available')
+            isPending('import') ||
+            !active ||
+            !templates.some((t) => t.status === 'available')
           "
           @click="importTemplates"
         >
@@ -212,7 +223,10 @@ function bound(model: string) {
       ><button
         class="primary"
         :disabled="
-          busy || loading || !upstream.trim() || (tab === 'pool' && !active)
+          isPending('add') ||
+          loading ||
+          !upstream.trim() ||
+          (tab === 'pool' && !active)
         "
       >
         {{ tab === "pool" ? "添加到模型池" : "保存供应商模板" }}
@@ -299,21 +313,24 @@ function bound(model: string) {
                 <button
                   class="icon-button"
                   :aria-label="'导入 ' + m.upstreamModel"
-                  :disabled="busy || !active || m.status !== 'available'"
+                  :disabled="
+                    isPending(`import:${m.upstreamModel}`) ||
+                    !active ||
+                    m.status !== 'available'
+                  "
                   @click="importOne(m)"
                 >
                   <BoostIcon name="download" :size="16" /></button
                 ><button
                   class="icon-button"
                   :aria-label="'切换模板 ' + m.upstreamModel"
-                  :disabled="busy"
+                  :disabled="isPending(`toggle:${m.upstreamModel}`)"
                   @click="toggle(m)"
                 >
                   <BoostIcon name="power" :size="16" /></button
                 ><button
                   class="icon-button"
                   :aria-label="'删除模板 ' + m.upstreamModel"
-                  :disabled="busy"
                   @click="pendingDelete = m"
                 >
                   <BoostIcon name="trash-2" :size="16" />
@@ -329,20 +346,13 @@ function bound(model: string) {
     </div>
     <div v-if="pendingDelete" class="inline-confirm">
       <span>确认删除模板 {{ pendingDelete.upstreamModel }}？</span
-      ><button
-        class="text-button"
-        :disabled="busy"
-        @click="pendingDelete = null"
-      >
-        取消</button
-      ><button class="danger-button" :disabled="busy" @click="remove">
-        确认删除
-      </button>
+      ><button class="text-button" @click="pendingDelete = null">取消</button
+      ><button class="danger-button" @click="remove">确认删除</button>
     </div>
     <DialogActions
       ><RouterLink class="text-button" to="/models/" @click="emit('close')"
         >打开模型目录</RouterLink
-      ><button class="primary" :disabled="busy" @click="emit('close')">
+      ><button class="primary" @click="emit('close')">
         完成
       </button></DialogActions
     >

@@ -28,17 +28,14 @@ const progressSweep = computed(() =>
     ? 86.4
     : Math.max(5.4, Math.min(100, progress.value)) * 3.6,
 );
-const progressHue = computed(() =>
-  120 * Math.min(1, Math.max(0, progress.value ?? 0) / 100),
+const progressHue = computed(
+  () => 120 * Math.min(1, Math.max(0, progress.value ?? 0) / 100),
 );
 </script>
 <template>
   <span
     class="bot-task-progress"
-    :class="[
-      activity.state,
-      { compact, stale: activity.stale },
-    ]"
+    :class="[activity.state, { compact, stale: activity.stale }]"
     role="progressbar"
     :aria-label="label"
     :aria-valuenow="progress ?? undefined"
@@ -64,11 +61,9 @@ const progressHue = computed(() =>
         :class="{ 'is-unknown': progress == null }"
       />
     </span>
-    <strong
-      v-if="showValue && progress != null"
-      class="bot-task-number"
-      >{{ progress }}</strong
-    >
+    <strong v-if="showValue && progress != null" class="bot-task-number">{{
+      progress
+    }}</strong>
     <BoostBotAvatar
       v-else
       :size="compact ? 26 : 34"
@@ -76,17 +71,22 @@ const progressHue = computed(() =>
       :thinking="activity.state === 'working'"
       :ambient="compact"
     />
-    <span
-      v-if="compact && activity.state === 'done'"
-      class="bot-task-complete-dot"
-      aria-hidden="true"
-    />
   </span>
 </template>
 <style scoped>
+@property --bot-task-progress-hue {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --bot-task-progress-sweep {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 86.4deg;
+}
 .bot-task-progress.compact {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 .bot-task-number {
   font-size: 10px;
@@ -131,36 +131,57 @@ const progressHue = computed(() =>
   background: conic-gradient(
     from -90deg,
     hsl(0 82% 48%) 0deg,
-    hsl(calc(var(--bot-task-progress-hue) / 2) 82% 48%) calc(var(--bot-task-progress-sweep) / 2),
+    hsl(calc(var(--bot-task-progress-hue) / 2) 82% 48%)
+      calc(var(--bot-task-progress-sweep) / 2),
     hsl(var(--bot-task-progress-hue) 82% 48%) var(--bot-task-progress-sweep),
     transparent var(--bot-task-progress-sweep) 1turn
   );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3px),
+    #000 calc(100% - 1px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3px),
+    #000 calc(100% - 1px)
+  );
 }
 .bot-task-progress.done .bot-task-arc {
   background: conic-gradient(from -90deg, #22c55e 0deg, #22c55e 1turn);
 }
 .bot-task-progress.failed .bot-task-arc {
-  background: conic-gradient(from -90deg, #ef4444 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
+  background: conic-gradient(
+    from -90deg,
+    #ef4444 0deg var(--bot-task-progress-sweep),
+    transparent var(--bot-task-progress-sweep) 1turn
+  );
 }
 .bot-task-progress.waiting .bot-task-arc {
-  background: conic-gradient(from -90deg, #e9ac43 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
+  background: conic-gradient(
+    from -90deg,
+    #e9ac43 0deg var(--bot-task-progress-sweep),
+    transparent var(--bot-task-progress-sweep) 1turn
+  );
 }
 .bot-task-arc.is-unknown {
-  background: conic-gradient(from -90deg, var(--tray-muted, #8d929d) 0deg var(--bot-task-progress-sweep), transparent var(--bot-task-progress-sweep) 1turn);
+  background: conic-gradient(
+    from -90deg,
+    var(--tray-muted, #8d929d) 0deg var(--bot-task-progress-sweep),
+    transparent var(--bot-task-progress-sweep) 1turn
+  );
 }
-.bot-task-complete-dot {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  z-index: 1;
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid var(--tray-bg, #111214);
+.working .bot-task-arc.is-unknown {
+  animation: task-search 1.4s linear infinite;
+}
+.bot-task-progress.done {
+  background: color-mix(in srgb, #22c55e 9%, transparent);
   border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 0 1px #22c55e;
+}
+@keyframes task-search {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .idle .bot-task-track,
 .unavailable .bot-task-track {
@@ -179,6 +200,7 @@ const progressHue = computed(() =>
 @media (prefers-reduced-motion: reduce) {
   .bot-task-arc {
     transition: none;
+    animation: none !important;
   }
 }
 </style>

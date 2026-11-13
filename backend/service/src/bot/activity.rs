@@ -2,7 +2,10 @@ use super::{scope, Endpoint, HOSTS};
 use crate::RpcActor;
 use serde_json::{json, Value};
 use std::io::Read;
+use std::sync::OnceLock;
 use std::time::Duration;
+
+static ACTIVITY_CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
 
 /// Observe only an already running actor-owned host; polling never launches a bot or creates keys.
 pub(crate) fn read(actor: &RpcActor) -> Result<Value, String> {
@@ -37,12 +40,17 @@ pub(crate) fn read(actor: &RpcActor) -> Result<Value, String> {
             json!({"available":true,"state":"idle","percent":null,"activeTasks":0,"waitingTasks":0}),
         );
     };
-    let client = reqwest::blocking::Client::builder()
-        .no_proxy()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(2))
-        .build()
-        .map_err(|_| "Boost Bot activity unavailable")?;
+    let client = ACTIVITY_CLIENT
+        .get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(Duration::from_secs(2))
+                .build()
+                .map_err(|_| "Boost Bot activity unavailable".to_string())
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
     let response = client
         .get(format!(
             "http://127.0.0.1:{}/boost-bot/amb/api/activity",

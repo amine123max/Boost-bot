@@ -61,6 +61,8 @@ export function mountBotAvatar(svg: SVGSVGElement, preferences: () => BotAppeara
   const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; resume(); });
   const themeObserver = new MutationObserver(() => { dark = darkTheme(); resume(); });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  const localTheme = svg.closest('[data-avatar-theme]');
+  if (localTheme) themeObserver.observe(localTheme, { attributes: true, attributeFilter: ['data-avatar-theme'] });
   observer.observe(svg);
   window.addEventListener('pointermove', pointer, { passive: true });
   document.addEventListener('visibilitychange', resume);

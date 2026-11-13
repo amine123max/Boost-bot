@@ -5,43 +5,99 @@ import { isTauriRuntime } from "@/lib/api/transport-runtime";
 import { readBotActivity, mergeActivities } from "@/lib/bot-activity";
 import { boost } from "./useBoost";
 
-export function useBotActivity() {
-  const activity = ref(readBotActivity(null));
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let disposed = false;
-  let polling = false;
-  async function hostedActivity() {
-    const value = readBotActivity(await botClient.activity());
-    if (value.available && value.state !== "idle") {
-      value.sources = ["boost-bot"];
-      value.activeSources = ["boost-bot"];
-    }
-    return value;
-  }
-  async function poll() {
-    clearTimeout(timer);
-    if (disposed || polling || document.hidden) return;
-    polling = true;
+// One sampler per webview; mounting a preview does not duplicate disk scans/RPCs.
+const local = ref(readBotActivity(null));
+const hosted = ref(readBotActivity(null));
+const receivedAt = ref({ local: 0, hosted: 0 });
+const now = ref(Date.now());
+let freshnessTimer: ReturnType<typeof setInterval> | undefined;
+let subscribers = 0;
+let generation = 0;
+const timers: Partial<
+  Record<"local" | "hosted", ReturnType<typeof setTimeout>>
+> = {};
+const activity = computed(() =>
+  mergeActivities(
+    (["local", "hosted"] as const).map((kind) => {
+      const value = kind === "local" ? local.value : hosted.value;
+      const age = now.value - receivedAt.value[kind];
+      if (age >= 10000) return readBotActivity(null);
+      return {
+        ...value,
+        tokensPerSecond: age < 5000 ? value.tokensPerSecond : null,
+        stale: value.stale || age >= 5000,
+      };
+    }),
+  ),
+);
+async function sample(kind: "local" | "hosted", run: number) {
+  if (!subscribers || generation !== run) return;
+  timers[kind] = undefined;
+  if (!document.hidden) {
     try {
-      const results = await Promise.allSettled([
-        boost.connected ? hostedActivity() : Promise.resolve(readBotActivity(null)),
-        isTauriRuntime() ? appClient.localAgentActivity().then(readBotActivity) : Promise.resolve(readBotActivity(null)),
-      ]);
-      const next = mergeActivities(results.map(r => r.status === "fulfilled" ? r.value : readBotActivity(null)));
-      if (!disposed) activity.value = next;
+      const value = readBotActivity(
+        await (kind === "local"
+          ? appClient.localAgentActivity()
+          : boost.connected
+            ? botClient.activity()
+            : null),
+      );
+      if (kind === "hosted" && value.available && value.state !== "idle") {
+        value.sources = ["boost-bot"];
+        value.activeSources = ["boost-bot"];
+      }
+      if (generation === run) {
+        (kind === "local" ? local : hosted).value = value;
+        receivedAt.value[kind] = Date.now();
+      }
     } catch {
-      if (!disposed) activity.value = readBotActivity(null);
-    } finally {
-      polling = false;
-      if (!disposed) timer = setTimeout(poll, 1500);
+      if (generation === run)
+        (kind === "local" ? local : hosted).value = readBotActivity(null);
     }
   }
+  if (subscribers && generation === run)
+    timers[kind] = setTimeout(
+      () => void sample(kind, run),
+      kind === "local" ? 500 : 1000,
+    );
+}
+function resume() {
+  // Poll loops stay scheduled while hidden; waking does not spawn competing loops.
+  if (document.hidden) return;
+  for (const kind of ["local", "hosted"] as const) {
+    if (timers[kind]) {
+      clearTimeout(timers[kind]);
+      timers[kind] = undefined;
+      if (kind === "hosted" || isTauriRuntime()) void sample(kind, generation);
+    }
+  }
+}
+export function useBotActivity() {
+  onMounted(() => {
+    if (++subscribers !== 1) return;
+    generation++;
+    now.value = Date.now();
+    freshnessTimer = setInterval(() => {
+      now.value = Date.now();
+    }, 500);
+    document.addEventListener("visibilitychange", resume);
+    if (isTauriRuntime()) void sample("local", generation);
+    void sample("hosted", generation);
+  });
+  onBeforeUnmount(() => {
+    if (--subscribers) return;
+    generation++;
+    clearInterval(freshnessTimer);
+    Object.values(timers).forEach(clearTimeout);
+    timers.local = timers.hosted = undefined;
+    document.removeEventListener("visibilitychange", resume);
+  });
   const label = computed(() => {
     const value = activity.value;
     if (value.state === "working")
       return value.percent == null
         ? `${value.activeTasks || 1} 项任务进行中`
-        : `任务进度 ${value.percent}%${value.stale ? ' · 等待新估计' : ''}`;
+        : `任务进度 ${value.percent}%${value.stale ? " · 等待新估计" : ""}`;
     return {
       idle: "智能体待命",
       waiting: "等待你的回复",
@@ -50,15 +106,6 @@ export function useBotActivity() {
       stopped: "任务已停止",
       unavailable: "进度暂不可用",
     }[value.state];
-  });
-  onMounted(() => {
-    document.addEventListener("visibilitychange", poll);
-    void poll();
-  });
-  onBeforeUnmount(() => {
-    disposed = true;
-    clearTimeout(timer);
-    document.removeEventListener("visibilitychange", poll);
   });
   return { activity, label };
 }

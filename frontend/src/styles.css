@@ -1,3 +1,5 @@
+@import "./styles/typography-fonts.css";
+
 @font-face {
   font-family: "Bahamas Bold";
   src: url("../../assets/fonts/BAHAMASB.woff") format("woff");
@@ -9,9 +11,7 @@
   --ui-body-weight: 400;
   --ui-heading-weight: 500;
   --ui-letter-spacing: 0px;
-  font-family:
-    "Segoe UI", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial,
-    sans-serif;
+  font-family: var(--ui-font-family, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif);
   font-size: calc(14px * var(--font-scale));
   font-weight: var(--ui-body-weight);
   font-synthesis: none;

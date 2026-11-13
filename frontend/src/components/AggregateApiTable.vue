@@ -14,8 +14,7 @@ import RecordSwitch from "./RecordSwitch.vue";
 import AggregateCredentialCell from "./AggregateCredentialCell.vue";
 const props = defineProps<{
   apis: AggregateApi[];
-  busy: boolean;
-  working: string;
+  isPending: (key: string) => boolean;
   latency: Record<string, number>;
   pools: QuotaModelPoolItem[];
   importedCounts: Record<string, number>;
@@ -100,7 +99,7 @@ const records = computed(() => {
             >
           </td>
           <td data-label="密钥">
-            <AggregateCredentialCell :api="row.api" :disabled="busy" />
+            <AggregateCredentialCell :api="row.api" :disabled="false" />
           </td>
           <td data-label="顺序" class="record-center-cell record-sort">
             {{ row.api.sort }}
@@ -125,13 +124,13 @@ const records = computed(() => {
                 }}</span
               ><button
                 class="secondary record-small-button"
-                :disabled="busy"
+                :disabled="isPending(`${row.api.id}:test`)"
                 @click="emit('action', row.api, 'test')"
               >
                 <BoostIcon
                   name="rotate-ccw"
                   :size="13"
-                  :class="{ spinning: working === `${row.api.id}:test` }"
+                  :class="{ spinning: isPending(`${row.api.id}:test`) }"
                 />测试</button
               ><span v-if="latency[row.api.id] != null" class="record-subtext"
                 >{{ latency[row.api.id] }} ms</span
@@ -163,14 +162,17 @@ const records = computed(() => {
                 >{{ row.balance.label }}</span
               ><button
                 class="icon-button"
-                :disabled="busy || !row.api.balanceQueryEnabled"
+                :disabled="
+                  isPending(`${row.api.id}:balance`) ||
+                  !row.api.balanceQueryEnabled
+                "
                 :aria-label="`刷新 ${row.api.supplierName || row.api.id} 余额`"
                 @click="emit('action', row.api, 'balance')"
               >
                 <BoostIcon
                   name="rotate-ccw"
                   :size="14"
-                  :class="{ spinning: working === `${row.api.id}:balance` }"
+                  :class="{ spinning: isPending(`${row.api.id}:balance`) }"
                 />
               </button>
             </div>
@@ -202,7 +204,7 @@ const records = computed(() => {
             <RecordSwitch
               :label="`${row.api.supplierName || row.api.id} 状态`"
               :enabled="row.api.status !== 'disabled'"
-              :disabled="busy"
+              :disabled="isPending(`${row.api.id}:toggle`)"
               @toggle="emit('action', row.api, 'toggle')"
             />
           </td>
@@ -210,7 +212,6 @@ const records = computed(() => {
             <div class="record-actions">
               <button
                 class="icon-button"
-                :disabled="busy"
                 :aria-label="`导入 ${row.api.supplierName || row.api.url} 模型`"
                 title="模型池 / 导入模型"
                 @click="emit('action', row.api, 'models')"
@@ -218,7 +219,6 @@ const records = computed(() => {
                 <BoostIcon name="database" :size="16" /></button
               ><button
                 class="icon-button"
-                :disabled="busy"
                 :aria-label="`编辑 ${row.api.supplierName || row.api.url}`"
                 @click="emit('action', row.api, 'edit')"
               >
@@ -227,7 +227,6 @@ const records = computed(() => {
                 :label="`${row.api.supplierName || row.api.id} 的操作`"
                 icon="ellipsis"
                 icon-only
-                :disabled="busy"
                 :items="[
                   { value: 'edit', label: '编辑聚合 API', icon: 'settings' },
                   {

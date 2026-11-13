@@ -1,15 +1,16 @@
 import type { RequestOptions } from "../utils/request";
 import { getAppErrorMessage, unwrapRpcPayload } from "./transport-errors";
+import { managementRequestQueue } from "../utils/request-queue";
 
 export type JsonRpcFetcher = (
   url: string,
   init?: RequestInit,
-  options?: RequestOptions
+  options?: RequestOptions,
 ) => Promise<Response>;
 
 export function buildJsonRpcRequestBody(
   method: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, unknown> = {},
 ): string {
   return JSON.stringify({
     jsonrpc: "2.0",
@@ -57,7 +58,7 @@ async function readRpcHttpErrorPayload(response: Response): Promise<unknown> {
 function buildRpcHttpErrorMessage(
   status: number,
   payload: unknown,
-  headers?: Pick<Headers, "get">
+  headers?: Pick<Headers, "get">,
 ): string {
   const detail = getAppErrorMessage(payload, "").trim();
   const errorCode =
@@ -99,27 +100,38 @@ export async function postJsonRpc<T>(
   url: string,
   rpcMethod: string,
   params: Record<string, unknown> = {},
-  options: RequestOptions = {}
+  options: RequestOptions = {},
 ): Promise<T> {
-  const response = await fetcher(
-    url,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: buildJsonRpcRequestBody(rpcMethod, params),
-    },
-    options
-  );
-
-  if (!response.ok) {
-    const payload = await readRpcHttpErrorPayload(response);
-    if (response.status === 401 && isWebAuthRequiredPayload(payload)) {
-      redirectToWebLoginIfBrowser();
-    }
-    throw new Error(
-      buildRpcHttpErrorMessage(response.status, payload, response.headers)
+  // Serialize before queueing: editing a form must not change an accepted request.
+  const body = buildJsonRpcRequestBody(rpcMethod, params);
+  // Allow the service's 60-second shared queue wait in addition to execution.
+  // A timed-out mutation must never be silently submitted a second time.
+  const requestOptions = {
+    ...options,
+    timeoutMs: (options.timeoutMs ?? 10_000) + 65_000,
+    retries: options.retries ?? 0,
+  };
+  return managementRequestQueue.run(async () => {
+    const response = await fetcher(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+      requestOptions,
     );
-  }
 
-  return unwrapRpcPayload<T>((await response.json()) as unknown);
+    if (!response.ok) {
+      const payload = await readRpcHttpErrorPayload(response);
+      if (response.status === 401 && isWebAuthRequiredPayload(payload)) {
+        redirectToWebLoginIfBrowser();
+      }
+      throw new Error(
+        buildRpcHttpErrorMessage(response.status, payload, response.headers),
+      );
+    }
+
+    return unwrapRpcPayload<T>((await response.json()) as unknown);
+  }, options.signal);
 }

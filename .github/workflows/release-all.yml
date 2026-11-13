@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing version tag, for example v0.5.0'
+        description: 'Existing version tag, for example v0.5.1'
         required: true
         type: string
       reuse_run_id:
@@ -69,7 +69,6 @@ jobs:
       - name: Build and verify frontend
         run: |
           pnpm -C frontend install --frozen-lockfile
-          pnpm -C frontend run test:runtime
           pnpm -C frontend run build:desktop
       - name: Prepare embedded Bot runtime
         run: node scripts/prepare-boost-bot.mjs

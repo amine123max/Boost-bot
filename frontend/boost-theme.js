@@ -28,7 +28,40 @@
     var colors = ['green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'pink', 'fuchsia', 'rose', 'red', 'orange', 'amber', 'yellow', 'lime'];
     root.dataset.accent = raw && colors.includes(raw.themeColor) ? raw.themeColor : 'teal';
     var version = raw && raw.typographyVersion;
-    var prefs = raw && [1, 2, 3].includes(version) ? raw : {};
+    var prefs = raw && [1, 2, 3, 4].includes(version) ? raw : {};
+    // Keep the allowlists and ordering aligned with ui-typography.ts so saved
+    // fonts are present on the first paint, before Vue or the service loads.
+    var chineseFonts = {
+      system: '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC"',
+      yahei: '"Microsoft YaHei", "Microsoft YaHei UI"',
+      pingfang: '"PingFang SC", "Heiti SC"',
+      'noto-sans': '"Noto Sans CJK SC", "Source Han Sans SC", "Noto Sans SC"',
+      simsun: 'SimSun, "Songti SC", "Noto Serif CJK SC"',
+      kaiti: 'KaiTi, "Kaiti SC", STKaiti',
+      'noto-serif': '"Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif SC"'
+    };
+    var englishFonts = {
+      system: '"Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial',
+      'times-new-roman': '"Times New Roman", "Liberation Serif", Times',
+      arial: 'Arial, "Liberation Sans", Helvetica',
+      georgia: 'Georgia, "Times New Roman", "Liberation Serif"',
+      consolas: 'Consolas, "Cascadia Mono", Menlo, "Liberation Mono"'
+    };
+    var numberFonts = {
+      inherit: '',
+      'times-new-roman': '"Boost Digits Times"',
+      arial: '"Boost Digits Arial"',
+      consolas: '"Boost Digits Consolas"'
+    };
+    function fontFrom(options, key, fallback) {
+      return Object.prototype.hasOwnProperty.call(options, key) ? options[key] : options[fallback];
+    }
+    root.style.setProperty('--ui-font-family', [
+      fontFrom(numberFonts, prefs.numberFont, 'inherit'),
+      fontFrom(englishFonts, prefs.englishFont, 'system'),
+      fontFrom(chineseFonts, prefs.chineseFont, 'system'),
+      '"Microsoft YaHei", "PingFang SC", sans-serif'
+    ].filter(Boolean).join(', '));
     function bounded(value, min, max, fallback) {
       return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
     }

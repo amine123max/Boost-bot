@@ -57,7 +57,7 @@ const settings: [string, string, boolean?, boolean?][] = [
   ["关闭主窗口时", "关闭 退出 最小化 记忆 close exit minimize", false, true],
   ["显示内容", "悬浮窗 余量 进度 TPS 内存 上传 下载 dock monitor"],
   ["主题模式", "主题 颜色 深色 浅色 theme color"],
-  ["文字显示", "字体 字号 字重 font typography"],
+  ["文字显示", "字体 中文 英文 数字 宋体 楷体 Times New Roman 字号 字重 font typography"],
   ["外观设置", "智能体 动画 bot avatar"],
   ["账号路由", "路由 策略 routing", true],
   ["单账号并发上限", "并发 concurrency", true],

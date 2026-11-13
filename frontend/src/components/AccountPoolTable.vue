@@ -12,8 +12,7 @@ import BoostMenu, { type MenuItem } from "./BoostMenu.vue";
 const props = defineProps<{
   accounts: Account[];
   selected: string[];
-  busy: boolean;
-  working: string;
+  isPending: (key: string) => boolean;
   menuItems: (account: Account) => MenuItem[];
 }>();
 const emit = defineEmits<{
@@ -46,7 +45,6 @@ const partlySelected = computed(
               type="checkbox"
               :checked="allSelected"
               :indeterminate="partlySelected"
-              :disabled="busy"
               aria-label="全选当前结果"
               @change="emit('selectAll')"
             />
@@ -68,7 +66,6 @@ const partlySelected = computed(
               <input
                 type="checkbox"
                 :checked="selected.includes(account.id)"
-                :disabled="busy"
                 :aria-label="`选择 ${account.name}`"
                 @change="emit('select', account.id)"
               /><span :title="'账号编号 / 排序'">#{{ account.sort }}</span>
@@ -122,29 +119,37 @@ const partlySelected = computed(
               <div class="account-quota-actions">
                 <button
                   class="text-button blue-text"
-                  :disabled="busy || account.status === 'disabled'"
+                  :disabled="
+                    isPending(`${account.id}:refresh`) ||
+                    account.status === 'disabled'
+                  "
                   @click="emit('action', account, 'refresh')"
                 >
                   <BoostIcon
                     name="rotate-ccw"
                     :size="13"
-                    :class="{ spinning: working === `${account.id}:refresh` }"
-                  />{{
-                    working === `${account.id}:refresh` ? "刷新中" : "刷新"
-                  }}
+                    :class="{ spinning: isPending(`${account.id}:refresh`) }"
+                  />{{ isPending(`${account.id}:refresh`) ? "刷新中" : "刷新" }}
                 </button>
                 <AccountResetCredits
                   :account="account"
-                  :busy="busy"
-                  :working="working === `${account.id}:credits`"
+                  :busy="isPending(`${account.id}:credits`)"
+                  :working="isPending(`${account.id}:credits`)"
                   @refresh="emit('action', account, 'credits')"
                 />
                 <button
                   class="text-button account-reset-button"
-                  :disabled="busy || account.quotaResetAvailableCount === 0"
+                  :disabled="
+                    isPending(`${account.id}:reset`) ||
+                    account.quotaResetAvailableCount === 0
+                  "
                   @click="emit('action', account, 'reset')"
                 >
-                  <BoostIcon name="rotate-ccw" :size="13" />重置
+                  <BoostIcon
+                    name="rotate-ccw"
+                    :size="13"
+                    :class="{ spinning: isPending(`${account.id}:reset`) }"
+                  />{{ isPending(`${account.id}:reset`) ? "重置中" : "重置" }}
                 </button>
               </div>
             </div>
@@ -163,7 +168,7 @@ const partlySelected = computed(
             <div class="account-table-actions">
               <button
                 class="icon-button"
-                :disabled="busy"
+                :disabled="isPending(`${account.id}:up`)"
                 :aria-label="`向前移动 ${account.name}`"
                 @click="emit('action', account, 'up')"
               >
@@ -171,7 +176,7 @@ const partlySelected = computed(
               </button>
               <button
                 class="icon-button"
-                :disabled="busy"
+                :disabled="isPending(`${account.id}:down`)"
                 :aria-label="`向后移动 ${account.name}`"
                 @click="emit('action', account, 'down')"
               >
@@ -179,7 +184,6 @@ const partlySelected = computed(
               </button>
               <button
                 class="icon-button"
-                :disabled="busy"
                 :aria-label="`编辑 ${account.name}`"
                 @click="emit('action', account, 'edit')"
               >
@@ -190,7 +194,6 @@ const partlySelected = computed(
                 icon="ellipsis"
                 icon-only
                 :items="menuItems(account)"
-                :disabled="busy"
                 @select="emit('action', account, $event)"
               />
             </div>

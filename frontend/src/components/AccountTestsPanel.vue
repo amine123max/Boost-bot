@@ -23,6 +23,7 @@ const {
   completed,
   succeeded,
   testAll,
+  isPending,
 } = useAccountTests();
 const query = ref("");
 const strategyItems: MenuItem[] = [
@@ -48,7 +49,6 @@ const stateLabels = {
 };
 async function choose(id: string) {
   if (
-    running.value ||
     pendingSelection.value ||
     results[id]?.state !== "success"
   )
@@ -93,19 +93,19 @@ async function automatic(
               ? 'manual'
               : boost.settings?.routeStrategy || 'ordered'
           "
-          :disabled="running || pendingSelection"
+          :disabled="pendingSelection"
           @select="automatic"
         />
         <button
           v-if="boost.selectedId && isAdmin"
           class="secondary"
-          :disabled="running || pendingSelection"
+          :disabled="pendingSelection"
           @click="automatic()"
         >
           恢复自动选择</button
         ><button
           class="primary"
-          :disabled="running || pendingSelection || !eligibleAccounts.length"
+          :disabled="running || !eligibleAccounts.length"
           @click="testAll()"
         >
           <BoostIcon
@@ -177,7 +177,7 @@ async function automatic(
           <button
             class="round-button"
             :aria-label="`检测 ${a.name}`"
-            :disabled="running || pendingSelection"
+            :disabled="isPending(a.id)"
             @click="testAll(a.id)"
           >
             <BoostIcon
@@ -228,7 +228,6 @@ async function automatic(
             v-if="isAdmin"
             :class="boost.selectedId === a.id ? 'primary' : 'secondary'"
             :disabled="
-              running ||
               pendingSelection ||
               results[a.id]?.state !== 'success' ||
               boost.selectedId === a.id

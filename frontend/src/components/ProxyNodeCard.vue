@@ -6,11 +6,14 @@ import CountryFlag from "./CountryFlag.vue";
 const props = defineProps<{
   node: ProxyNode;
   blocked: boolean;
+  testing: boolean;
+  removing: boolean;
+  choosing: boolean;
   manual: boolean;
 }>();
 const emit = defineEmits<{ choose: []; test: []; remove: [] }>();
 function choose(event: Event) {
-  if (props.blocked || (props.manual && props.node.selected)) return;
+  if (props.blocked || props.choosing || (props.manual && props.node.selected)) return;
   if (event.target instanceof Element && event.target.closest("button")) return;
   emit("choose");
 }
@@ -53,7 +56,7 @@ function state() {
         type="button"
         class="node-refresh"
         :aria-label="`测速 ${node.name}`"
-        :disabled="blocked"
+        :disabled="blocked || testing"
         @click.stop="emit('test')"
         @dblclick.stop
       >
@@ -115,7 +118,7 @@ function state() {
           type="button"
           class="text-button"
           :aria-label="`删除 ${node.name}`"
-          :disabled="blocked"
+          :disabled="blocked || removing"
           @click.stop="emit('remove')"
           @dblclick.stop
         >

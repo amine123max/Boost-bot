@@ -8,7 +8,7 @@ import {
 export const uiDefaults = {
   themeColor: defaultThemeColor,
   ...typographyDefaults,
-  typographyVersion: 3,
+  typographyVersion: 4,
   showTrafficChart: true,
   showKernelUsage: true,
   pauseWhenHidden: true,
@@ -42,7 +42,8 @@ function readPreferences() {
       ...resolveTypographyPreferences(
         value.typographyVersion === 1 ||
         value.typographyVersion === 2 ||
-        value.typographyVersion === 3
+        value.typographyVersion === 3 ||
+        value.typographyVersion === 4
           ? value
           : {},
         value.typographyVersion,

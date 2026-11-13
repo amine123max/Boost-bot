@@ -15,6 +15,8 @@ import { getAppErrorMessage } from "@/lib/api/transport";
 import { accountClient } from "@/lib/api/account-client";
 import { normalizeManagedModelInfo } from "@/lib/api/normalize";
 import { formatNumber, isAdmin, notify, perform } from "@/composables/useBoost";
+import { usePendingActions } from "@/composables/usePendingActions";
+const { run, isPending } = usePendingActions();
 const props = defineProps<{ readOnly?: boolean }>();
 const route = useRoute();
 const filter = ref("all"),
@@ -29,7 +31,10 @@ const detail = ref<ManagedModelInfo | null>(null);
 const visibility = ref("list");
 const supported = ref(true);
 const query = ref("");
-const busy = ref(false);
+const loading = ref(false);
+const saving = ref(false);
+let loadVersion = 0;
+let appliedLoad = 0;
 const dialog = ref(false);
 const remoteImport = ref(false);
 const editing = ref<ManagedModelInfo | null>(null);
@@ -56,19 +61,22 @@ const visible = computed(() =>
   ),
 );
 async function load(refresh = false) {
-  busy.value = true;
+  const version = ++loadVersion;
+  loading.value = true;
   await perform(async () => {
     const [catalog, routes] = await Promise.all([
       accountClient.listManagedModels(refresh),
       accountClient.listManagedModelRouting(),
     ]);
+    if (version < appliedLoad) return;
+    appliedLoad = version;
     models.value = catalog.items;
     routing.value = routes;
     selected.value = selected.value.filter((slug) =>
       models.value.some((model) => model.slug === slug),
     );
   });
-  busy.value = false;
+  if (version === loadVersion) loading.value = false;
 }
 function open(m?: ManagedModelInfo) {
   editing.value = m || null;
@@ -100,7 +108,8 @@ function open(m?: ManagedModelInfo) {
   dialog.value = true;
 }
 async function save() {
-  busy.value = true;
+  if (saving.value) return;
+  saving.value = true;
   await perform(async () => {
     let extra: Record<string, unknown>;
     try {
@@ -131,18 +140,19 @@ async function save() {
     dialog.value = false;
     notify("模型已保存");
   });
-  busy.value = false;
+  saving.value = false;
 }
 async function remove() {
   if (!deleting.value) return;
-  busy.value = true;
-  await perform(async () => {
-    await accountClient.deleteManagedModel(deleting.value!.slug);
-    await load();
-    deleting.value = null;
-    notify("模型已删除");
+  const model = deleting.value;
+  deleting.value = null;
+  await run(`delete:${model.slug}`, async () => {
+    await perform(async () => {
+      await accountClient.deleteManagedModel(model.slug);
+      await load();
+      notify("模型已删除");
+    });
   });
-  busy.value = false;
 }
 onMounted(async () => {
   await load();
@@ -152,25 +162,29 @@ onMounted(async () => {
   }
 });
 async function deleteSelected() {
-  busy.value = true;
-  const failed: string[] = [];
-  let count = 0;
-  for (const slug of [...selected.value]) {
-    try {
-      await accountClient.deleteManagedModel(slug);
-      selected.value = selected.value.filter((s) => s !== slug);
-      count++;
-    } catch (e) {
-      failed.push(`${slug}：${getAppErrorMessage(e)}`);
-    }
-  }
-  await load();
-  busy.value = false;
-  if (count) notify(`已删除 ${count} 个模型`);
-  if (failed.length) notify(failed.join("；"), true);
-  else batchDelete.value = false;
+  const targets = [...selected.value];
+  batchDelete.value = false;
+  await run("delete:selected", async () => {
+    const failed: string[] = [];
+    let count = 0;
+    await Promise.all(
+      targets.map(async (slug) => {
+        try {
+          await accountClient.deleteManagedModel(slug);
+          selected.value = selected.value.filter((s) => s !== slug);
+          count++;
+        } catch (e) {
+          failed.push(`${slug}：${getAppErrorMessage(e)}`);
+        }
+      }),
+    );
+    await load();
+    if (count) notify(`已删除 ${count} 个模型`);
+    if (failed.length) notify(failed.join("；"), true);
+  });
 }
 async function exportCache() {
+  if (exporting.value) return;
   exporting.value = true;
   await perform(async () => {
     if (!models.value.length) throw new Error("没有可导出的模型");
@@ -240,17 +254,12 @@ function reasoning(model: ManagedModelInfo) {
     <div class="page-toolbar">
       <h2 class="section-title">模型目录明细</h2>
       <div class="toolbar-group catalog-actions">
-        <button
-          v-if="writable"
-          class="secondary"
-          :disabled="busy"
-          @click="remoteImport = true"
-        >
+        <button v-if="writable" class="secondary" @click="remoteImport = true">
           <BoostIcon name="download" :size="16" />并入远端模型
         </button>
         <button
           class="secondary"
-          :disabled="busy || exporting || !models.length"
+          :disabled="exporting || !models.length"
           @click="exportCache"
         >
           <BoostIcon name="file" :size="16" />导出模型缓存
@@ -258,7 +267,7 @@ function reasoning(model: ManagedModelInfo) {
         <button
           v-if="writable"
           class="secondary"
-          :disabled="busy || !selected.length"
+          :disabled="isPending('delete:selected') || !selected.length"
           @click="batchDelete = true"
         >
           <BoostIcon name="trash-2" :size="16" />批量删除模型
@@ -310,7 +319,7 @@ function reasoning(model: ManagedModelInfo) {
           <option value="custom">自定义模型</option>
           <option value="overrides">本地覆写</option>
         </select>
-        <button class="secondary" :disabled="busy" @click="load(false)">
+        <button class="secondary" :disabled="loading" @click="load(false)">
           <BoostIcon name="rotate-ccw" :size="14" />刷新目录
         </button>
       </div>
@@ -428,7 +437,7 @@ function reasoning(model: ManagedModelInfo) {
     <PanelCard v-else
       ><EmptyState
         icon="box"
-        :title="busy ? '正在读取模型…' : '暂无模型'"
+        :title="loading ? '正在读取模型…' : '暂无模型'"
         description="同步上游模型，或添加自定义模型。"
     /></PanelCard>
     <BoostDialog
@@ -507,19 +516,14 @@ function reasoning(model: ManagedModelInfo) {
     <BoostDialog
       v-if="batchDelete"
       title="批量删除模型"
-      @close="!busy && (batchDelete = false)"
+      @close="batchDelete = false"
       ><p>确认删除选中的 {{ selected.length }} 个模型？关联路由将一并清理。</p>
       <div class="delete-model-list">
         <code v-for="slug in selected" :key="slug">{{ slug }}</code>
       </div>
       <DialogActions
-        ><button
-          class="secondary"
-          :disabled="busy"
-          @click="batchDelete = false"
-        >
-          取消</button
-        ><button class="danger-button" :disabled="busy" @click="deleteSelected">
+        ><button class="secondary" @click="batchDelete = false">取消</button
+        ><button class="danger-button" @click="deleteSelected">
           确认删除
         </button></DialogActions
       ></BoostDialog
@@ -532,7 +536,7 @@ function reasoning(model: ManagedModelInfo) {
     <BoostDialog
       v-if="dialog"
       :title="editing ? '编辑模型' : '添加模型'"
-      @close="!busy && (dialog = false)"
+      @close="!saving && (dialog = false)"
       ><form class="form-stack" @submit.prevent="save">
         <label class="form-field"
           >模型标识<input v-model="slug" required placeholder="gpt-…" /></label
@@ -569,24 +573,18 @@ function reasoning(model: ManagedModelInfo) {
           <button
             type="button"
             class="secondary"
-            :disabled="busy"
+            :disabled="saving"
             @click="dialog = false"
           >
             取消</button
-          ><button class="primary" :disabled="busy">保存模型</button>
+          ><button class="primary" :disabled="saving">保存模型</button>
         </DialogActions>
       </form></BoostDialog
-    ><BoostDialog
-      v-if="deleting"
-      title="删除模型"
-      @close="!busy && (deleting = null)"
+    ><BoostDialog v-if="deleting" title="删除模型" @close="deleting = null"
       ><p style="margin-bottom: 20px">确认删除 {{ deleting.slug }}？</p>
       <DialogActions>
-        <button class="secondary" :disabled="busy" @click="deleting = null">
-          取消</button
-        ><button class="danger-button" :disabled="busy" @click="remove">
-          删除模型
-        </button>
+        <button class="secondary" @click="deleting = null">取消</button
+        ><button class="danger-button" @click="remove">删除模型</button>
       </DialogActions></BoostDialog
     >
   </div>

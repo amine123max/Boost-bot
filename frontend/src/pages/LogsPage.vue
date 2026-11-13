@@ -36,6 +36,7 @@ const pageSize = ref(20),
   startTime = ref(""),
   endTime = ref("");
 const busy = ref(false);
+const clearingBusy = ref(false);
 const error = ref("");
 const result = ref<RequestLogListResult>({
   items: [],
@@ -125,7 +126,8 @@ onBeforeUnmount(() => {
   clearInterval(refreshTimer);
 });
 async function clear() {
-  busy.value = true;
+  if (clearingBusy.value) return;
+  clearingBusy.value = true;
   await perform(async () => {
     await serviceClient.clearRequestLogs();
     clearing.value = false;
@@ -133,7 +135,7 @@ async function clear() {
     await load();
     notify("请求日志已清空");
   });
-  busy.value = false;
+  clearingBusy.value = false;
 }
 </script>
 <template>
@@ -179,7 +181,7 @@ async function clear() {
           ><button
             v-if="isAdmin"
             class="secondary"
-            :disabled="busy || !result.total"
+            :disabled="clearingBusy || !result.total"
             @click="clearing = true"
           >
             <BoostIcon name="trash-2" :size="14" />清空日志</button
@@ -262,14 +264,14 @@ async function clear() {
       <BoostDialog
         v-if="clearing"
         title="清空请求日志"
-        @close="!busy && (clearing = false)"
+        @close="!clearingBusy && (clearing = false)"
         ><p style="line-height: 1.8; margin-bottom: 20px">
           确认清空请求日志？已保存的请求记录将被移除。
         </p>
         <DialogActions>
-          <button class="secondary" :disabled="busy" @click="clearing = false">
+          <button class="secondary" :disabled="clearingBusy" @click="clearing = false">
             取消</button
-          ><button class="danger-button" :disabled="busy" @click="clear">
+          ><button class="danger-button" :disabled="clearingBusy" @click="clear">
             清空日志
           </button>
         </DialogActions></BoostDialog

@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "Boost"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "boost-core",
  "boost-service",
@@ -584,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "boost-core"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "base64 0.22.1",
  "rand 0.8.5",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "boost-service"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "axum",
  "base64 0.22.1",

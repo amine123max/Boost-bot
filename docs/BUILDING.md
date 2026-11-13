@@ -99,10 +99,10 @@ The source-build files use the new `frontend/` and `backend/` paths. See [Docker
 The [release workflow](../.github/workflows/release-all.yml) builds Windows x64 desktop portable EXE and NSIS installer, plus an Apple Silicon macOS DMG, from a version tag. Validate versions first:
 
 ```bash
-node scripts/check-release-version.mjs v0.5.0
+node scripts/check-release-version.mjs v0.5.1
 ```
 
-After preparing the Bot runtime and frontend on Windows, run `python scripts/package-portable.py` to build `output/Boost_0.5.0_x64.exe`. Pass `--target x86_64-pc-windows-msvc` for an explicit Rust target. The portable Cargo feature embeds the complete Bot runtime inside the native desktop executable; first launch extracts it into the application's versioned runtime cache. No manual extraction or installation is required. Build the NSIS installer before this command, using the normal desktop feature set.
+After preparing the Bot runtime and frontend on Windows, run `python scripts/package-portable.py` to build `output/Boost_0.5.1_x64.exe`. Pass `--target x86_64-pc-windows-msvc` for an explicit Rust target. The portable Cargo feature embeds the complete Bot runtime inside the native desktop executable; first launch extracts it into the application's versioned runtime cache. No manual extraction or installation is required. Build the NSIS installer before this command, using the normal desktop feature set.
 
 The packaging script sets `BOOST_EMBEDDED_BOT_ARCHIVE` and `BOOST_EMBEDDED_BOT_DIGEST` only for the portable Cargo build. They identify the project-local temporary runtime archive and its SHA-256 cache key; users do not need to configure them when launching the desktop program.
 

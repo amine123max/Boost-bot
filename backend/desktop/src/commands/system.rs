@@ -109,11 +109,12 @@ pub fn app_tray_layout_sync(
     window: tauri::Window,
     rings: u32,
     metrics: u32,
+    layout: Option<crate::app_shell::dock_layout::LayoutOptions>,
 ) -> Result<crate::app_shell::dock_layout::DockLayout, String> {
     if window.label() != "tray-preview" {
         return Err("当前窗口不是悬浮窗".into());
     }
-    crate::app_shell::dock_layout::sync(&window, rings, metrics)
+    crate::app_shell::dock_layout::sync(&window, rings, metrics, layout)
 }
 
 #[tauri::command]

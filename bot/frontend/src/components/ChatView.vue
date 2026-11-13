@@ -293,6 +293,7 @@ export default defineComponent({
                 v-if="chat.live.steps?.length"
                 :steps="chat.live.steps"
                 :running="chat.running"
+                :title="chat.live.userText"
               />
               <Markdown
                 v-for="(text, i) in chat.live.interim"

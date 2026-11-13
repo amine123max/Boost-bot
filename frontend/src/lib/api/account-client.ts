@@ -487,7 +487,8 @@ export const accountClient = {
         targetAccountId
           ? { accountId: targetAccountId, account_id: targetAccountId }
           : {}
-      )
+      ),
+      { timeoutMs: targetAccountId ? 10_000 : 600_000, retries: 0 }
     );
   },
   resetUsageQuota: (accountId: string) => {

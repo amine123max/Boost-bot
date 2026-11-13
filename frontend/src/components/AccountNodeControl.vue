@@ -4,7 +4,7 @@ import { isAdmin, perform, notify } from "@/composables/useBoost";
 import { useProxyNetwork } from "@/composables/useProxyNetwork";
 import CountryFlag from "./CountryFlag.vue";
 const props = defineProps<{ accountId: string }>();
-const { snapshot, busy, refresh, action } = useProxyNetwork();
+const { snapshot, isPending, refresh, action } = useProxyNetwork();
 const binding = computed(() => snapshot.value?.bindings[props.accountId] || "");
 const node = computed(() =>
   snapshot.value?.nodes.find((n) => n.id === binding.value),
@@ -16,7 +16,8 @@ async function change(event: Event) {
   const target = event.target as HTMLSelectElement;
   const id = target.value;
   await perform(async () => {
-    await action("bind", { accountId: props.accountId, nodeId: id });
+    const result = await action("bind", { accountId: props.accountId, nodeId: id });
+    if (!result) return;
     notify(id ? "账号已固定使用所选节点" : "账号已跟随全局策略");
   });
   target.value = binding.value;
@@ -32,7 +33,7 @@ async function change(event: Event) {
     <select
       :value="binding"
       :disabled="
-        busy || snapshot?.testRunning || snapshot?.kernel.busy || !snapshot
+        isPending(`bind:${accountId}`) || !snapshot
       "
       :aria-label="`账号 ${accountId} 的代理节点`"
       @change="change"

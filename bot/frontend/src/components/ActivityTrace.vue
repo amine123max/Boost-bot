@@ -4,18 +4,44 @@ import type { Activity } from "../types";
 import { api, enc } from "../api";
 import Icon from "./Icon.vue";
 import Markdown from "./Markdown.vue";
-const props = defineProps<{
-  steps?: Activity[];
-  count?: number;
-  conversationId?: string;
-  messageId?: number | string;
-  running?: boolean;
-}>();
+import PlanOverview from "./PlanOverview.vue";
+import { taskPlan } from "../lib/task-plan";
+const props = withDefaults(
+  defineProps<{
+    steps?: Activity[];
+    count?: number;
+    conversationId?: string;
+    messageId?: number | string;
+    running?: boolean;
+    overview?: boolean;
+    title?: string;
+  }>(),
+  { overview: true },
+);
 const history = ref<Activity[]>([]),
   loading = ref(false),
   error = ref(""),
   fetched = ref(false);
 const entries = computed(() => props.steps || history.value);
+const trace = ref<HTMLDetailsElement>();
+const plan = computed(() => taskPlan(entries.value));
+const hasError = computed(() =>
+  entries.value.some((step) => step.status === "error"),
+);
+function openTrace() {
+  if (trace.value) trace.value.open = true;
+}
+function exportOverview() {
+  const text = `# ${props.title || "本轮处理过程"}\n\n${plan.value.items.map((item) => `- [${item.state === "done" ? "x" : " "}] ${item.text}`).join("\n")}\n`;
+  const url = URL.createObjectURL(
+    new Blob([text], { type: "text/markdown;charset=utf-8" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "处理计划.md";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 async function load(event: Event) {
   if (
     !(event.target as HTMLDetailsElement).open ||
@@ -53,7 +79,22 @@ const tokens = (value?: number) =>
       : String(value);
 </script>
 <template>
-  <details class="activity-trace" @toggle="load">
+  <PlanOverview
+    v-if="overview && entries.length"
+    borderless
+    :title="
+      title?.slice(0, 100) ||
+      (plan.kind === 'plan' ? '本轮任务计划' : '本轮处理概览')
+    "
+    :caption="plan.kind === 'plan' ? '执行计划' : '处理概览'"
+    :status="running ? '执行中' : hasError ? '存在失败步骤' : '本轮已结束'"
+    :tone="running ? 'working' : hasError ? 'failed' : 'ended'"
+    :plan="plan"
+    inspect
+    @open="openTrace"
+    @export="exportOverview"
+  />
+  <details ref="trace" class="activity-trace" @toggle="load">
     <summary class="trace-toggle">
       <Icon name="chevron" :size="15" /><span>处理过程</span
       ><span v-if="running" class="trace-running">执行中</span
@@ -131,9 +172,10 @@ const tokens = (value?: number) =>
 .trace-step {
   margin-top: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-lg);
-  background: var(--well);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   overflow-wrap: anywhere;
 }
 .trace-step > summary {

@@ -13,7 +13,7 @@ const source = ref(''), error = ref(''), busy = ref(false), loaded = ref(false);
 const frame = ref<HTMLIFrameElement>();
 const surface = ref<HTMLElement>();
 const launch = consumeBotLaunch();
-const waitingForGesture = ref(!launch.requested);
+const waitingForGesture = ref(false);
 const pageContentReady = ref(false);
 const opening = { '--bot-origin-x': launch.x, '--bot-origin-y': launch.y };
 const revealing = ref(false), revealed = ref(false);
@@ -48,7 +48,8 @@ async function connect() {
 }
 function sync() {
   if (!source.value) return;
-  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: document.documentElement.dataset.theme }, new URL(source.value).origin);
+  const themeMode = boost.settings?.theme === 'business' ? 'light' : boost.settings?.theme === 'tech' ? 'system' : 'dark';
+  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: themeMode }, new URL(source.value).origin);
 }
 function onFrameLoad() {
   loaded.value = true;
@@ -63,7 +64,9 @@ function message(event: MessageEvent) {
   if (event.data?.type === 'boost:bot:back') void back();
   if (event.data?.type === 'boost:theme' && ['light', 'dark', 'system'].includes(event.data.mode)) {
     const theme = event.data.mode === 'light' ? 'business' : event.data.mode === 'system' ? 'tech' : 'dark';
-    void saveSettings({ theme }).catch(e => { error.value = getAppErrorMessage(e); });
+    const origin = event.data.origin, box = frame.value?.getBoundingClientRect();
+    const point = origin && Number.isFinite(origin.x) && Number.isFinite(origin.y) ? { x: origin.x + (box?.left || 0), y: origin.y + (box?.top || 0) } : undefined;
+    void saveSettings({ theme }, point).catch(e => { error.value = getAppErrorMessage(e); });
   }
 }
 async function signalContentReady() {
@@ -113,7 +116,7 @@ async function reveal() {
 function back() { return router.push('/'); }
 watch(botAppearance, sync, { deep: true });
 watch(() => boost.settings?.theme, sync);
-watch(() => boost.ready, ready => { if (ready && launch.requested && !source.value) void connect(); }, { immediate: true });
+watch(() => boost.ready, ready => { if (ready && !source.value) void connect(); }, { immediate: true });
 watch(() => boost.error, value => { if (!boost.connected && value) error.value = value; });
 onMounted(() => { window.addEventListener('message', message); });
 onBeforeUnmount(() => { disposed = true; revealAnimation?.cancel(); clearTimeout(readyTimeout); window.removeEventListener('message', message); });

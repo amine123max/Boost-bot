@@ -69,7 +69,7 @@ export class ActivityLog {
   progress: number | null = null;
   outputTps(now = Date.now()): number | null {
     const step = this.steps.findLast(s => s.kind === "model" && s.status === "ok" && s.tokens?.output && s.ms && s.ms >= 100);
-    if (!step || !step.ms || !step.tokens || now - step.at - step.ms > 30000) return null;
+    if (!step || !step.ms || !step.tokens || now - step.at - step.ms > 5000) return null;
     return (step.tokens.output ?? 0) * 1000 / step.ms;
   }
 

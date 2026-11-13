@@ -23,6 +23,7 @@ const result = ref<GatewayErrorLogListResult>({
 const page = ref(1);
 const stage = ref("all");
 const busy = ref(false);
+const clearingBusy = ref(false);
 const confirming = ref(false);
 const detail = ref<GatewayErrorLog | null>(null);
 const query = ref("");
@@ -53,7 +54,8 @@ watch(stage, () => {
 watch(page, () => void load());
 onMounted(load);
 async function clear() {
-  busy.value = true;
+  if (clearingBusy.value) return;
+  clearingBusy.value = true;
   await perform(async () => {
     await serviceClient.clearGatewayErrorLogs();
     confirming.value = false;
@@ -61,7 +63,7 @@ async function clear() {
     await load();
     notify("网关日志已清空");
   });
-  busy.value = false;
+  clearingBusy.value = false;
 }
 </script>
 <template>
@@ -79,7 +81,7 @@ async function clear() {
       <div class="toolbar-group">
         <button
           class="secondary"
-          :disabled="busy || !result.total"
+          :disabled="clearingBusy || !result.total"
           @click="confirming = true"
         >
           清空日志</button
@@ -211,12 +213,12 @@ async function clear() {
     <BoostDialog
       v-if="confirming"
       title="清空网关日志"
-      @close="!busy && (confirming = false)"
+      @close="!clearingBusy && (confirming = false)"
       ><p>确认移除所有网关错误日志？</p>
       <DialogActions>
-        <button class="secondary" :disabled="busy" @click="confirming = false">
+        <button class="secondary" :disabled="clearingBusy" @click="confirming = false">
           取消</button
-        ><button class="danger-button" :disabled="busy" @click="clear">
+        ><button class="danger-button" :disabled="clearingBusy" @click="clear">
           清空
         </button>
       </DialogActions></BoostDialog

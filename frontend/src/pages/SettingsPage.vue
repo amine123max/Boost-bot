@@ -24,6 +24,7 @@ import {
 } from "@/composables/useBoost";
 import { serviceClient } from "@/lib/api/service-client";
 import { isTauriRuntime } from "@/lib/api/transport";
+import { usePendingActions } from "@/composables/usePendingActions";
 const route = useRoute();
 const router = useRouter();
 watch(
@@ -49,7 +50,7 @@ watch(
   },
   { immediate: true },
 );
-const busy = ref(false);
+const { isPending, run } = usePendingActions();
 const address = ref(boost.settings?.serviceAddr || "localhost:12580");
 const concurrency = ref(boost.settings?.accountMaxInflight ?? 1);
 const forwardRules = ref(boost.settings?.modelForwardRules || "");
@@ -71,24 +72,25 @@ async function patch(value: AppSettingsPatch, event?: MouseEvent) {
   const origin = bounds
     ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
     : undefined;
-  busy.value = true;
-  await perform(() => saveSettings(value, origin));
-  busy.value = false;
+  const key = value.backgroundTasks
+    ? `backgroundTasks.${Object.keys(value.backgroundTasks)[0]}`
+    : Object.keys(value)[0];
+  await run(key, () => perform(() => saveSettings(value, origin)));
 }
 async function changeListen(event: Event) {
-  busy.value = true;
-  const target = event.target as HTMLSelectElement;
-  const previous = boost.settings?.serviceListenMode || "loopback";
-  const success = await perform(async () => {
-    const r = await serviceClient.setListenConfig(target.value);
-    if (boost.settings) boost.settings.serviceListenMode = r.mode;
-    notify(
-      r.requiresRestart ? "监听设置已保存，重启服务后生效" : "监听设置已保存",
-    );
-    return true;
+  await run("serviceListenMode", async () => {
+    const target = event.target as HTMLSelectElement;
+    const previous = boost.settings?.serviceListenMode || "loopback";
+    const success = await perform(async () => {
+      const r = await serviceClient.setListenConfig(target.value);
+      if (boost.settings) boost.settings.serviceListenMode = r.mode;
+      notify(
+        r.requiresRestart ? "监听设置已保存，重启服务后生效" : "监听设置已保存",
+      );
+      return true;
+    });
+    if (!success) target.value = previous;
   });
-  if (!success) target.value = previous;
-  busy.value = false;
 }
 async function saveAddress() {
   if (
@@ -129,7 +131,7 @@ async function saveAddress() {
                 ? 'minimize'
                 : boost.settings.mainWindowCloseAction
             "
-            :disabled="busy || !isAdmin"
+            :disabled="isPending('mainWindowCloseAction') || !isAdmin"
             @change="
               patch({
                 mainWindowCloseAction: ($event.target as HTMLSelectElement)
@@ -146,7 +148,9 @@ async function saveAddress() {
           label="自动检查更新"
           description="桌面版启动时检查，此后每 24 小时检查一次。"
           :model-value="boost.settings.updateAutoCheck"
-          :disabled="busy || !isAdmin || !isTauriRuntime()"
+          :disabled="
+            isPending('updateAutoCheck') || !isAdmin || !isTauriRuntime()
+          "
           @update:model-value="patch({ updateAutoCheck: $event })"
         />
         <div class="setting-row">
@@ -161,12 +165,12 @@ async function saveAddress() {
           label="每日清理累计流量"
           description="按服务所在时区每天 00:00 清零累计上传量和下载量，不影响实时速度与最近 10 分钟图表。"
           :model-value="boost.settings.dailyTrafficCleanupEnabled"
-          :disabled="busy"
+          :disabled="isPending('dailyTrafficCleanupEnabled')"
           @update:model-value="patch({ dailyTrafficCleanupEnabled: $event })"
         />
       </PanelCard>
       <PanelCard title="悬浮窗" icon="monitor"
-        ><SettingControl label="显示内容"
+        ><SettingControl label="显示内容" confirm-label="确认"
           ><TrayDisplaySettings /></SettingControl
       ></PanelCard>
       <AppUpdatePanel v-if="isTauriRuntime()" />
@@ -186,7 +190,7 @@ async function saveAddress() {
         >
           <select
             :value="boost.settings.routeStrategy"
-            :disabled="busy"
+            :disabled="isPending('routeStrategy')"
             aria-label="账号路由"
             @change="
               patch({
@@ -203,7 +207,7 @@ async function saveAddress() {
           label="额度保护"
           description="跳过剩余额度过低的账号。"
           :model-value="boost.settings.quotaGuard.enabled"
-          :disabled="busy"
+          :disabled="isPending('quotaGuard')"
           @update:model-value="
             patch({
               quotaGuard: { ...boost.settings!.quotaGuard, enabled: $event },
@@ -225,7 +229,12 @@ async function saveAddress() {
               min="0"
               max="10000"
               aria-label="单账号并发上限"
-            /><button class="secondary" :disabled="busy">保存并发上限</button>
+            /><button
+              class="secondary"
+              :disabled="isPending('accountMaxInflight')"
+            >
+              保存并发上限
+            </button>
           </form>
         </SettingControl>
         <SettingControl
@@ -238,7 +247,7 @@ async function saveAddress() {
         >
           <select
             :value="boost.settings.serviceListenMode"
-            :disabled="busy"
+            :disabled="isPending('serviceListenMode')"
             aria-label="监听范围"
             @change="changeListen"
           >
@@ -257,7 +266,9 @@ async function saveAddress() {
               required
               aria-label="本地服务地址"
               placeholder="localhost:12580"
-            /><button class="secondary" :disabled="busy">保存地址</button>
+            /><button class="secondary" :disabled="isPending('serviceAddr')">
+              保存地址
+            </button>
           </form>
         </SettingControl>
       </PanelCard>
@@ -266,7 +277,7 @@ async function saveAddress() {
           label="自动刷新用量"
           description="定期同步账号额度。"
           :model-value="boost.settings.backgroundTasks.usagePollingEnabled"
-          :disabled="busy"
+          :disabled="isPending('backgroundTasks.usagePollingEnabled')"
           @update:model-value="
             patch({ backgroundTasks: { usagePollingEnabled: $event } })
           "
@@ -277,7 +288,7 @@ async function saveAddress() {
           :model-value="
             boost.settings.backgroundTasks.tokenRefreshPollingEnabled
           "
-          :disabled="busy"
+          :disabled="isPending('backgroundTasks.tokenRefreshPollingEnabled')"
           @update:model-value="
             patch({ backgroundTasks: { tokenRefreshPollingEnabled: $event } })
           "
@@ -285,7 +296,7 @@ async function saveAddress() {
         <SettingsToggle
           label="网关保活"
           :model-value="boost.settings.backgroundTasks.gatewayKeepaliveEnabled"
-          :disabled="busy"
+          :disabled="isPending('backgroundTasks.gatewayKeepaliveEnabled')"
           @update:model-value="
             patch({ backgroundTasks: { gatewayKeepaliveEnabled: $event } })
           "
@@ -316,7 +327,7 @@ async function saveAddress() {
               ]"
               :key="item.value"
               :class="{ selected: boost.settings.theme === item.value }"
-              :disabled="busy || !isAdmin"
+              :disabled="isPending('theme') || !isAdmin"
               @click="patch({ theme: item.value }, $event)"
             >
               {{ item.label }}
@@ -360,7 +371,12 @@ async function saveAddress() {
               aria-label="模型映射规则"
               spellcheck="false"
               placeholder="模型转发规则"
-            /><button class="secondary" :disabled="busy">保存规则</button>
+            /><button
+              class="secondary"
+              :disabled="isPending('modelForwardRules')"
+            >
+              保存规则
+            </button>
           </form>
         </SettingControl>
       </PanelCard>

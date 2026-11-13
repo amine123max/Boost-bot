@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 use std::time::Duration;
 
 struct Host {
@@ -26,6 +26,22 @@ pub(crate) struct Endpoint {
 static HOSTS: OnceLock<Mutex<HashMap<String, Host>>> = OnceLock::new();
 static SERVICE_ADDR: OnceLock<Mutex<String>> = OnceLock::new();
 static RESOURCE_ROOT: OnceLock<PathBuf> = OnceLock::new();
+static LIFECYCLE: OnceLock<RwLock<()>> = OnceLock::new();
+static START_LOCKS: OnceLock<Mutex<HashMap<String, Weak<Mutex<()>>>>> = OnceLock::new();
+
+fn start_lock(actor_scope: &str) -> Result<Arc<Mutex<()>>, String> {
+    let mut locks = START_LOCKS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|_| "Boost Bot startup locks unavailable")?;
+    if let Some(lock) = locks.get(actor_scope).and_then(Weak::upgrade) {
+        return Ok(lock);
+    }
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(actor_scope.to_string(), Arc::downgrade(&lock));
+    Ok(lock)
+}
 
 pub fn configure_bot_runtime(root: PathBuf) {
     let _ = RESOURCE_ROOT.set(root);
@@ -171,7 +187,13 @@ fn gateway_key(actor: &RpcActor, scope: &str) -> Result<String, String> {
 }
 
 pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
+    // Cold-starting one user's runtime must not stall every other user's API.
+    // Shutdown waits for admitted starts before draining the process map.
+    let _lifecycle = LIFECYCLE.get_or_init(|| RwLock::new(())).read()
+        .map_err(|_| "Boost Bot lifecycle unavailable")?;
     let actor_scope = scope(actor)?;
+    let actor_start = start_lock(&actor_scope)?;
+    let _actor_start = actor_start.lock().map_err(|_| "Boost Bot startup unavailable")?;
     let mut hosts = HOSTS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -185,6 +207,7 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         }
     }
     hosts.remove(&actor_scope);
+    drop(hosts);
     let root = runtime_root()?;
     let base_url = gateway_base_url()?;
     let key = gateway_key(actor, &actor_scope)?;
@@ -257,6 +280,8 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
             ));
         }
     };
+    let mut hosts = HOSTS.get().ok_or("Boost Bot hosts unavailable")?.lock()
+        .map_err(|_| "Boost Bot host lock unavailable")?;
     hosts.insert(
         actor_scope,
         Host {
@@ -279,6 +304,7 @@ pub(crate) fn open(actor: &RpcActor, desktop: bool) -> Result<Value, String> {
 }
 
 pub(crate) fn shutdown() {
+    let Ok(_lifecycle) = LIFECYCLE.get_or_init(|| RwLock::new(())).write() else { return; };
     let Some(hosts) = HOSTS.get() else {
         return;
     };
@@ -306,6 +332,17 @@ pub(crate) fn shutdown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actor_startup_locks_deduplicate_one_actor_without_blocking_another() {
+        let a = start_lock("startup-test-alice").unwrap();
+        let same = start_lock("startup-test-alice").unwrap();
+        let b = start_lock("startup-test-bob").unwrap();
+        assert!(Arc::ptr_eq(&a, &same));
+        assert!(!Arc::ptr_eq(&a, &b));
+        let _held = a.lock().unwrap();
+        assert!(same.try_lock().is_err());
+        assert!(b.try_lock().is_ok());
+    }
     #[test]
     fn selects_existing_keys_without_provisioning_and_preserves_disabled_keys() {
         let key = |id: &str, status: &str, protocol: &str| {

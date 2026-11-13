@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{LogicalSize, PhysicalPosition, PhysicalRect, PhysicalSize};
 
@@ -16,6 +16,19 @@ static EDGE: Mutex<Edge> = Mutex::new(Edge::Floating);
 pub(crate) struct DockLayout {
     edge: Edge,
     horizontal: bool,
+    x: i32,
+    y: i32,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LayoutOptions {
+    horizontal_width: f64,
+    horizontal_height: f64,
+    vertical_width: f64,
+    vertical_height: f64,
+    orientation: String,
+    snap: bool,
+    position: Option<PhysicalPosition<i32>>,
 }
 
 fn dimensions(horizontal: bool, rings: u32, metrics: u32) -> LogicalSize<f64> {
@@ -92,16 +105,88 @@ fn resolve(
     )
 }
 
-pub(crate) fn sync(window: &tauri::Window, rings: u32, metrics: u32) -> Result<DockLayout, String> {
-    let monitor = window
-        .current_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or("无法读取显示器")?;
+fn configured_layout(
+    options: &LayoutOptions,
+    mut edge: Edge,
+    position: PhysicalPosition<i32>,
+    area: PhysicalRect<i32, u32>,
+    scale: f64,
+) -> Result<(Edge, bool, LogicalSize<f64>, PhysicalPosition<i32>), String> {
+    if !options.snap {
+        edge = Edge::Floating;
+    }
+    let horizontal = match options.orientation.as_str() {
+        "horizontal" => true,
+        "vertical" => false,
+        _ => edge == Edge::Top,
+    };
+    let (width, height) = if horizontal {
+        (options.horizontal_width, options.horizontal_height)
+    } else {
+        (options.vertical_width, options.vertical_height)
+    };
+    if !width.is_finite()
+        || !height.is_finite()
+        || !(32.0..=720.0).contains(&width)
+        || !(32.0..=720.0).contains(&height)
+    {
+        return Err("悬浮窗尺寸无效".into());
+    }
+    let size = LogicalSize::new(
+        width.min(f64::from(area.size.width) / scale),
+        height.min(f64::from(area.size.height) / scale),
+    );
+    let pixels = size.to_physical::<u32>(scale);
+    let max_x =
+        (area.position.x + area.size.width as i32 - pixels.width as i32).max(area.position.x);
+    let max_y =
+        (area.position.y + area.size.height as i32 - pixels.height as i32).max(area.position.y);
+    let desired = options.position.unwrap_or(position);
+    let next = PhysicalPosition::new(
+        (match edge {
+            Edge::Left => area.position.x,
+            Edge::Right => max_x,
+            _ => desired.x,
+        })
+        .clamp(area.position.x, max_x),
+        (if edge == Edge::Top {
+            area.position.y
+        } else {
+            desired.y
+        })
+        .clamp(area.position.y, max_y),
+    );
+    Ok((edge, horizontal, size, next))
+}
+
+pub(crate) fn sync(
+    window: &tauri::Window,
+    rings: u32,
+    metrics: u32,
+    options: Option<LayoutOptions>,
+) -> Result<DockLayout, String> {
     let position = window.outer_position().map_err(|e| e.to_string())?;
+    let desired = options
+        .as_ref()
+        .and_then(|options| options.position)
+        .unwrap_or(position);
+    let monitor = window
+        .available_monitors()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|monitor| {
+            let area = monitor.work_area();
+            desired.x >= area.position.x
+                && desired.y >= area.position.y
+                && desired.x < area.position.x + area.size.width as i32
+                && desired.y < area.position.y + area.size.height as i32
+        })
+        .or(window.current_monitor().map_err(|e| e.to_string())?)
+        .ok_or("无法读取显示器")?;
     let current = window.inner_size().map_err(|e| e.to_string())?;
     let mut previous = EDGE.lock().map_err(|_| "悬浮窗布局暂不可用")?;
-    let (edge, size, next) = resolve(
-        position,
+    let (mut edge, mut size, mut next) = resolve(
+        desired,
         current,
         *monitor.work_area(),
         monitor.scale_factor(),
@@ -109,6 +194,16 @@ pub(crate) fn sync(window: &tauri::Window, rings: u32, metrics: u32) -> Result<D
         rings,
         metrics,
     );
+    let mut horizontal = edge == Edge::Top;
+    if let Some(options) = options {
+        (edge, horizontal, size, next) = configured_layout(
+            &options,
+            edge,
+            position,
+            *monitor.work_area(),
+            monitor.scale_factor(),
+        )?;
+    }
     *previous = edge;
     if current != size.to_physical::<u32>(monitor.scale_factor()) {
         window.set_size(size).map_err(|e| e.to_string())?;
@@ -118,13 +213,41 @@ pub(crate) fn sync(window: &tauri::Window, rings: u32, metrics: u32) -> Result<D
     }
     Ok(DockLayout {
         edge,
-        horizontal: edge == Edge::Top,
+        horizontal,
+        x: next.x,
+        y: next.y,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn free_position_restores_on_a_scaled_monitor_and_rejects_invalid_sizes() {
+        let mut options = LayoutOptions {
+            horizontal_width: 280.0,
+            horizontal_height: 55.0,
+            vertical_width: 64.0,
+            vertical_height: 220.0,
+            orientation: "horizontal".into(),
+            snap: false,
+            position: Some(PhysicalPosition::new(-1500, 120)),
+        };
+        let (edge, horizontal, size, position) = configured_layout(
+            &options,
+            Edge::Right,
+            PhysicalPosition::new(0, 0),
+            area(),
+            1.5,
+        )
+        .unwrap();
+        assert_eq!(edge, Edge::Floating);
+        assert!(horizontal);
+        assert_eq!(size.width, 280.0);
+        assert_eq!(position, PhysicalPosition::new(-1500, 120));
+        options.horizontal_width = f64::NAN;
+        assert!(configured_layout(&options, Edge::Top, position, area(), 1.5).is_err());
+    }
     fn area() -> PhysicalRect<i32, u32> {
         PhysicalRect {
             position: PhysicalPosition::new(-1920, -200),

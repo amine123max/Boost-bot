@@ -668,6 +668,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     if (p === "/activity" && m === "GET") {
       const now = Date.now();
       const foreground = app.agent.monitorActivity();
+      const direct = app.runtime.monitorActivity();
       const background = app.tasks.list({ limit: 32, since: now - 60_000 }).map((task): TaskProgress => ({
         id: task.id,
         state: task.stage.key === "failed" ? "failed" : task.stage.key === "stopped" ? "stopped"
@@ -677,8 +678,9 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }));
       const pending = [...new Set([...live.bots(), ...app.runtime.busyBots()])]
         .filter(botId => ![...app.agent.turnsInProgress.values()].some(turn => turn.botId === botId))
+        .filter(botId => !direct.some(task => task.id === botId && task.state === 'working'))
         .map((id): TaskProgress => ({ id, state: "working", percent: null, updatedAt: now }));
-      return send(res, 200, progressSnapshot([...foreground, ...background, ...pending], now));
+      return send(res, 200, progressSnapshot([...foreground, ...direct, ...background, ...pending], now));
     }
     if (p === "/agent" && m === "GET") {
       const items = app.attention.list();

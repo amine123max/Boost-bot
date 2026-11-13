@@ -4,17 +4,16 @@ import { accountClient } from "@/lib/api/account-client";
 import { getAppErrorMessage } from "@/lib/api/transport";
 import { boost, notify, refreshAccounts } from "./useBoost";
 import { serviceClient } from "@/lib/api/service-client";
+import { usePendingActions } from "./usePendingActions";
 import {
   orderAccountsBySize,
   planAccountNumbers,
   runAccountBatch,
 } from "@/lib/account-workflows";
-import {
-  usageRefreshError,
-  exportSummary,
-} from "@/lib/account-feedback";
+import { usageRefreshError, exportSummary } from "@/lib/account-feedback";
 
-export function useAccountPool(busy: { value: boolean }) {
+export function useAccountPool() {
+  const { isPending, run } = usePendingActions();
   const selected = ref<string[]>([]);
   const action = ref("");
   const confirming = ref("");
@@ -22,7 +21,6 @@ export function useAccountPool(busy: { value: boolean }) {
   const numberingStart = ref(1);
   const exportMode = ref<"single" | "multiple">("multiple");
   const resetAccount = ref<Account | null>(null);
-  const working = ref("");
   watch(
     () => boost.accounts.map((a) => a.id),
     (ids) => {
@@ -46,33 +44,31 @@ export function useAccountPool(busy: { value: boolean }) {
     selected.value = [...ids];
   }
   async function execute(
+    key: string,
     task: () => Promise<unknown>,
     message?: string,
     errorPrefix = "账号操作失败",
   ) {
-    if (busy.value) return;
-    if (!boost.connected) {
-      working.value = "";
-      notify("服务未连接，暂时无法操作账号", true);
-      return;
-    }
-    busy.value = true;
-    try {
-      await task();
-      if (message) notify(message);
-    } catch (e) {
-      const message = getAppErrorMessage(e);
-      notify(
-        `${errorPrefix}: ${errorPrefix === "刷新失败" ? usageRefreshError(message) : message}`,
-        true,
-      );
-    } finally {
-      await refreshAccounts().catch((e) =>
-        notify(`刷新账号列表失败: ${getAppErrorMessage(e)}`, true),
-      );
-      busy.value = false;
-      working.value = "";
-    }
+    return run(key, async () => {
+      if (!boost.connected) {
+        notify("服务未连接，暂时无法操作账号", true);
+        return;
+      }
+      try {
+        await task();
+        if (message) notify(message);
+      } catch (e) {
+        const message = getAppErrorMessage(e);
+        notify(
+          `${errorPrefix}: ${errorPrefix === "刷新失败" ? usageRefreshError(message) : message}`,
+          true,
+        );
+      } finally {
+        await refreshAccounts().catch((e) =>
+          notify(`刷新账号列表失败: ${getAppErrorMessage(e)}`, true),
+        );
+      }
+    });
   }
   async function batch(
     ids: string[],
@@ -88,17 +84,19 @@ export function useAccountPool(busy: { value: boolean }) {
   async function chooseAction(command?: string) {
     const value = command || action.value;
     action.value = "";
-    if (!value || busy.value) return;
-    targets.value = scope.value.map((a) => a.id);
+    if (!value || isPending(`batch:${value}`)) return;
+    const accounts = [...scope.value];
+    const ids = accounts.map((a) => a.id);
+    const allAccounts = !selected.value.length;
     if (["delete", "cleanup", "export", "number"].includes(value)) {
       if (value === "delete" && !selected.value.length) {
         notify("请先选择要删除的账号", true);
         return;
       }
       confirming.value = value;
+      targets.value = ids;
       return;
     }
-    working.value = value;
     const errors: Record<string, string> = {
       refresh: "刷新失败",
       tokens: "批量刷新 AT/RT 失败",
@@ -107,28 +105,27 @@ export function useAccountPool(busy: { value: boolean }) {
       small: "调整账号顺序失败",
     };
     await execute(
+      `batch:${value}`,
       async () => {
         if (value === "list") {
           await refreshAccounts();
           notify("账号列表已刷新");
         }
         if (value === "refresh") {
-          if (!scope.value.some((a) => a.status !== "disabled")) {
+          if (!accounts.some((a) => a.status !== "disabled")) {
             notify("当前没有可刷新的账号");
             return;
           }
-          if (!selected.value.length) await accountClient.refreshUsage();
+          if (allAccounts) await accountClient.refreshUsage();
           else
             await batch(
-              scope.value
-                .filter((a) => a.status !== "disabled")
-                .map((a) => a.id),
+              accounts.filter((a) => a.status !== "disabled").map((a) => a.id),
               (id) => accountClient.refreshUsage(id),
             );
           notify("账号用量已刷新");
         }
         if (value === "tokens") {
-          if (!selected.value.length) {
+          if (allAccounts) {
             const result = await accountClient.refreshAllChatgptAuthTokens();
             const first = result.results?.find((item) => !item.ok);
             notify(
@@ -136,27 +133,25 @@ export function useAccountPool(busy: { value: boolean }) {
               Boolean(result.failed),
             );
           } else {
-            await batch(targets.value, (id) =>
+            await batch(ids, (id) =>
               accountClient.refreshChatgptAuthTokens(id),
             );
             notify("账号 AT/RT 已刷新");
           }
         }
         if (value === "enable" || value === "disable") {
-          await batch(targets.value, (id) =>
+          await batch(ids, (id) =>
             value === "enable"
               ? accountClient.enableAccount(id)
               : accountClient.disableAccount(id),
           );
           notify(
-            `已${value === "enable" ? "启用" : "禁用"} ${targets.value.length} 个账号`,
+            `已${value === "enable" ? "启用" : "禁用"} ${ids.length} 个账号`,
           );
         }
         if (value === "large" || value === "small") {
           const plan = planAccountNumbers(
-            orderAccountsBySize(scope.value, value === "large").map(
-              (a) => a.id,
-            ),
+            orderAccountsBySize(accounts, value === "large").map((a) => a.id),
             1,
           );
           await batch(
@@ -172,25 +167,48 @@ export function useAccountPool(busy: { value: boolean }) {
     );
   }
   const cleanupStatuses = ref<string[]>(["banned", "unavailable"]);
+  const resetError = ref("");
+  async function confirmReset() {
+    const account = resetAccount.value;
+    if (!account || isPending(`${account.id}:reset`) || account.quotaResetAvailableCount === 0) return;
+    await run(`${account.id}:reset`, async () => {
+      resetError.value = "";
+      if (!boost.connected) { resetError.value = "服务未连接，请连接后重试。"; return; }
+      try {
+        await accountClient.resetUsageQuota(account.id);
+        notify("额度重置成功");
+        if (resetAccount.value?.id === account.id && confirming.value === "reset") confirming.value = "";
+        await refreshAccounts().catch(e => notify(`刷新账号列表失败: ${getAppErrorMessage(e)}`, true));
+      } catch(e) { resetError.value = getAppErrorMessage(e); }
+    });
+  }
   async function confirm() {
-    working.value = confirming.value;
+    const command = confirming.value;
+    if (command === "reset") { await confirmReset(); return; }
+    const ids = [...targets.value];
+    const statuses = [...cleanupStatuses.value];
+    const mode = exportMode.value;
+    const start = numberingStart.value;
+    if (!command) return;
+    // Close before awaiting so another confirmation can be submitted independently.
+    confirming.value = "";
     const errors: Record<string, string> = {
       delete: "批量删除失败",
       cleanup: "清理失败",
       export: "导出失败",
       number: "调整账号顺序失败",
-      reset: "额度重置失败",
     };
     await execute(
+      `batch:${command}`,
       async () => {
-        switch (confirming.value) {
+        switch (command) {
           case "delete":
-            await accountClient.deleteMany(targets.value);
-            notify(`已删除 ${targets.value.length} 个账号`);
+            await accountClient.deleteMany(ids);
+            notify(`已删除 ${ids.length} 个账号`);
             break;
           case "cleanup": {
             const result = await accountClient.deleteByStatuses({
-              statuses: cleanupStatuses.value,
+              statuses,
             });
             notify(
               result.deleted
@@ -201,17 +219,14 @@ export function useAccountPool(busy: { value: boolean }) {
           }
           case "export": {
             const result = await accountClient.export({
-              selectedAccountIds: targets.value,
-              exportMode: exportMode.value,
+              selectedAccountIds: ids,
+              exportMode: mode,
             });
             notify(exportSummary(result));
             break;
           }
           case "number": {
-            const plan = planAccountNumbers(
-              targets.value,
-              numberingStart.value,
-            );
+            const plan = planAccountNumbers(ids, start);
             await batch(
               plan.map((a) => a.id),
               (id) =>
@@ -223,24 +238,20 @@ export function useAccountPool(busy: { value: boolean }) {
             notify("账号编号已保存");
             break;
           }
-          case "reset":
-            await accountClient.resetUsageQuota(resetAccount.value!.id);
-            notify("额度重置成功");
-            break;
         }
-        confirming.value = "";
       },
       undefined,
-      errors[confirming.value],
+      errors[command],
     );
   }
   async function rowAction(account: Account, value: string) {
+    if (isPending(`${account.id}:${value}`)) return;
     if (value === "reset") {
+      resetError.value = "";
       resetAccount.value = account;
       confirming.value = "reset";
       return;
     }
-    working.value = `${account.id}:${value}`;
     const errors: Record<string, string> = {
       refresh: "刷新失败",
       tokens: "刷新 AT/RT 失败",
@@ -251,6 +262,7 @@ export function useAccountPool(busy: { value: boolean }) {
       down: "调整账号顺序失败",
     };
     await execute(
+      `${account.id}:${value}`,
       async () => {
         if (value === "refresh") {
           await accountClient.refreshUsage(account.id);
@@ -311,7 +323,10 @@ export function useAccountPool(busy: { value: boolean }) {
     exportMode,
     cleanupStatuses,
     resetAccount,
-    working,
+    resetError,
+    confirmReset,
+    isPending,
+    execute,
     toggle,
     selectVisible,
     chooseAction,

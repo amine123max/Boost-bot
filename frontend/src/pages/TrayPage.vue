@@ -1,271 +1,51 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import BoostIcon from "@/components/BoostIcon.vue";
-import BotTaskProgress from "@/components/BotTaskProgress.vue";
-import { useBotActivity } from "@/composables/useBotActivity";
-import { useTelemetry, formatRate } from "@/composables/useTelemetry";
-import { boost, currentAccount } from "@/composables/useBoost";
+import { ref } from "vue";
+import TrayDashboard from "@/components/TrayDashboard.vue";
+import TrayLayoutEditor from "@/components/TrayLayoutEditor.vue";
+import TraySurface from "@/components/TraySurface.vue";
+import { useTrayMetrics } from "@/composables/useTrayMetrics";
 import { useTrayDock } from "@/composables/useTrayDock";
 import { trayPreferences } from "@/composables/useTrayPreferences";
 import { isTauriRuntime } from "@/lib/api/transport-runtime";
-
-const { telemetry, error: telemetryError, upload, download } = useTelemetry();
-const { activity, label: taskLabel } = useBotActivity();
+const editing = ref(false);
+const { metrics, activity } = useTrayMetrics();
 const { actionError, edge, horizontal, openMain, startDragging } =
-  useTrayDock();
-const memory = computed(() => formatRate(telemetry.value?.memoryBytes));
-const status = computed(() =>
-  boost.loading
-    ? "连接中"
-    : !boost.connected
-      ? "未连接"
-      : telemetryError.value
-        ? "状态不可用"
-        : "服务在线",
-);
-const accountName = computed(() =>
-  boost.connected
-    ? currentAccount.value?.name || "自动选择账号"
-    : "等待服务连接",
-);
-const activitySources = computed(() => {
-  const sources = activity.value.activeSources.length
-    ? activity.value.activeSources
-    : activity.value.sources ?? [];
-  if (!sources.length) return activity.value.state === "idle" ? "智能体待命" : "任务来源未知";
-  const labels = [...new Set(sources)].map((source) => {
-    if (source === "boost-bot") return `Boost 账号：${currentAccount.value?.name || "自动选择账号"}`;
-    if (source === "codex") return "Codex 本地任务";
-    if (source === "claude") return "Claude 本地任务";
-    if (source === "deepseek") return "DeepSeek 本地任务";
-    return `${source} 本地任务`;
-  });
-  return [...new Set(labels)].join(" · ");
-});
-const activityTitle = computed(() => `${taskLabel.value} · ${activitySources.value}`);
-function percent(value: number | null | undefined) {
-  return value == null || !Number.isFinite(value)
-    ? null
-    : Math.max(0, Math.min(100, Math.round(value)));
-}
-const primary = computed(() =>
-  percent(
-    currentAccount.value
-      ? currentAccount.value.primaryRemainPercent
-      : boost.quotaSummary?.primaryRemainPercent,
-  ),
-);
-const tps = computed(() => activity.value.tokensPerSecond);
-const tpsKnown = computed(() => tps.value != null && Number.isFinite(tps.value));
-const tpsArc = ref<HTMLElement | null>(null);
-let tpsOrbit: Animation | undefined;
-function syncTpsOrbitSpeed() {
-  if (!tpsOrbit) return;
-  tpsOrbit.updatePlaybackRate(tpsKnown.value ? Math.max(0, tps.value!) : 20);
-}
-watch(tpsArc, (arc) => {
-  tpsOrbit?.cancel();
-  tpsOrbit = undefined;
-  if (!arc) return;
-  tpsOrbit = arc.animate(
-    [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
-    { duration: 60_000, iterations: Infinity, easing: "linear" },
-  );
-  tpsOrbit.id = "tray-tps-orbit";
-  syncTpsOrbitSpeed();
-}, { flush: "post" });
-watch(tps, syncTpsOrbitSpeed);
-onBeforeUnmount(() => tpsOrbit?.cancel());
-const tpsHue = computed(() => {
-  if (!tpsKnown.value) return 0;
-  const speed = tps.value!;
-  return 120 * Math.min(1, Math.max(0, speed) / 40);
-});
-const tpsLabel = computed(() =>
-  tps.value == null
-    ? "—"
-    : tps.value >= 1000
-      ? `${(tps.value / 1000).toFixed(1)}k`
-      : tps.value < 10
-        ? tps.value.toFixed(1)
-        : Math.round(tps.value).toString(),
-);
-const metrics = computed(() =>
-  [
-    {
-      key: "upload",
-      label: "上传",
-      icon: "arrow-up",
-      ...upload.value,
-    },
-    {
-      key: "download",
-      label: "下载",
-      icon: "arrow-down",
-      ...download.value,
-    },
-    {
-      key: "memory",
-      label: "内核占用",
-      icon: "cpu",
-      value: memory.value.value,
-      unit: memory.value.unit.replace("/s", ""),
-    },
-  ]
-    .filter(
-      (metric) =>
-        ({
-          upload: trayPreferences.showUpload,
-          download: trayPreferences.showDownload,
-          memory: trayPreferences.showMemory,
-        })[metric.key as "upload" | "download" | "memory"],
-    )
-    .map((metric) => ({
-      ...metric,
-      fullValue: metric.value,
-      fullUnit: metric.unit,
-      value:
-        metric.value === "—"
-          ? "—"
-          : Number(metric.value) < 10
-            ? Number(metric.value).toFixed(1)
-            : Math.round(Number(metric.value)).toString(),
-      unit: metric.unit
-        .replace("KB", "K")
-        .replace("MB", "M")
-        .replace("GB", "G"),
-    })),
-);
+  useTrayDock(editing);
 </script>
-
 <template>
-  <main class="tray-page" aria-label="Boost 右侧悬浮条">
+  <main class="tray-page" aria-label="Boost 悬浮窗">
     <aside
       class="tray-rail"
       :class="[
-        { 'is-draggable': isTauriRuntime(), 'is-horizontal': horizontal },
+        {
+          'is-draggable': isTauriRuntime(),
+          'is-horizontal': horizontal,
+          'is-editing': editing,
+        },
         `is-${edge}`,
       ]"
       aria-label="实时指标"
       tabindex="0"
       @pointerdown="startDragging"
-      @dblclick="openMain"
-      @keydown.enter="openMain"
+      @dblclick="!editing && openMain()"
+      @keydown.enter.self="!editing && openMain()"
     >
-      <div
-        v-if="isTauriRuntime()"
-        class="tray-drag-handle"
-        aria-hidden="true"
-        title="按住拖动悬浮条，可放到屏幕顶部"
-      />
-      <div
-        v-if="trayPreferences.showProgress"
-        class="tray-logo"
-        :title="activityTitle"
-      >
-        <BotTaskProgress
+      <TrayLayoutEditor v-if="editing" floating @done="editing = false" />
+      <TraySurface v-else :edge="edge" :theme="trayPreferences.appearance"
+        ><TrayDashboard
+          :preferences="trayPreferences"
+          :metrics="metrics"
           :activity="activity"
-          :label="taskLabel"
-          compact
-          :show-value="trayPreferences.showRingValues"
-        />
-        <span class="tray-sr-only" role="status">{{ status }}</span>
-      </div>
-
-      <div
-        v-if="trayPreferences.showQuota"
-        class="tray-quota-ring"
-        role="img"
-        :class="{
-          low: primary != null && primary <= 10,
-          unknown: primary == null,
-        }"
-        :aria-label="
-          '5小时剩余额度 ' + (primary == null ? '暂无数据' : primary + '%')
-        "
-      >
-        <span class="tray-ring">
-          <svg viewBox="0 0 44 44" aria-hidden="true">
-            <circle class="tray-ring-track" cx="22" cy="22" r="19" />
-            <circle
-              class="tray-ring-value"
-              cx="22"
-              cy="22"
-              r="19"
-              pathLength="100"
-              stroke-dasharray="100"
-              :stroke-dashoffset="100 - (primary ?? 0)"
-            />
-          </svg>
-          <strong
-            >{{
-              !trayPreferences.showRingValues
-                ? ""
-                : primary == null
-                  ? "—"
-                  : primary
-            }}<small v-if="trayPreferences.showRingValues && primary != null"
-              >%</small
-            ></strong
-          >
-        </span>
-      </div>
-
-      <div
-        v-if="trayPreferences.showTps"
-        class="tray-tps-ring"
-        role="img"
-        :aria-label="`TPS ${tps == null ? '暂无数据' : tps.toFixed(1) + ' TPS'}`"
-        title="最近输出速率 · tokens/s"
-      >
-        <span class="tps-track" aria-hidden="true" />
-        <span
-          ref="tpsArc"
-          class="tps-arc"
-          :class="{ 'is-unknown': !tpsKnown }"
-          :style="{ '--tps-hue': `${tpsHue}deg` }"
-          aria-hidden="true"
-        />
-        <span v-if="trayPreferences.showRingValues"
-          class="tps-reading"
-          ><strong>{{ tpsLabel }}</strong
-          ><small>TPS</small></span
-        >
-        <BoostIcon v-else name="zap" :size="12" />
-      </div>
-      <div v-if="metrics.length" class="tray-rail-metrics">
-        <div
-          v-for="metric in metrics"
-          :key="metric.key"
-          class="tray-rail-metric"
-          :class="'tray-metric-' + metric.key"
-          :aria-label="
-            metric.label + ' ' + metric.fullValue + ' ' + metric.fullUnit
-          "
-          :title="metric.label"
-        >
-          <span class="tray-rail-caption"
-            ><BoostIcon :name="metric.icon" :size="9"
-          /></span>
-          <span class="tray-rail-reading"
-            ><strong>{{ metric.value }}</strong
-            ><span class="tray-rail-unit">{{ metric.unit }}</span></span
-          >
-        </div>
-      </div>
-
-      <p
-        v-if="actionError"
-        class="tray-rail-error"
-        role="alert"
-        :title="actionError"
-      >
-        操作失败
+          :horizontal="horizontal"
+          @page="trayPreferences.activePage = $event"
+          @configure="editing = true"
+      /></TraySurface>
+      <p v-if="actionError" class="tray-rail-error" role="alert">
+        {{ actionError }}
       </p>
     </aside>
   </main>
 </template>
-
 <style>
 html.tray-preview-window,
 .tray-preview-window body,
@@ -278,5 +58,73 @@ html.tray-preview-window,
   padding: 0;
 }
 </style>
-
-<style scoped src="../styles/tray-dock.css"></style>
+<style scoped>
+.tray-page {
+  --tray-bg: var(--sidebar);
+  --tray-text: var(--text);
+  --tray-muted: var(--muted);
+  --tray-line: var(--border);
+  height: 100%;
+  min-width: 0;
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1.2;
+}
+.tray-rail {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: 10px;
+  outline: none;
+  overflow: hidden;
+}
+.tray-rail.is-draggable {
+  cursor: grab;
+  user-select: none;
+}
+.tray-rail.is-draggable:active {
+  cursor: grabbing;
+}
+.tray-rail.is-top {
+  border-top: 0;
+  border-radius: 0 0 11px 11px;
+}
+.tray-rail.is-left {
+  border-left: 0;
+  border-radius: 0 11px 11px 0;
+}
+.tray-rail.is-right {
+  border-right: 0;
+  border-radius: 11px 0 0 11px;
+}
+.tray-drag-handle {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 14px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: var(--border);
+  pointer-events: none;
+}
+.is-editing {
+  padding: 0;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  overflow: auto;
+  cursor: default !important;
+}
+.tray-rail-error {
+  position: absolute;
+  inset: auto 3px 0;
+  font-size: 9px;
+  color: var(--red);
+  background: var(--sidebar);
+  margin: 0;
+}
+.tray-rail:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+</style>

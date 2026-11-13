@@ -107,7 +107,7 @@ fn ensure_tray_preview_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWi
     .title("Boost")
     .inner_size(TRAY_PREVIEW_WIDTH, TRAY_PREVIEW_HEIGHT)
     .min_inner_size(32.0, 32.0)
-    .max_inner_size(300.0, 244.0)
+    .max_inner_size(720.0, 720.0)
     .resizable(false)
     .maximizable(false)
     .minimizable(false)

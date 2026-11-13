@@ -1,11 +1,10 @@
 import { computed, reactive, ref } from "vue";
 import { accountClient } from "@/lib/api/account-client";
 import { getAppErrorMessage } from "@/lib/api/transport";
-import {
-  runAccountTests,
-  type AccountTest,
-} from "@/lib/account-tests";
+import { runAccountTests, type AccountTest } from "@/lib/account-tests";
 import { boost, eligibleAccounts, notify, refreshAccounts } from "./useBoost";
+import { usePendingActions } from "./usePendingActions";
+const { run, isPending } = usePendingActions();
 const results = reactive<Record<string, AccountTest>>({});
 const running = ref(false);
 const pendingSelection = ref(false);
@@ -21,45 +20,40 @@ const succeeded = computed(
       .length,
 );
 async function testOne(accountId: string) {
-  results[accountId] = {
-    accountId,
-    state: "running",
-    message: "",
-    testedAt: null,
-  };
-  try {
-    await accountClient.refreshUsage(accountId);
+  return run(accountId, async () => {
     results[accountId] = {
       accountId,
-      state: "success",
-      message: "额度接口可用",
-      testedAt: Date.now(),
+      state: "running",
+      message: "",
+      testedAt: null,
     };
-  } catch (e) {
-    results[accountId] = {
-      accountId,
-      state: "failed",
-      message: getAppErrorMessage(e),
-      testedAt: Date.now(),
-    };
-  }
+    try {
+      await accountClient.refreshUsage(accountId);
+      results[accountId] = {
+        accountId,
+        state: "success",
+        message: "额度接口可用",
+        testedAt: Date.now(),
+      };
+    } catch (e) {
+      results[accountId] = {
+        accountId,
+        state: "failed",
+        message: getAppErrorMessage(e),
+        testedAt: Date.now(),
+      };
+    }
+  });
 }
 async function testAll(id?: string) {
-  if (running.value || pendingSelection.value) return;
-  running.value = true;
+  if (id ? isPending(id) : running.value) return;
+  if (!id) running.value = true;
   try {
     const accounts = eligibleAccounts.value.filter((a) => !id || a.id === id);
     if (!accounts.length) {
       notify("没有可测试的账号，请先导入或启用账号", true);
       return;
     }
-    for (const a of accounts)
-      results[a.id] = {
-        accountId: a.id,
-        state: "pending",
-        message: "",
-        testedAt: null,
-      };
     await runAccountTests(accounts, (a) => testOne(a.id));
     await refreshAccounts().catch((e) =>
       notify(`刷新账号数据失败：${getAppErrorMessage(e)}`, true),
@@ -70,7 +64,7 @@ async function testAll(id?: string) {
   } catch (e) {
     notify(getAppErrorMessage(e), true);
   } finally {
-    running.value = false;
+    if (!id) running.value = false;
   }
 }
 export function useAccountTests() {
@@ -81,5 +75,6 @@ export function useAccountTests() {
     completed,
     succeeded,
     testAll,
+    isPending,
   };
 }

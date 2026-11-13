@@ -11,6 +11,8 @@ import DialogActions from "./DialogActions.vue";
 import { quotaClient } from "@/lib/api/quota-client";
 import { getAppErrorMessage } from "@/lib/api/transport";
 import { isAdmin, formatTime, notify, perform } from "@/composables/useBoost";
+import { usePendingActions } from "@/composables/usePendingActions";
+const { run } = usePendingActions();
 const editing = ref<ModelPriceRule | null>(null),
   editor = ref(false),
   deleting = ref<ModelPriceRule | null>(null);
@@ -20,14 +22,15 @@ function edit(rule?: ModelPriceRule) {
 }
 async function remove() {
   if (!deleting.value) return;
-  busy.value = true;
+  const rule = deleting.value;
+  deleting.value = null;
+  await run(`delete:${rule.id}`, async () => {
   await perform(async () => {
-    await quotaClient.deleteModelPriceRule(deleting.value!.id);
-    deleting.value = null;
+    await quotaClient.deleteModelPriceRule(rule.id);
     await load();
     notify("自定义价格已删除");
   });
-  busy.value = false;
+  });
 }
 const providers = [
   { id: "openai", name: "OpenAI" },
@@ -72,6 +75,7 @@ async function load() {
   rules.value = await quotaClient.modelPriceRules();
 }
 async function sync() {
+  if (busy.value) return;
   busy.value = true;
   let count = 0,
     successes = 0;
@@ -108,7 +112,7 @@ onMounted(() => perform(load));
             aria-label="搜索价格规则"
           />
         </div>
-        <select v-model="provider" aria-label="价格提供商" :disabled="busy">
+        <select v-model="provider" aria-label="价格提供商">
           <option value="all">全部提供商</option>
           <option v-for="p in providers" :key="p.id" :value="p.id">
             {{ p.name }}
@@ -123,7 +127,7 @@ onMounted(() => perform(load));
             :class="{ spinning: busy }"
           />{{ busy ? "正在同步 " + active + "…" : "同步官方价格" }}
         </button>
-        <button v-if="isAdmin" class="primary" :disabled="busy" @click="edit()">
+        <button v-if="isAdmin" class="primary" @click="edit()">
           <BoostIcon name="plus" :size="16" />新增价格
         </button>
       </div>
@@ -260,12 +264,12 @@ onMounted(() => perform(load));
     <BoostDialog
       v-if="deleting"
       title="删除自定义价格"
-      @close="!busy && (deleting = null)"
+      @close="deleting = null"
       ><p>确认删除 {{ deleting.modelPattern }} 的自定义价格？</p>
       <DialogActions
-        ><button class="secondary" :disabled="busy" @click="deleting = null">
+        ><button class="secondary" @click="deleting = null">
           取消</button
-        ><button class="danger-button" :disabled="busy" @click="remove">
+        ><button class="danger-button" @click="remove">
           确认删除
         </button></DialogActions
       ></BoostDialog

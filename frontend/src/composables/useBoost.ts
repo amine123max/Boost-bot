@@ -81,7 +81,10 @@ export async function perform<T>(
     return undefined;
   }
 }
+let accountRefreshVersion = 0;
+let appliedAccountRefresh = 0;
 export async function refreshAccounts() {
+  const version = ++accountRefreshVersion;
   const admin = isAdmin.value;
   const [accountsResult, usagesResult, quotaResult] = await Promise.allSettled([
     accountClient.list(),
@@ -91,6 +94,8 @@ export async function refreshAccounts() {
   if (accountsResult.status === "rejected") throw accountsResult.reason;
   if (usagesResult.status === "rejected") throw usagesResult.reason;
   const nextAccounts = attachUsagesToAccounts(accountsResult.value.items, usagesResult.value);
+  if (version < appliedAccountRefresh) return;
+  appliedAccountRefresh = version;
   boost.accounts = nextAccounts;
   if (admin && quotaResult.status === "fulfilled" && quotaResult.value)
     boost.quotaSummary = quotaResult.value;
@@ -99,12 +104,17 @@ export async function refreshAccounts() {
 export async function refreshData() {
   const jobs: Array<[string, () => Promise<() => void>]> = [
     ["订阅", async () => {
+      const version = ++accountRefreshVersion;
       const [accounts, usages] = await Promise.all([
         accountClient.list(),
         accountClient.listUsage(),
       ]);
       const nextAccounts = attachUsagesToAccounts(accounts.items, usages);
-      return () => { boost.accounts = nextAccounts; };
+      return () => {
+        if (version < appliedAccountRefresh) return;
+        appliedAccountRefresh = version;
+        boost.accounts = nextAccounts;
+      };
     }],
     [
       "最近账号",
@@ -217,20 +227,27 @@ export function applyAppearance() {
   document.documentElement.style.removeProperty('--blue');
   try { localStorage.setItem('boost.theme.v1', mode); } catch { /* Keep session theme when storage is unavailable. */ }
 }
+let settingsWrite: Promise<void> = Promise.resolve();
 export async function saveSettings(
   patch: AppSettingsPatch,
   origin?: ThemeOrigin,
 ) {
-  const result = await appClient.setSettings(patch);
-  const apply = async () => {
-    boost.settings = result;
-    applyAppearance();
-    await nextTick();
-  };
-  if (patch.theme)
-    await applyThemeWithTransition(appearanceMode(result.theme), apply, origin);
-  else await apply();
-  notify("设置已保存");
+  // A settings response contains the complete document. Keep writes ordered so
+  // independent controls cannot restore an earlier snapshot over a later one.
+  const task = settingsWrite.then(async () => {
+    const result = await appClient.setSettings(patch);
+    const apply = async () => {
+      boost.settings = result;
+      applyAppearance();
+      await nextTick();
+    };
+    if (patch.theme)
+      await applyThemeWithTransition(appearanceMode(result.theme), apply, origin);
+    else await apply();
+    notify("设置已保存");
+  });
+  settingsWrite = task.catch(() => {});
+  await task;
 }
 export async function selectAccount(id: string) {
   if (!isAdmin.value) throw new Error("需要管理员权限才能切换网关账号");

@@ -24,6 +24,12 @@ Boost 将 AI 账号、模型路由、平台密钥、用量监控与内置智能�
 
 ![Boost 总览](docs/images/dashboard-dark.png)
 
+## Linux DO 社区致谢
+
+Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开源项目，欢迎社区朋友体验、反馈问题和参与贡献。项目由独立开发者维护，非 Linux DO 官方项目。
+
+感谢 [Linux DO](https://linux.do/) 提供技术交流与开源分享的平台，欢迎佬友们一起交流、完善 Boost。
+
 ## 版本与下载
 
 **[下载最新版本](https://github.com/amine123max/Boost-bot/releases/latest)** · [全部版本](https://github.com/amine123max/Boost-bot/releases)
@@ -32,7 +38,7 @@ Boost 将 AI 账号、模型路由、平台密钥、用量监控与内置智能�
 
 | 平台 | 发布格式 |
 | --- | --- |
-| Windows x64 | 桌面免安装 EXE（`Boost_0.5.0_x64.exe`）/ NSIS 安装程序（`-setup.exe`） |
+| Windows x64 | 桌面免安装 EXE（`Boost_0.5.1_x64.exe`）/ NSIS 安装程序（`-setup.exe`） |
 | macOS Apple Silicon | 磁盘映像（`.dmg`） |
 
 以上为发布工作流定义的打包目标，具体下载内容以已发布版本为准。
@@ -49,6 +55,12 @@ Boost 将 AI 账号、模型路由、平台密钥、用量监控与内置智能�
 | 桌面与外观 | 系统托盘、由用户决定执行的更新、明暗主题及 17 种强调色。 |
 
 协议能力取决于配置的上游和模型，部署与授权边界见[文档中心](docs/README.md)。
+
+管理操作独立记录执行状态。同一服务进程内的所有浏览器和用户共用先进先出的管理 RPC 队列：同时执行 6 个请求，最多等待 256 个，排队超时为 60 秒；本地安装包使用本机服务的同一套队列。每个客户端也限制同时发出的 RPC 为 6 个，等待不锁定无关控件。用量历史明细默认收起。这些限制独立于网关推理并发；Nginx 为管理 RPC 使用更长超时，并关闭自动重放。
+
+首页与密钥页使用独立用量卡片，并显示“较前1日”的绝对增量。缓存命中率增量使用百分点（pp）；无增长或缺少可比数据时显示 `--`。用量明细默认收起，返回页面时也恢复收起状态。
+
+在“设置 → 文字显示”中，可分别选择中文、英文和数字字体，英文与数字均支持 Times New Roman，并提供实时预览。选择保存在本机，页面加载前即生效；字体使用本机已安装版本，缺失时自动使用替代字体。
 
 ## 界面预览
 
@@ -110,13 +122,6 @@ cargo run --locked -p boost-start
 ## Star 增长曲线
 
 [![Boost Star 增长曲线](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)
-
-## Linux DO 社区致谢
-
-Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开源项目，欢迎社区朋友体验、反馈问题和参与贡献。项目由独立开发者维护，非 Linux DO 官方项目。
-
-感谢 [Linux DO](https://linux.do/) 提供技术交流与开源分享的平台，欢迎佬友们一起交流、完善 Boost。
-
 
 ## 许可
 

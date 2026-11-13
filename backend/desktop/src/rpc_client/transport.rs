@@ -9,6 +9,18 @@ use super::http::parse_http_body;
 const RPC_CONNECT_TIMEOUT: Duration = Duration::from_millis(400);
 const RPC_DEFAULT_IO_TIMEOUT: Duration = Duration::from_secs(10);
 const RPC_BULK_USAGE_REFRESH_IO_TIMEOUT: Duration = Duration::from_secs(600);
+const RPC_QUEUE_WAIT_ALLOWANCE: Duration = Duration::from_secs(65);
+
+enum RpcAttemptError {
+    Connect(String),
+    Submitted(String),
+}
+
+impl From<String> for RpcAttemptError {
+    fn from(message: String) -> Self {
+        Self::Submitted(message)
+    }
+}
 
 /// 函数 `rpc_io_timeout`
 ///
@@ -22,7 +34,13 @@ const RPC_BULK_USAGE_REFRESH_IO_TIMEOUT: Duration = Duration::from_secs(600);
 /// # 返回
 /// 返回函数执行结果
 fn rpc_io_timeout(method: &str, params: Option<&serde_json::Value>) -> Duration {
-    if matches!(method, "bot/open" | "bot/openDesktop") { return Duration::from_secs(60); }
+    rpc_execution_timeout(method, params).saturating_add(RPC_QUEUE_WAIT_ALLOWANCE)
+}
+
+fn rpc_execution_timeout(method: &str, params: Option<&serde_json::Value>) -> Duration {
+    if matches!(method, "bot/open" | "bot/openDesktop") {
+        return Duration::from_secs(60);
+    }
     if method == "apikey/modelSourceSync" {
         return Duration::from_secs(180);
     }
@@ -64,7 +82,7 @@ fn rpc_call_on_socket(
     addr: &str,
     sock: SocketAddr,
     params: Option<serde_json::Value>,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, RpcAttemptError> {
     let io_timeout = rpc_io_timeout(method, params.as_ref());
     let mut stream = TcpStream::connect_timeout(&sock, RPC_CONNECT_TIMEOUT).map_err(|e| {
         let msg = format!("Failed to connect to service at {addr}: {e}");
@@ -75,7 +93,7 @@ fn rpc_call_on_socket(
             sock,
             e
         );
-        msg
+        RpcAttemptError::Connect(msg)
     })?;
     let _ = stream.set_read_timeout(Some(io_timeout));
     let _ = stream.set_write_timeout(Some(io_timeout));
@@ -130,7 +148,9 @@ fn rpc_call_on_socket(
     if body.trim().is_empty() {
         log::warn!("rpc empty response ({} -> {} via {})", method, addr, sock);
         return Err(
-            "Empty response from service (service not ready, exited, or port occupied)".to_string(),
+            "Empty response from service (service not ready, exited, or port occupied)"
+                .to_string()
+                .into(),
         );
     }
 
@@ -178,7 +198,10 @@ pub(crate) fn rpc_call_with_sockets(
         for sock in socket_addrs {
             match rpc_call_on_socket(method, addr, *sock, params.clone()) {
                 Ok(v) => return Ok(v),
-                Err(err) => last_err = err,
+                Err(RpcAttemptError::Connect(err)) => last_err = err,
+                // Once connected, a queued mutation may already have executed.
+                // Do not resubmit it to another address after a read/write failure.
+                Err(RpcAttemptError::Submitted(err)) => return Err(err),
             }
         }
         if attempt == 0 {
@@ -210,7 +233,50 @@ pub(crate) fn rpc_call(
 
 #[cfg(test)]
 mod tests {
-    use super::{rpc_io_timeout, RPC_BULK_USAGE_REFRESH_IO_TIMEOUT, RPC_DEFAULT_IO_TIMEOUT};
+    use super::{
+        rpc_io_timeout, RPC_BULK_USAGE_REFRESH_IO_TIMEOUT, RPC_DEFAULT_IO_TIMEOUT,
+        RPC_QUEUE_WAIT_ALLOWANCE,
+    };
+
+    #[test]
+    fn submitted_mutation_is_not_replayed_after_a_broken_response() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let calls = AtomicUsize::new(0);
+        let done = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while !done.load(Ordering::SeqCst) {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            calls.fetch_add(1, Ordering::SeqCst);
+                            stream.set_read_timeout(Some(std::time::Duration::from_secs(2))).unwrap();
+                            let mut buffer = [0; 8192];
+                            let _ = stream.read(&mut buffer);
+                            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\nConnection: close\r\n\r\n!");
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(std::time::Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("mock listener: {error}"),
+                    }
+                }
+            });
+            let result = super::rpc_call_with_sockets(
+                "account/usage/resetQuota",
+                &address.to_string(),
+                &[address, address],
+                None,
+            );
+            done.store(true, Ordering::SeqCst);
+            assert!(result.is_err());
+        });
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn official_price_sync_allows_the_upstream_download_timeout() {
@@ -233,7 +299,10 @@ mod tests {
     #[test]
     fn bulk_usage_refresh_uses_extended_timeout() {
         let timeout = rpc_io_timeout("account/usage/refresh", None);
-        assert_eq!(timeout, RPC_BULK_USAGE_REFRESH_IO_TIMEOUT);
+        assert_eq!(
+            timeout,
+            RPC_BULK_USAGE_REFRESH_IO_TIMEOUT + RPC_QUEUE_WAIT_ALLOWANCE
+        );
     }
 
     /// 函数 `single_usage_refresh_keeps_default_timeout`
@@ -252,7 +321,7 @@ mod tests {
             "account/usage/refresh",
             Some(&serde_json::json!({ "accountId": "acc-1" })),
         );
-        assert_eq!(timeout, RPC_DEFAULT_IO_TIMEOUT);
+        assert_eq!(timeout, RPC_DEFAULT_IO_TIMEOUT + RPC_QUEUE_WAIT_ALLOWANCE);
     }
 
     /// 函数 `unrelated_rpc_keeps_default_timeout`
@@ -268,6 +337,6 @@ mod tests {
     #[test]
     fn unrelated_rpc_keeps_default_timeout() {
         let timeout = rpc_io_timeout("account/list", None);
-        assert_eq!(timeout, RPC_DEFAULT_IO_TIMEOUT);
+        assert_eq!(timeout, RPC_DEFAULT_IO_TIMEOUT + RPC_QUEUE_WAIT_ALLOWANCE);
     }
 }

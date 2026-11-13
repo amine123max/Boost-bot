@@ -11,6 +11,7 @@ import PlatformKeysTable from "@/components/PlatformKeysTable.vue";
 import ApiKeyEditorDialog from "@/components/ApiKeyEditorDialog.vue";
 import BoostMenu from "@/components/BoostMenu.vue";
 import UsageOverview from "@/components/UsageOverview.vue";
+import { usePendingActions } from "@/composables/usePendingActions";
 import {
   buildOpenAiGatewayEndpoint,
   buildClaudeCodeGatewayEndpoint,
@@ -31,7 +32,7 @@ import {
 import { accountClient } from "@/lib/api/account-client";
 import { appClient } from "@/lib/api/app-client";
 const query = ref("");
-const busy = ref(false);
+const { isPending, run } = usePendingActions();
 const usageOverview = ref<InstanceType<typeof UsageOverview>>();
 const dialog = ref(false);
 const editing = ref<ApiKey | null>(null);
@@ -175,31 +176,30 @@ async function saved(_keyId: string, value: string) {
   await perform(reload);
 }
 async function toggle(k: ApiKey) {
-  busy.value = true;
-  try {
-    if (k.status !== "disabled") await accountClient.disableApiKey(k.id);
-    else await accountClient.enableApiKey(k.id);
-    await reload();
-    notify("状态已更新");
-  } catch (e) {
-    notify(`更新状态失败: ${getAppErrorMessage(e)}`, true);
-  } finally {
-    busy.value = false;
-  }
+  await run(`${k.id}:toggle`, async () => {
+    try {
+      if (k.status !== "disabled") await accountClient.disableApiKey(k.id);
+      else await accountClient.enableApiKey(k.id);
+      await reload();
+      notify("状态已更新");
+    } catch (e) {
+      notify(`更新状态失败: ${getAppErrorMessage(e)}`, true);
+    }
+  });
 }
 async function remove() {
   if (!deleting.value) return;
-  busy.value = true;
-  try {
-    await accountClient.deleteApiKey(deleting.value!.id);
-    await reload();
-    deleting.value = null;
-    notify("密钥已删除");
-  } catch (e) {
-    notify(`删除失败: ${getAppErrorMessage(e)}`, true);
-  } finally {
-    busy.value = false;
-  }
+  const key = deleting.value;
+  deleting.value = null;
+  await run(`${key.id}:delete`, async () => {
+    try {
+      await accountClient.deleteApiKey(key.id);
+      await reload();
+      notify("密钥已删除");
+    } catch (e) {
+      notify(`删除失败: ${getAppErrorMessage(e)}`, true);
+    }
+  });
 }
 </script>
 <template>
@@ -246,7 +246,7 @@ async function remove() {
       <div class="toolbar-group">
         <button
           class="secondary"
-          :disabled="usageLoading || busy"
+          :disabled="usageLoading"
           @click="perform(reload)"
         >
           <BoostIcon
@@ -263,7 +263,7 @@ async function remove() {
       v-if="visible.length"
       :keys="visible"
       :usage="usage"
-      :busy="busy"
+      :is-pending="isPending"
       :show-owners="memberOwnershipEnabled"
       :owners="ownerLabels"
       :distribution-enabled="distributionEnabled"
@@ -309,19 +309,13 @@ async function remove() {
         </button>
       </DialogActions></BoostDialog
     >
-    <BoostDialog
-      v-if="deleting"
-      title="删除密钥"
-      @close="!busy && (deleting = null)"
+    <BoostDialog v-if="deleting" title="删除密钥" @close="deleting = null"
       ><p style="line-height: 1.8; margin-bottom: 20px">
         确认删除 {{ deleting.name }}？使用此密钥的客户端将无法继续调用服务。
       </p>
       <DialogActions>
-        <button class="secondary" :disabled="busy" @click="deleting = null">
-          取消</button
-        ><button class="danger-button" :disabled="busy" @click="remove">
-          删除密钥
-        </button>
+        <button class="secondary" @click="deleting = null">取消</button
+        ><button class="danger-button" @click="remove">删除密钥</button>
       </DialogActions></BoostDialog
     >
     <BoostConfigGuide

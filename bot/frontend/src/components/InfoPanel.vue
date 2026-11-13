@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
-import type { Bot, Approval } from "../types";
+import type { Bot, Approval, Task, LiveTurn, Message } from "../types";
 import { api, enc } from "../api";
 import Icon from "./Icon.vue";
 import HelpTip from "./HelpTip.vue";
 import ConversationLabel from "./ConversationLabel.vue";
 import ConversationHistory from "./ConversationHistory.vue";
+import TaskOverviewCard from "./TaskOverviewCard.vue";
+import ConversationPlanCard from "./ConversationPlanCard.vue";
 const props = defineProps<{
   bot: Bot;
   configure: boolean;
   pending: Approval[];
+  conversationId: string;
+  messages: Message[];
+  live: LiveTurn | null;
 }>();
 const emit = defineEmits<{
   close: [];
   edit: [];
   settings: [];
   approvals: [];
+  task: [task: Task];
+  tasks: [];
 }>();
 interface Conversation {
   id: string;
@@ -37,19 +44,31 @@ const conversations = ref<Conversation[]>([]),
   memory = ref<string[]>([]),
   error = ref("");
 const viewing = ref<Conversation | null>(null);
+const tasks = ref<Task[]>([]),
+  tasksError = ref("");
 let generation = 0,
   timer: ReturnType<typeof setTimeout> | undefined;
 async function load() {
   clearTimeout(timer);
+  if (document.hidden) {
+    timer = setTimeout(load, 5000);
+    return;
+  }
   const ticket = generation,
     id = props.bot.id;
   error.value = "";
   try {
-    const c = await api<{ conversations: Conversation[] }>(
-      `/conversations?bot=${enc(id)}`,
-    );
+    const [c, result] = await Promise.all([
+      api<{ conversations: Conversation[] }>(`/conversations?bot=${enc(id)}`),
+      api<{ tasks: Task[] }>(`/tasks?bot=${enc(id)}&limit=4`).then(
+        (value) => ({ tasks: value.tasks, error: "" }),
+        (e) => ({ tasks: [] as Task[], error: (e as Error).message }),
+      ),
+    ]);
     if (ticket !== generation) return;
     conversations.value = c.conversations;
+    tasks.value = result.tasks;
+    tasksError.value = result.error;
     if (props.configure) {
       const [a, m] = await Promise.all([
         api<{ accounts: Account[] }>("/channel-accounts"),
@@ -66,20 +85,19 @@ async function load() {
   } catch (e) {
     if (ticket === generation) error.value = (e as Error).message;
   } finally {
-    if (ticket === generation)
-      timer = setTimeout(() => {
-        if (!document.hidden) void load();
-      }, 8000);
+    if (ticket === generation) timer = setTimeout(load, 5000);
   }
 }
 watch(
-  () => props.bot.id,
+  [() => props.bot.id, () => props.configure],
   () => {
     generation++;
     clearTimeout(timer);
     conversations.value = [];
     accounts.value = [];
     memory.value = [];
+    tasks.value = [];
+    tasksError.value = "";
     void load();
   },
   { immediate: true },
@@ -116,6 +134,33 @@ const channelName = (channel: string) =>
     </div>
     <div class="panel-body">
       <p v-if="error" class="notice" role="alert">{{ error }}</p>
+      <div class="list-head">
+        任务<button
+          class="icon-btn"
+          aria-label="查看全部任务"
+          @click="emit('tasks')"
+        >
+          <Icon name="expand" :size="13" />
+        </button>
+      </div>
+      <div class="panel-task-cards">
+        <ConversationPlanCard
+          :key="conversationId"
+          :conversation-id="conversationId"
+          :messages="messages"
+          :live="live"
+          :pending="pending"
+        />
+        <TaskOverviewCard
+          v-for="task in tasks"
+          :key="task.id"
+          :task="task"
+          :inspect="configure"
+          @open="emit('task', $event)"
+        />
+        <p v-if="tasksError" class="notice" role="alert">{{ tasksError }}</p>
+        <p v-else-if="!tasks.length" class="task-empty">暂无后台任务</p>
+      </div>
       <div class="list-head">渠道</div>
       <div class="list">
         <div v-for="account in accounts" :key="account.key" class="row">
@@ -210,5 +255,17 @@ const channelName = (channel: string) =>
 .conversation-row {
   width: 100%;
   text-align: left;
+}
+.panel-task-cards {
+  display: grid;
+  gap: 14px;
+  padding-block: 4px 10px;
+  min-width: 0;
+}
+.task-empty {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

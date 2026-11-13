@@ -2,18 +2,20 @@
 import { onMounted, onBeforeUnmount, onActivated, onDeactivated, ref, watch } from 'vue';
 import { botAppearance } from '@/composables/useBotAppearance';
 import { mountBotAvatar } from '../../../bot/shared/appearance/renderer';
-const props = defineProps<{ active?: boolean; thinking?: boolean; size?: number; ambient?: boolean }>();
+import type { BotAppearance } from '../../../bot/shared/appearance/preferences';
+const props = defineProps<{ active?: boolean; thinking?: boolean; size?: number; ambient?: boolean; appearance?: BotAppearance }>();
 const svg = ref<SVGSVGElement>();
 let controller: ReturnType<typeof mountBotAvatar> | undefined;
 function mount() {
   controller?.dispose();
-  if (svg.value) controller = mountBotAvatar(svg.value, () => botAppearance, () => props);
+  if (svg.value) controller = mountBotAvatar(svg.value, () => props.appearance || botAppearance, () => props);
 }
 onMounted(mount);
 onActivated(mount);
 onDeactivated(() => controller?.dispose());
 onBeforeUnmount(() => controller?.dispose());
 watch(botAppearance, () => controller?.refresh(), { deep: true });
+watch(() => props.appearance, () => controller?.refresh(), { deep: true });
 </script>
 <template>
   <svg ref="svg" class="boost-bot-avatar" :style="{ width: `${size ?? botAppearance.size}px`, height: `${size ?? botAppearance.size}px` }" viewBox="-4 -4 72 72" aria-hidden="true" focusable="false" data-boost-bot-avatar>

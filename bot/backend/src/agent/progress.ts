@@ -29,7 +29,8 @@ export function progressSnapshot(tasks: TaskProgress[], now = Date.now()) {
     state: selected?.state ?? "idle",
     percent: active.length > 1 ? null : selected?.percent ?? null,
     tokensPerSecond: (() => {
-      const values = tasks.filter(task => now - task.updatedAt < 30000).map(task => task.tokensPerSecond).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0);
+      const values = (active.length ? active : recent.filter(task => task.state === "done"))
+        .filter(task => now - task.updatedAt < 5000).map(task => task.tokensPerSecond).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0);
       return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
     })(),
     activeTasks: active.length,

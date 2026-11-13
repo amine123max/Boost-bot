@@ -9,6 +9,7 @@ const props = defineProps<{
   description?: string;
   value?: string;
   disabled?: boolean;
+  confirmLabel?: string;
 }>();
 const open = ref(false);
 const route = useRoute();
@@ -49,7 +50,7 @@ function close() {
       <slot :close="close" />
     </div>
     <template #footer
-      ><button class="primary" @click="close">完成</button></template
+      ><button class="primary" @click="close">{{ confirmLabel || '完成' }}</button></template
     >
   </BoostDialog>
 </template>
