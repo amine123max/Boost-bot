@@ -218,14 +218,14 @@ Implementation: complete; 本地回归完成，生产 nginx／真实模型／真
 
 ### Batch B003: Bot 工程分层与仓库清理
 Created: 2026-11-13
-Status: open
+Status: complete
 Source: 用户要求分离 Bot 前后端与资源，删除无关测试及脚本并同步 GitHub
 
 - [x] B003-01 P0：整理 Bot backend/frontend/assets/shared 目录，保持 Vue 工作台与沙箱应用行为不变。
 - [x] B003-02 P0：同步 TypeScript、静态资源、Rust 启动器、Tauri、Docker 和分发路径。
 - [x] B003-03 P1：删除确认废弃的测试、原型、旧页面和验证脚本，移除失效依赖及命令。
 - [x] B003-04 P1：更新工程说明和目录校验，执行构建、启动、资源与打包检查。
-- [ ] B003-05 P2：仅提交本次工程整理的文件，保留远端更新并推送 GitHub，核实删除结果。
+- [x] B003-05 P2：仅提交本次工程整理的文件，保留远端更新并推送 GitHub，核实删除结果。
 
 - [x] B003-06 P1：按用户补充要求删除全仓独立测试目录、独立测试文件和 Playwright 依赖，清除 Rust 外部测试模块及 CI／文档失效引用。
 - [x] B003-07 P1：重新验证清理后的前端构建、Rust 单元测试与桌面编译，核实最终提交文件树。
@@ -309,3 +309,10 @@ Source: 用户要求分离 Bot 前后端与资源，删除无关测试及脚本�
 - 本轮先前的 1262 项 Rust／61 项前端／11 项 FastAPI 结果属于删除前验证；清理后的验证结果单独记录，不能继续当作现存套件。
 
 - 清理后的最终验证：`cargo test --workspace --locked` 的现存源码内嵌单元测试 475 项通过、3 项按原配置跳过；`pnpm -C frontend run build:desktop`、桌面 `cargo check --manifest-path backend/desktop/Cargo.toml --locked` 和仓库目录／文档校验均通过。暂存文件树没有独立测试目录，前端产品功能文件和其余管理 RPC／字体／用量改动均未混入本次提交。
+
+### 11.2 GitHub 同步结果
+
+- 工程整理提交 `6800981` 已正常推送到 `amine123max/Boost-bot` 的 `main`，未强制推送，保留远端 README 更新。
+- 已通过 GitHub Git Trees API 核实远端：Bot backend/frontend/assets/shared 及新构建入口存在，旧 bot/src、bot/ui、独立测试目录、旧测试配置和专用探针脚本不存在；生成的 dist 未上传。
+- 本轮总计删除 422 个旧／验证文件（含先前未跟踪的测试与生成文件）；Git 提交识别 405 个删除及 266 个重命名。所有其他页面、字体、用量和管理 RPC 队列改动仍留在工作区。
+- 最后一次精确限定 `tmp/bot-layout-b003` 的清理仍被自动审批拒绝（`blocked by policy`），未采用替代删除命令绕过；临时产物及部分空目录留在本机，不属于 GitHub 文件树。
