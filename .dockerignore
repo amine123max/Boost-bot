@@ -10,7 +10,10 @@ frontend/.turbo
 bot/bin
 bot/build
 bot/dist
-bot/ui/boost-appearance
+bot/test
+frontend/tests
+frontend/test-results
+frontend/playwright-report
 tmp
 .github
 portable

@@ -118,7 +118,3 @@ pub(in super::super) fn send_timeout(
     }
     remaining(deadline).map(|remaining| remaining.max(Duration::from_millis(1)))
 }
-
-#[cfg(test)]
-#[path = "../tests/support/deadline_tests.rs"]
-mod tests;

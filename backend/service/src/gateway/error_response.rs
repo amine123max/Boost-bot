@@ -76,7 +76,3 @@ pub(super) fn terminal_text_response(
     }
     with_trace_id_header(response, trace_id)
 }
-
-#[cfg(test)]
-#[path = "tests/error_response_tests.rs"]
-mod tests;

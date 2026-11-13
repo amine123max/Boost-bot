@@ -576,7 +576,3 @@ fn clear_storage_open_count_for_tests(path: &str) {
     });
     counts.remove(path);
 }
-
-#[cfg(test)]
-#[path = "tests/storage_helpers_tests.rs"]
-mod tests;

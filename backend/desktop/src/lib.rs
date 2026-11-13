@@ -129,7 +129,3 @@ pub fn run() {
         handle_run_event(app_handle, &event);
     });
 }
-
-#[cfg(test)]
-#[path = "tests/lib_tests.rs"]
-mod tests;

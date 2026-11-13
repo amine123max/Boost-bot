@@ -12,12 +12,17 @@ The Company Research, PPT Master and US Stock Research workspaces include intera
 
 | Directory | Responsibility |
 | --- | --- |
-| `src/` | Node.js host, conversations, channels, task scheduling and tool orchestration |
-| `ui/` | Preact browser workspace |
+| `backend/src/` | TypeScript Node.js host, conversations, channels, task scheduling and tool orchestration |
+| `backend/api/` | Optional FastAPI service ingress, with bounded async requests and SSE |
+| `frontend/src/` | Vue 3 + TypeScript workspace and components |
+| `frontend/styles/` | Existing design tokens and page styles |
+| `frontend/compat/` | Sandboxed specialist Bot UI kit and framework-neutral bridge/Markdown helpers |
+| `assets/` | Web fonts/icons, Bot templates and model metadata |
 | `dsh-runtime/` | Tool-runtime dependencies and bridge plugins |
 | `bots/` | Built-in specialist bots, personas and runtime skills |
-| `shared/appearance/` | Avatar implementation shared with the Vue frontend |
-| `test/` | Unit, integration and offline host regressions |
+| `shared/` | Avatar implementation and locale manifest shared by the frontends and backend |
+| `scripts/` | Runtime build, tool preparation and resource maintenance only |
+| `dist/` | Generated backend modules and production UI; ignored by Git |
 
 Skill Markdown and templates under `bots/` are runtime resources, not general repository documentation.
 
@@ -52,10 +57,7 @@ See [integration boundaries](INTEGRATION.md) and [runtime configuration](../docs
 
 ```bash
 npm --prefix bot run build
-npm --prefix bot run test:botkit
-node bot/scripts/smoke-host.mjs --browser
-node scripts/verify-bot-preview.mjs
-npm --prefix bot test -- test/boost-integration.test.ts test/e2e.test.ts test/tasks.unit.test.ts test/rules.unit.test.ts test/channel-accounts.e2e.test.ts
+node scripts/check-repository.mjs
 ```
 
-The host smoke uses an isolated local model fixture. Configure task-local temporary storage as described in [TESTING.md](../TESTING.md). Preserve [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) and [additional licenses](LICENSES/).
+Legacy Bot test fixtures, prototype scripts and the superseded Preact workspace have been removed. Sandboxed specialist previews still use their compatible UI kit. The runtime entry is `dist/backend/src/boost-host.js`; compiled web resources live in `dist/ui/`. Validate chat, channels, activity and previews in an authenticated Boost instance. See [TESTING.md](../TESTING.md), and preserve [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) and [additional licenses](LICENSES/).

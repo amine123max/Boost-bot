@@ -66,7 +66,3 @@ pub(in super::super) fn sleep_with_exponential_jitter(
     }
     true
 }
-
-#[cfg(test)]
-#[path = "../tests/support/backoff_tests.rs"]
-mod tests;

@@ -1,6 +1,7 @@
 // 界面只显示 app/state.json，开始、取消、导出、删除都交给 Bot（send）。选哪个任务、看哪个标签只影响这个界面，不用发消息。
 import { html, mount, useBot, useEffect, useState, Button, Empty, Field, Link, Meter, Notice, Page } from "/boost-bot/amb/botapp/kit/kit.js";
 import { Report } from "./report.js";
+import { NodeIcon, NodeState } from "./node-icon.js";
 
 const RESEARCH = [["financial_analyst", "financial"], ["news_scanner", "news"], ["industry_analyst", "industry"], ["company_analyst", "company"]];
 const AFTER_RESEARCH = ["collector", "curator", "enricher", "briefing", "editor"];
@@ -9,8 +10,7 @@ const ACTIVE = new Set(["pending", "grounding", "researching", "collecting", "cu
 const STALE_MS = 15 * 60_000;
 const NO_FORM = { company: "", url: "", industry: "", hq: "" };
 
-const statusTone = (status) => (status === "completed" ? "ok" : status === "failed" ? "err" : status === "cancelled" ? "off" : "warn");
-const nodeTone = (status) => (status === "done" ? "ok" : status === "failed" ? "err" : status === "running" ? "warn" : "off");
+const statusTone = (status) => (status === "completed" ? "is-complete" : status === "cancelled" ? "is-cancelled" : "is-incomplete");
 
 function timeOf(iso, lang) {
   const d = new Date(iso);
@@ -85,7 +85,7 @@ function JobList({ bot, jobs, jobId, onPick }) {
     ${jobs.map((job) => html`<button type="button" key=${job.id} role="listitem" class=${`cr-job${job.id === jobId ? " on" : ""}`} aria-current=${job.id === jobId} onClick=${() => onPick(job.id)}>
       <span class="cr-job-name">${job.company}</span>
       <span class="cr-job-meta">
-        <span class=${`badge ${statusTone(job.status)}`}>${t(`status.${job.status}`)}</span>
+        <span class=${`cr-status ${statusTone(job.status)}`}>${t(`status.${job.status}`)}</span>
         <span class="t-meta">${job.sample ? t("jobs.sample") : timeOf(job.updatedAt, lang)}</span>
       </span>
     </button>`)}
@@ -95,8 +95,11 @@ function JobList({ bot, jobs, jobId, onPick }) {
 function Node({ bot, job, node, count }) {
   const status = job.nodes?.[node] ?? "pending";
   return html`<li class="cr-node">
-    <span class=${`badge ${nodeTone(status)}`}>${bot.t(`node.${node}`)}</span>
-    ${count !== undefined && html`<span class="t-meta">${bot.t("node.docs", { count })}</span>`}
+    <${NodeIcon} node=${node}/>
+    <span class="cr-node-content"><span class="cr-node-name">${bot.t(`node.${node}`)}</span>
+      ${count !== undefined && html`<span class="t-meta">${bot.t("node.docs", { count })}</span>`}
+    </span>
+    <${NodeState} status=${status} label=${bot.t(status === 'pending' ? 'status.pending' : `nodeStatus.${status}`)}/>
   </li>`;
 }
 
@@ -185,7 +188,7 @@ function JobPanel({ bot, job, entries }) {
     <header class="cr-job-head">
       <h2 class="t-title">${job.company}</h2>
       <div class="cluster">
-        <span class=${`badge ${statusTone(job.status)}`}>${t(`status.${job.status}`)}</span>
+        <span class=${`cr-status ${statusTone(job.status)}`}>${t(`status.${job.status}`)}</span>
         ${job.track && html`<span class="t-meta">${t(`track.${job.track}`)}</span>`}
         ${job.sample && html`<span class="t-meta">${t("jobs.sampleNote")}</span>`}
       </div>

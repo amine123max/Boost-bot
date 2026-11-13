@@ -9,12 +9,12 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-appearance.mjs",
-    "start": "node dist/src/boost-host.js",
+    "build": "node scripts/build.mjs",
+    "build:backend": "tsc -p backend/tsconfig.json",
+    "start": "node dist/backend/src/boost-host.js",
     "prepare:tools": "node ../scripts/prepare-boost-bot.mjs",
-    "bot": "tsx src/cli/amb-bot.ts",
-    "test:botkit": "vitest run test/botkit.unit.test.ts test/botkit.e2e.test.ts",
-    "test": "vitest run"
+    "bot": "tsx backend/src/cli/amb-bot.ts",
+    "build:ui": "vue-tsc --noEmit -p frontend/tsconfig.json && vite build --config frontend/vite.config.ts"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "1.76.0",
@@ -22,6 +22,7 @@
     "preact": "^11.0.2",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
+    "vue": "3.5.24",
     "ws": "8.22.0"
   },
   "devDependencies": {
@@ -29,8 +30,10 @@
     "@types/qrcode": "^1.5.6",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ws": "^8.18.1",
+    "@vitejs/plugin-vue": "6.0.2",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vite": "7.2.2",
+    "vue-tsc": "3.1.4"
   }
 }

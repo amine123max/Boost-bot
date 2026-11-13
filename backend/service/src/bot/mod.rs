@@ -67,7 +67,7 @@ fn runtime_root() -> Result<PathBuf, String> {
     candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../bot"));
     candidates
         .into_iter()
-        .find(|p| p.join("dist/src/boost-host.js").is_file())
+        .find(|p| p.join("dist/backend/src/boost-host.js").is_file())
         .ok_or_else(|| "Boost Bot 运行时未准备：请运行 node scripts/prepare-boost-bot.mjs".into())
 }
 
@@ -203,7 +203,7 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         .collect::<String>();
     let mut command = Command::new(node_binary(&root));
     command
-        .arg(root.join("dist/src/boost-host.js"))
+        .arg(root.join("dist/backend/src/boost-host.js"))
         .current_dir(&root)
         .env("TEMP", &scratch)
         .env("TMP", &scratch)

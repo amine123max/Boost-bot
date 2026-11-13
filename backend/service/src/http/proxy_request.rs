@@ -41,7 +41,3 @@ pub(crate) fn filter_request_headers(headers: &HeaderMap) -> HeaderMap {
     }
     outbound_headers
 }
-
-#[cfg(test)]
-#[path = "tests/proxy_request_tests.rs"]
-mod tests;

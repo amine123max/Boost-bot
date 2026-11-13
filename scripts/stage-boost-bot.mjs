@@ -8,5 +8,5 @@ const destination = resolve(process.argv[2], 'boost-bot');
 const source = resolve(project, 'bot');
 if (!existsSync(resolve(source, 'bin', process.platform === 'win32' ? 'node.exe' : 'node'))) throw new Error('Run node scripts/prepare-boost-bot.mjs first');
 mkdirSync(destination, { recursive: true });
-for (const name of ['dist','ui','bots','assets','bin','node_modules','dsh-runtime','package.json','LICENSE','LICENSES','THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES_en.md']) cpSync(resolve(source,name),resolve(destination,name),{recursive:true});
+for (const name of ['dist','bots','assets','bin','node_modules','dsh-runtime','package.json','LICENSE','LICENSES','THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES_en.md']) cpSync(resolve(source,name),resolve(destination,name),{recursive:true});
 console.log(`Boost Bot staged at ${destination}`);

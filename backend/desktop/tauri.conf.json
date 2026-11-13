@@ -30,7 +30,6 @@
     "active": true,
     "resources": {
       "../../bot/dist/": "boost-bot/dist/",
-      "../../bot/ui/": "boost-bot/ui/",
       "../../bot/bots/": "boost-bot/bots/",
       "../../bot/assets/": "boost-bot/assets/",
       "../../bot/bin/": "boost-bot/bin/",

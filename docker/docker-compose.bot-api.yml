@@ -1,0 +1,16 @@
+# Overlay: docker compose -f docker/docker-compose.yml -f docker/docker-compose.bot-api.yml up -d --build
+services:
+  boost-bot-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.bot-api
+    restart: unless-stopped
+    depends_on:
+      - boost-web
+    environment:
+      BOT_API_UPSTREAM: http://boost-web:12000
+      BOT_API_CONCURRENCY: "256"
+      BOT_API_QUEUE_SIZE: "512"
+      BOT_API_QUEUE_TIMEOUT: "15"
+    ports:
+      - "127.0.0.1:12001:12001"

@@ -8,7 +8,7 @@ const sharp = require('sharp');
 const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><path d="M40 6C18 6 7 12 7 37C7 62 14 73 39 73C62 73 73 63 73 39C73 15 65 6 40 6Z" fill="#111113"/><g fill="white" transform="rotate(-5 40 40)"><rect x="23" y="27" width="9" height="26" rx="4.5"/><rect x="47" y="25" width="9" height="27" rx="4.5"/></g></svg>`);
 const png = size => sharp(svg).resize(size, size).png().toBuffer();
 for (const target of ['assets/images/favicon.png', 'backend/desktop/icons/favicon.png']) writeFileSync(new URL(target, project), await png(512));
-for (const [name, size] of [['favicon-32.png',32],['favicon-64.png',64],['apple-touch-icon.png',180]]) writeFileSync(new URL(`ui/assets/${name}`, root), await png(size));
+for (const [name, size] of [['favicon-32.png',32],['favicon-64.png',64],['apple-touch-icon.png',180]]) writeFileSync(new URL(`assets/web/${name}`, root), await png(size));
 const sizes = [16,24,32,48,64,128,256];
 const images = await Promise.all(sizes.map(png));
 const header = Buffer.alloc(6 + 16 * sizes.length);

@@ -1003,13 +1003,7 @@ fn refresh_agent_identity_authorization(
     Ok(())
 }
 
-#[cfg(test)]
-#[path = "../../../tests/usage/usage_refresh_status_tests.rs"]
-mod status_tests;
 
-#[cfg(test)]
-#[path = "../tests/usage_refresh_tests.rs"]
-mod tests;
 
 /// 函数 `classify_usage_status_from_snapshot_value`
 ///

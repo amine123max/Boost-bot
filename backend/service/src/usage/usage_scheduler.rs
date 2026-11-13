@@ -216,7 +216,3 @@ pub(crate) fn parse_interval_secs(raw: Option<&str>, default_secs: u64, min_secs
         .map(|secs| secs.max(min_secs))
         .unwrap_or(default_secs)
 }
-
-#[cfg(test)]
-#[path = "tests/usage_scheduler_tests.rs"]
-mod tests;

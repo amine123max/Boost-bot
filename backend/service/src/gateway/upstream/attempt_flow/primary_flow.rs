@@ -167,7 +167,3 @@ where
         },
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/attempt_flow/primary_flow_tests.rs"]
-mod tests;

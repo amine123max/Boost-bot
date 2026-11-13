@@ -10,10 +10,7 @@
     "dev:desktop": "vite --host 127.0.0.1 --port 3005 --strictPort",
     "build": "vue-tsc --noEmit && vite build",
     "build:desktop": "pnpm run build",
-    "start": "vite preview --host 127.0.0.1 --port 3005",
-    "test:runtime": "node --test tests/*.test.mjs",
-    "test:e2e": "playwright test tests/boost.spec.ts tests/app-updates.spec.ts",
-    "test:navigation": "playwright test tests/boost.spec.ts --grep navigation"
+    "start": "vite preview --host 127.0.0.1 --port 3005"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
@@ -21,7 +18,6 @@
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.0",
     "@types/node": "^24",
     "@vitejs/plugin-vue": "^6.0.2",
     "flag-icons": "^7.6.0",

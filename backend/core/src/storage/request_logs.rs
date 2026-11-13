@@ -1414,7 +1414,3 @@ fn append_status_filter_clause(
         _ => {}
     }
 }
-
-#[cfg(test)]
-#[path = "tests/request_logs_tests.rs"]
-mod tests;

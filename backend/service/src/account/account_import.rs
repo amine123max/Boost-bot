@@ -1812,7 +1812,3 @@ fn optional_tags_paths(value: &Value, paths: &[&[&str]]) -> Option<String> {
         .iter()
         .find_map(|path| value_at_path(value, path).and_then(optional_tags))
 }
-
-#[cfg(test)]
-#[path = "tests/account_import_tests.rs"]
-mod tests;

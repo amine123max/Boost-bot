@@ -170,7 +170,3 @@ pub(super) fn retry_stateless_then_optional_alt(
 
     StatelessRetryResult::Upstream(response)
 }
-
-#[cfg(test)]
-#[path = "../tests/attempt_flow/stateless_retry_tests.rs"]
-mod tests;

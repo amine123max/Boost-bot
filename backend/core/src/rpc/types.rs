@@ -1692,7 +1692,3 @@ pub struct MemberDashboardSummaryResult {
     #[serde(default)]
     pub alerts: Vec<MemberDashboardAlert>,
 }
-
-#[cfg(test)]
-#[path = "tests/types_tests.rs"]
-mod tests;

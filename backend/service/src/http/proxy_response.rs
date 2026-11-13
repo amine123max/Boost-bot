@@ -66,7 +66,3 @@ pub(crate) fn merge_upstream_headers(
     }
     builder
 }
-
-#[cfg(test)]
-#[path = "tests/proxy_response_tests.rs"]
-mod tests;

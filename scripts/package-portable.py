@@ -13,7 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_PARTS = (
-    "dist", "ui", "bots", "assets", "bin", "node_modules", "dsh-runtime",
+    "dist", "bots", "assets", "bin", "node_modules", "dsh-runtime",
     "package.json", "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md",
     "THIRD_PARTY_NOTICES_en.md",
 )
@@ -52,7 +52,7 @@ def main():
                     ):
                         continue
                     package.write(file, relative.as_posix())
-            required = {"bin/node.exe", "dist/src/boost-host.js", "package.json"}
+            required = {"bin/node.exe", "dist/backend/src/boost-host.js", "package.json"}
             if not required.issubset(package.namelist()):
                 raise RuntimeError("Embedded archive is missing required runtime files")
         digest = hashlib.sha256()

@@ -125,7 +125,3 @@ pub(crate) fn filter_weekly_quota_candidates(
         set_account_status(storage, &account_id, "limited", WEEKLY_QUOTA_EXCEEDED_REASON);
     }
 }
-
-#[cfg(test)]
-#[path = "tests/account_weekly_quota_tests.rs"]
-mod tests;

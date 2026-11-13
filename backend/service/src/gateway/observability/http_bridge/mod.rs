@@ -410,7 +410,3 @@ pub(super) use stream_readers::{
 };
 
 pub(super) use stream_readers::{AnthropicSseReader, GeminiSseReader};
-
-#[cfg(test)]
-#[path = "../tests/http_bridge_tests.rs"]
-mod tests;

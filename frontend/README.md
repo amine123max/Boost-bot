@@ -15,11 +15,10 @@ Vue 3, TypeScript and Vite provide the management interface for desktop and Web.
 | `src/composables/` | UI state and runtime coordination |
 | `src/lib/api/` | Typed clients and centralized Tauri/Web transport |
 | `src/styles.css` | Global surfaces, accent colors and typography |
-| `tests/` | Runtime and browser regressions |
 
 `boost-theme.js` restores appearance before first paint. The Bot avatar renderer is shared with `../bot/shared/appearance/`. UI preferences use versioned device storage; service policy remains backend-owned.
 
-## Build and test
+## Build and validation
 
 From the repository root:
 
@@ -27,10 +26,8 @@ From the repository root:
 pnpm -C frontend install --frozen-lockfile
 pnpm -C frontend run build
 pnpm -C frontend run build:desktop
-pnpm -C frontend run test:runtime
-pnpm -C frontend run test:e2e
 ```
 
-Static output is `frontend/out/`, including route-specific `index.html` files for Web and Tauri navigation. `build:desktop` currently delegates to the same static build. Vite alone does not provide authenticated RPC, sessions or Bot proxying.
+Static output is `frontend/out/`, including route-specific `index.html` files for Web and Tauri navigation. `build:desktop` currently delegates to the same static build. Vite alone does not provide authenticated RPC, sessions or Bot proxying. Standalone test directories, Playwright configuration and test package commands have been removed. Validate changed workflows in a running authenticated application; see [validation guidance](../TESTING.md).
 
 For hot reload, use `pnpm -C frontend run dev:full`. Development-only ports and environment settings are documented in [BUILDING.md](../docs/BUILDING.md). See [engineering rules](AGENTS.md) before changing transport or UI behavior.

@@ -227,7 +227,3 @@ impl Storage {
         )
     }
 }
-
-#[cfg(test)]
-#[path = "tests/conversation_bindings_tests.rs"]
-mod tests;

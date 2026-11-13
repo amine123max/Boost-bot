@@ -8,10 +8,11 @@ const errors = [];
 const requirePath = (path, owner) => {
   if (!existsSync(path)) errors.push(`${owner}: missing ${relative(root, path)}`);
 };
-for (const name of ['frontend/src', 'backend/core', 'backend/service', 'backend/web', 'backend/start', 'backend/desktop', 'bot/src', 'nginx/nginx.conf'])
+for (const name of ['frontend/src', 'backend/core', 'backend/service', 'backend/web', 'backend/start', 'backend/desktop', 'bot/backend/src', 'bot/backend/api', 'bot/frontend/src', 'bot/assets', 'bot/shared', 'nginx/nginx.conf'])
   requirePath(resolve(root, name), 'layout');
-for (const name of ['apps', 'crates', 'docker/nginx'])
-  if (existsSync(resolve(root, name))) errors.push(`layout: obsolete directory ${name}`);
+for (const name of ['apps', 'crates', 'docker/nginx', 'bot/src', 'bot/ui', 'bot/api', 'bot/test', 'bot/scripts/spikes'])
+  if (existsSync(resolve(root, name)) && walk(resolve(root, name), () => true).length)
+    errors.push(`layout: obsolete directory ${name}`);
 
 const cargo = readFileSync(resolve(root, 'Cargo.toml'), 'utf8');
 for (const member of cargo.matchAll(/"(backend\/[^\"]+)"/g))
@@ -27,7 +28,7 @@ for (const hook of [config.build.beforeDevCommand, config.build.beforeBuildComma
 for (const dependency of readFileSync(resolve(native, 'Cargo.toml'), 'utf8').matchAll(/path\s*=\s*"([^"]+)"/g))
   requirePath(resolve(native, dependency[1], 'Cargo.toml'), 'Desktop Cargo dependency');
 for (const path of Object.keys(config.bundle.resources)) requirePath(resolve(native, path), 'Tauri resources');
-for (const name of ['Dockerfile.all-in-one', 'Dockerfile.service', 'Dockerfile.web']) {
+for (const name of ['Dockerfile.all-in-one', 'Dockerfile.service', 'Dockerfile.web', 'Dockerfile.bot-api']) {
   const dockerfile = readFileSync(resolve(root, 'docker', name), 'utf8');
   for (const line of dockerfile.split(/\r?\n/)) {
     if (!line.startsWith('COPY ') || line.includes('--from=')) continue;
@@ -43,6 +44,8 @@ function walk(directory, predicate) {
     return entry.isDirectory() ? walk(path, predicate) : predicate(path) ? [path] : [];
   });
 }
+for (const path of walk(root, path => relative(root, path).split(/[\\/]/).some(part => ['test', 'tests', '__tests__'].includes(part))))
+  errors.push(`layout: standalone test file ${relative(root, path)}`);
 const documents = [
   ...readdirSync(root).filter(name => name.endsWith('.md')).map(name => resolve(root, name)),
   ...walk(resolve(root, 'docs'), path => path.endsWith('.md')),

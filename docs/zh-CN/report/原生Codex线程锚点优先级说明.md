@@ -70,7 +70,7 @@ Anthropic 适配阶段可能生成临时 `prompt_cache_key`，因此不能把这
   `backend/service/src/gateway/request/session_affinity.rs`
 - 回归测试：
   `backend/service/src/gateway/local_validation/tests/request_tests.rs`
-  `backend/service/tests/gateway_logs/openai.rs`
+  协议验证（原独立测试目录已移除，参见根目录 `TESTING.md`）
   `backend/service/src/http/tests/proxy_runtime_tests.rs`
 
 ## 排障建议

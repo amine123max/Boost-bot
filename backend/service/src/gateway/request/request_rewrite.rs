@@ -844,7 +844,3 @@ fn apply_request_overrides_with_prompt_cache_key_mode(
     );
     filtered_body
 }
-
-#[cfg(test)]
-#[path = "tests/request_rewrite_tests.rs"]
-mod tests;

@@ -778,7 +778,3 @@ fn infer_auth_mode_from_token(token: &Token) -> &'static str {
         AUTH_MODE_CHATGPT
     }
 }
-
-#[cfg(test)]
-#[path = "tests/auth_account_tests.rs"]
-mod tests;

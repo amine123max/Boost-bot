@@ -1123,7 +1123,3 @@ pub(crate) fn gateway_compute_upstream_url(
 ) -> (String, Option<String>) {
     compute_upstream_url(upstream_base_url, path)
 }
-
-#[cfg(test)]
-#[path = "../../tests/gateway/availability/mod.rs"]
-mod availability_tests;

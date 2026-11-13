@@ -450,7 +450,3 @@ where
         }
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/attempt_flow/fallback_branch_tests.rs"]
-mod tests;

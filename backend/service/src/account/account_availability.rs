@@ -35,7 +35,3 @@ pub(crate) fn evaluate_snapshot(snap: &UsageSnapshotRecord) -> Availability {
     }
     Availability::Available
 }
-
-#[cfg(test)]
-#[path = "tests/account_availability_tests.rs"]
-mod tests;

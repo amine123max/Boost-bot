@@ -276,13 +276,13 @@
 
 ## 测试入口
 
-- 单元/模块测试：各子目录 `tests/`
-- service 兼容测试：`backend/service/tests/gateway/`
-- 手工探针：`scripts/tests/gateway_regression_suite.ps1`
+- 保留源码文件内的 Rust 单元测试：`cargo test --workspace --locked`。
+- 独立测试目录及一次性探针脚本已按用户要求删除；验证方法见根目录 `TESTING.md`。
+- 协议改动仍需在目标服务验证流式／非流式、工具调用与两类 OpenAI 风格端点。
 
 ## 当前治理重点
 
 - 持续拆小 `http_bridge.rs`
 - 继续压缩 `protocol_adapter/` 的历史占位字段
-- 把协议兼容回归固定到脚本与 Rust 测试双路径
+- 使用保留的 Rust 单元测试与真实协议请求检查兼容性
 - 持续保持 `/v1/models` 与平台模型目录、桌面端 `models_cache.json` 预期之间的行为对齐

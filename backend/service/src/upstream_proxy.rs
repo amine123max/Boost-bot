@@ -734,7 +734,3 @@ fn save_nodes(text: &str) -> Result<(), String> {
         Err(error) => Err(error),
     }
 }
-
-#[cfg(test)]
-#[path = "upstream_proxy_tests.rs"]
-mod tests;

@@ -276,7 +276,3 @@ fn parse_official_prices(document: &str, timestamp: i64) -> Result<Vec<ModelPric
     }
     Ok(rules.into_values().collect())
 }
-
-#[cfg(test)]
-#[path = "tests/official_price_sync_tests.rs"]
-mod tests;

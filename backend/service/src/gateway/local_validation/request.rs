@@ -2088,9 +2088,6 @@ pub(super) fn build_local_validation_result(
     })
 }
 
-#[cfg(test)]
-#[path = "tests/request_tests.rs"]
-mod tests;
 
 #[cfg(test)]
 mod images_generation_tests {

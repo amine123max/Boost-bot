@@ -2,7 +2,10 @@ FROM node:24-bookworm-slim AS bot
 WORKDIR /src
 COPY bot ./bot
 COPY scripts/prepare-boost-bot.mjs ./scripts/prepare-boost-bot.mjs
+COPY scripts/stage-boost-bot.mjs ./scripts/stage-boost-bot.mjs
+COPY frontend/src/lib/theme-transition.ts ./frontend/src/lib/theme-transition.ts
 RUN node scripts/prepare-boost-bot.mjs && cd bot && npm prune --omit=dev --no-audit --no-fund
+RUN node scripts/stage-boost-bot.mjs /out
 
 FROM node:24-bookworm-slim AS ui
 
@@ -64,7 +67,7 @@ RUN apt-get update \
 COPY --from=builder /out/boost-service /usr/local/bin/boost-service
 COPY --from=builder /out/boost-web /usr/local/bin/boost-web
 COPY --from=builder /out/boost-start /usr/local/bin/boost-start
-COPY --from=bot /src/bot /usr/local/bin/boost-bot
+COPY --from=bot /out/boost-bot /usr/local/bin/boost-bot
 
 ENV BOOST_SERVICE_ADDR=0.0.0.0:12580
 ENV BOOST_WEB_ADDR=0.0.0.0:12000

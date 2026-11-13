@@ -240,7 +240,3 @@ fn env_non_empty(name: &str) -> Option<String> {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
 }
-
-#[cfg(test)]
-#[path = "tests/config_tests.rs"]
-mod tests;

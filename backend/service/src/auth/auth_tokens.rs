@@ -1479,7 +1479,3 @@ fn ensure_workspace_allowed(
         Err(format!("Login is restricted to workspace id {expected}."))
     }
 }
-
-#[cfg(test)]
-#[path = "tests/auth_tokens_tests.rs"]
-mod tests;

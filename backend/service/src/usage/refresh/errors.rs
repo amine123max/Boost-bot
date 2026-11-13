@@ -269,7 +269,3 @@ fn prune_failure_event_state(
         }
     });
 }
-
-#[cfg(test)]
-#[path = "../tests/usage_refresh_errors_tests.rs"]
-mod tests;

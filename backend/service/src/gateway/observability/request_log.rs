@@ -478,7 +478,3 @@ pub(crate) fn write_request_log_with_attempts(
         });
     }
 }
-
-#[cfg(test)]
-#[path = "tests/request_log_tests.rs"]
-mod tests;

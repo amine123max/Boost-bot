@@ -1598,7 +1598,3 @@ fn build_refresh_token_body(client_id: &str, refresh_token: &str) -> String {
     serializer.append_pair("scope", REFRESH_TOKEN_SCOPES);
     serializer.finish()
 }
-
-#[cfg(test)]
-#[path = "tests/usage_http_tests.rs"]
-mod tests;

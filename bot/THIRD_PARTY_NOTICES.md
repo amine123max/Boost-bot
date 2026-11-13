@@ -11,8 +11,8 @@ anymodel bot 自身以 MIT 许可发布（见 LICENSE）。以下组件随本程
 来源：https://github.com/yetone/magpie （vendor/magpie 子模块，v0.1.1720）
 
 - 以二进制形式随附：内置模型网关。
-- 改编：`ui/design/tokens/semantic.css`、`ui/design/components/`（`button.css`、`list.css`、`seg.css`、
-  `popover.css`、`toast.css`）、`ui/css/settings.css` 中的中性色、圆角、动效与组件样式
+- 改编：`frontend/styles/design/tokens/semantic.css`、`frontend/styles/design/components/`（`button.css`、`list.css`、`seg.css`、
+  `popover.css`、`toast.css`）、`frontend/styles/css/settings.css` 中的中性色、圆角、动效与组件样式
   （`.list` / `.row`、分段控件 `.seg`、弹出菜单 `.pop`、设置页页签、"已保存"胶囊）改编自
   `internal/gui/assets/app.css`。未使用 magpie 的名称、喜鹊标志、`assets/icons/` 中的厂商 logo、
   赞助商/合作方图片或官网截图。
@@ -164,9 +164,9 @@ SOFTWARE.
 
 以下内容移植或改编自 DS Bot，并按 Apache License 2.0 第 4 条作了修改（改写为 TypeScript、接入本项目的存储与渠道、中文提示）：
 
-- src/agent/memory.ts：三层记忆（团队 / 机器人 / 群）的 MEMORY.md + 主题文件格式、大小上限、秘密过滤的模式（改编自 ds-bot/src/host/memory.js）。
-- src/agent/steward.ts、src/agent/manager.ts：上下文管家的阈值算法与判定提示词（压缩 / 开新段 + 交接），冻结的记忆前缀（改编自 ds-bot/src/host/steward.js 与 docs/plans/2026-10-09-context-and-memory.md）。
-- src/agent/settings.ts：每个机器人的权限预设与设置思路。
+- backend/src/agent/memory.ts：三层记忆（团队 / 机器人 / 群）的 MEMORY.md + 主题文件格式、大小上限、秘密过滤的模式（改编自 ds-bot/src/host/memory.js）。
+- backend/src/agent/steward.ts、src/agent/manager.ts：上下文管家的阈值算法与判定提示词（压缩 / 开新段 + 交接），冻结的记忆前缀（改编自 ds-bot/src/host/steward.js 与 docs/plans/2026-10-09-context-and-memory.md）。
+- backend/src/agent/settings.ts：每个机器人的权限预设与设置思路。
 
 DS Bot 的 NOTICE 原文（节选其版权声明）：
 

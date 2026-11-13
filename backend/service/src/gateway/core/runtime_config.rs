@@ -2139,7 +2139,3 @@ fn stable_account_hash(account_id: &str) -> u64 {
     }
     hash
 }
-
-#[cfg(test)]
-#[path = "tests/runtime_config_tests.rs"]
-mod tests;

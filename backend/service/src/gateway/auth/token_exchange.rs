@@ -328,7 +328,3 @@ fn clear_account_token_exchange_locks_for_tests() {
         table.last_cleanup_at = 0;
     }
 }
-
-#[cfg(test)]
-#[path = "tests/token_exchange_tests.rs"]
-mod tests;

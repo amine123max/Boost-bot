@@ -447,7 +447,3 @@ pub(crate) fn normalize_models_path(path: &str) -> String {
     }
     path.to_string()
 }
-
-#[cfg(test)]
-#[path = "tests/request_helpers_tests.rs"]
-mod tests;

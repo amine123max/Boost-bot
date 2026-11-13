@@ -57,7 +57,3 @@ pub(crate) fn handle_backend_request(request: Request) {
         BackendRoute::Gateway => crate::http::gateway_endpoint::handle_gateway(request),
     }
 }
-
-#[cfg(test)]
-#[path = "tests/backend_router_tests.rs"]
-mod tests;

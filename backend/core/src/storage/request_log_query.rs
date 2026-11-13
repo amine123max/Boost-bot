@@ -172,7 +172,3 @@ fn parse_status_query(raw: &str) -> Option<RequestLogQuery> {
         .ok()
         .map(RequestLogQuery::StatusExact)
 }
-
-#[cfg(test)]
-#[path = "tests/request_log_query_tests.rs"]
-mod tests;

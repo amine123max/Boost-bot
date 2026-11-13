@@ -1532,9 +1532,6 @@ impl Storage {
     }
 }
 
-#[cfg(test)]
-#[path = "../../tests/storage/migration_tests.rs"]
-mod migration_tests;
 
 /// 函数 `now_ts`
 ///

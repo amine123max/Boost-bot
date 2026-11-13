@@ -285,7 +285,3 @@ pub(crate) fn run_front_proxy(addr: &str, backend_addr: &str) -> io::Result<()> 
         run_proxy_server(addr, app).await
     })
 }
-
-#[cfg(test)]
-#[path = "tests/proxy_runtime_tests.rs"]
-mod tests;

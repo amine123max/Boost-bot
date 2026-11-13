@@ -4,7 +4,7 @@ This file applies to the whole Boost repository. Read `frontend/AGENTS.md`
 for frontend work and `backend/AGENTS.md` for service and desktop work.
 
 ## 1. Project Shape
-- `frontend/`: Vue 3 frontend, browser tests and static build configuration.
+- `frontend/`: Vue 3 frontend and static build configuration.
 - `frontend/src/`: Vue pages, components, composables, typed API clients,
   runtime helpers, and UI state.
 - `backend/desktop/`: Tauri v2 application shell, desktop lifecycle, tray/window
@@ -78,8 +78,9 @@ for frontend work and `backend/AGENTS.md` for service and desktop work.
   boundaries; do not weaken checks for UI convenience.
 
 ## 7. Validation
-- Frontend-only changes: run at least `pnpm -C frontend run build` and, when runtime
-  behavior is touched, `pnpm -C frontend run test:runtime`.
+- Frontend-only changes: run at least `pnpm -C frontend run build` and verify
+  changed runtime behavior in the running application. Independent test
+  directories and their package commands have been removed at the user's request.
 - Desktop/static-export changes: run `pnpm -C frontend run build:desktop`.
 - Rust/service changes: run `cargo test --workspace`, or the narrowest relevant
   package test only when the change is clearly isolated.

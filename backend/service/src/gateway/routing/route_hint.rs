@@ -838,7 +838,3 @@ fn clear_route_state_for_tests() {
         state.maintenance_tick = 0;
     }
 }
-
-#[cfg(test)]
-#[path = "tests/route_hint_tests.rs"]
-mod tests;

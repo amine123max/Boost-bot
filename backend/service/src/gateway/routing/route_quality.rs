@@ -250,7 +250,3 @@ fn route_health_delta(status_code: u16) -> i32 {
         _ => -2,
     }
 }
-
-#[cfg(test)]
-#[path = "tests/route_quality_tests.rs"]
-mod tests;

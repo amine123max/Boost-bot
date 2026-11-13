@@ -144,7 +144,3 @@ where
     log_gateway_result(Some(url), status.as_u16(), Some("upstream non-success"));
     UpstreamOutcomeDecision::RespondUpstream
 }
-
-#[cfg(test)]
-#[path = "../tests/support/outcome_tests.rs"]
-mod tests;

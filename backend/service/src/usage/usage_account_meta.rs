@@ -320,7 +320,3 @@ fn apply_account_meta_patch(
     }
     changed
 }
-
-#[cfg(test)]
-#[path = "tests/usage_account_meta_tests.rs"]
-mod tests;

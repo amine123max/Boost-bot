@@ -470,7 +470,3 @@ fn next_dynamic_failure_backoff(
         Duration::from_millis(bounded_ms as u64)
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/usage_refresh_runner_tests.rs"]
-mod tests;

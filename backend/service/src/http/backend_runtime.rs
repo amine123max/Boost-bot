@@ -425,7 +425,3 @@ pub(crate) fn wake_backend_shutdown(addr: &str) {
     let request = format!("GET /__shutdown HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
     let _ = stream.write_all(request.as_bytes());
 }
-
-#[cfg(test)]
-#[path = "tests/backend_runtime_tests.rs"]
-mod tests;

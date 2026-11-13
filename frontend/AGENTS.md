@@ -1,6 +1,6 @@
 # Frontend and Desktop Engineering Standards
 
-Applies to the Vue frontend, tests and build configuration under `frontend/`.
+Applies to the Vue frontend and build configuration under `frontend/`.
 Native desktop ownership and validation are documented in `../backend/AGENTS.md`.
 
 - Use Vue 3 Composition API with strict TypeScript, Vue Router and Vite. UI state belongs in focused composables; business calls go through typed clients in `src/lib/api`.
@@ -11,6 +11,6 @@ Native desktop ownership and validation are documented in `../backend/AGENTS.md`
 - Use `BoostDialog` for accessible modal focus, Escape handling, scrollable content and sticky actions. Never nest buttons. Errors, empty states and loading states must reflect real runtime state.
 - Respect role permissions; global system metrics, configuration and routing controls belong to administrators. Do not weaken service authorization.
 - Persist service settings through existing backend APIs. UI-only preferences need explicit defaults and versioned client storage. Redact credentials in configuration and diagnostic copy views.
-- Do not fabricate accounts, traffic, IP data, latency or process metrics. Regression fixtures belong only in tests.
-- Run `pnpm -C frontend run build`, `build:desktop`, `test:runtime` and meaningful browser regressions for behavior changes. Rust changes require the relevant Cargo validation; broad changes require workspace tests.
+- Do not fabricate accounts, traffic, IP data, latency or process metrics. Keep disposable validation fixtures in task-local `tmp/` only.
+- Run `pnpm -C frontend run build`, `build:desktop` and verify behavior changes in the running application. Independent test directories, Playwright configuration and test package commands have been removed at the user's request. Rust changes require the relevant Cargo validation; broad changes require workspace tests of the retained inline unit tests.
 - Keep temporary files in the project's task-specific `tmp` directory, respect the user's backup policy and do not spawn subagents without an explicit current user request.

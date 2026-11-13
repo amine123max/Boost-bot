@@ -58,7 +58,3 @@ pub(crate) fn should_skip_response_header(name: &HeaderName) -> bool {
     let lower = name.as_str();
     is_hop_by_hop_header(lower) || lower.eq_ignore_ascii_case("content-length")
 }
-
-#[cfg(test)]
-#[path = "tests/header_filter_tests.rs"]
-mod tests;

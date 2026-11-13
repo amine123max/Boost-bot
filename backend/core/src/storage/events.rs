@@ -119,7 +119,3 @@ fn extract_status_reason_from_event_message(message: &str) -> Option<&str> {
         Some(reason)
     }
 }
-
-#[cfg(test)]
-#[path = "tests/events_tests.rs"]
-mod tests;

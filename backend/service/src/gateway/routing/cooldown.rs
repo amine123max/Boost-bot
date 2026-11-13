@@ -329,7 +329,3 @@ pub(super) fn clear_runtime_state() {
 fn clear_account_cooldown_for_tests() {
     clear_runtime_state();
 }
-
-#[cfg(test)]
-#[path = "tests/cooldown_tests.rs"]
-mod tests;

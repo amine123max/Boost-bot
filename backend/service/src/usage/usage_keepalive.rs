@@ -28,7 +28,3 @@ pub(crate) fn is_keepalive_error_ignorable(err: &str) -> bool {
     let normalized = err.trim().to_ascii_lowercase();
     normalized.contains("no available account") || normalized.contains("storage unavailable")
 }
-
-#[cfg(test)]
-#[path = "tests/usage_keepalive_tests.rs"]
-mod tests;

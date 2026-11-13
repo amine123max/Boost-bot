@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Boost</title>
+    <link rel="stylesheet" href="/boost-bot/amb/static/design/index.css" />
+    <link rel="stylesheet" href="/boost-bot/amb/static/css/shell.css" />
+    <link rel="stylesheet" href="/boost-bot/amb/static/css/chat.css" />
+    <link rel="stylesheet" href="/boost-bot/amb/static/css/settings.css" />
+    <link rel="stylesheet" href="/boost-bot/amb/static/css/botapp.css" />
+    <link rel="stylesheet" href="/boost-bot/amb/static/css/boost.css" />
+    <script>
+      // Consume the one-time launch token before any subresource request.
+      try {
+        const query = new URLSearchParams(location.search),
+          token = query.get("token");
+        if (token) {
+          sessionStorage.setItem("amb-token", token);
+          query.delete("token");
+          history.replaceState(
+            null,
+            "",
+            location.pathname + (query.size ? "?" + query : "") + location.hash,
+          );
+        }
+        const mode =
+          query.get("boostTheme") ||
+          localStorage.getItem("boost.theme.v1") ||
+          "system";
+        document.documentElement.dataset.theme =
+          mode === "light" || mode === "dark"
+            ? mode
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+      } catch (_) {}
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <p id="boot-error" role="alert" hidden>
+      工作台加载失败，请返回 Boost 后重新打开。
+    </p>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

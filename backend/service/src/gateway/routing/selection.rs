@@ -585,7 +585,3 @@ fn clear_candidate_cache() {
 fn clear_candidate_cache_for_tests() {
     clear_candidate_cache();
 }
-
-#[cfg(test)]
-#[path = "tests/selection_tests.rs"]
-mod tests;

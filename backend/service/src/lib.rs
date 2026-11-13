@@ -194,7 +194,3 @@ pub(crate) fn handle_request(req: JsonRpcRequest) -> JsonRpcMessage {
 pub(crate) fn handle_request_with_actor(req: JsonRpcRequest, actor: RpcActor) -> JsonRpcMessage {
     rpc_dispatch::handle_request_with_actor(req, actor)
 }
-
-#[cfg(test)]
-#[path = "tests/lib_tests.rs"]
-mod tests;

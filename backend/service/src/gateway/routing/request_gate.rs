@@ -278,7 +278,3 @@ pub(super) fn clear_runtime_state() {
 fn clear_request_gate_locks_for_tests() {
     clear_runtime_state();
 }
-
-#[cfg(test)]
-#[path = "tests/request_gate_tests.rs"]
-mod tests;

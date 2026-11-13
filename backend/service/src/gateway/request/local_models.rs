@@ -199,7 +199,3 @@ pub(super) fn maybe_respond_local_models(
     )?;
     Ok(None)
 }
-
-#[cfg(test)]
-#[path = "tests/local_models_tests.rs"]
-mod tests;

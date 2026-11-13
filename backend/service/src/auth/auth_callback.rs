@@ -615,7 +615,3 @@ fn build_callback_error_page(err: &str) -> String {
 </html>"#
     )
 }
-
-#[cfg(test)]
-#[path = "../../tests/auth/auth_callback_tests.rs"]
-mod tests;

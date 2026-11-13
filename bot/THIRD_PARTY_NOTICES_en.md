@@ -11,8 +11,8 @@ Some code is ported or adapted from Fei2411/DS-Bot (Apache-2.0); see the "DS Bot
 Source: https://github.com/yetone/magpie (vendor/magpie submodule, v0.1.1720)
 
 - Shipped as a binary: the built-in model gateway.
-- Adapted: the neutral colors, corner radii, motion and component styles in `ui/design/tokens/semantic.css`,
-  `ui/design/components/` (`button.css`, `list.css`, `seg.css`, `popover.css`, `toast.css`) and `ui/css/settings.css`
+- Adapted: the neutral colors, corner radii, motion and component styles in `frontend/styles/design/tokens/semantic.css`,
+  `frontend/styles/design/components/` (`button.css`, `list.css`, `seg.css`, `popover.css`, `toast.css`) and `frontend/styles/css/settings.css`
   (`.list` / `.row`, the `.seg` segmented control, the `.pop` popover menu, settings tabs, the "Saved" pill) are adapted from
   `internal/gui/assets/app.css`. We do not use the magpie name, the magpie logo, the vendor logos in `assets/icons/`,
   sponsor/partner images or website screenshots.
@@ -164,9 +164,9 @@ Source: https://github.com/Fei2411/DS-Bot
 
 The following were ported or adapted from DS Bot and modified under Section 4 of the Apache License 2.0 (rewritten in TypeScript, wired into this project's storage and channels, Chinese prompts):
 
-- src/agent/memory.ts: the MEMORY.md + topic-file format of the three memory layers (team / bot / group), size limits and secret-filter patterns (adapted from ds-bot/src/host/memory.js).
-- src/agent/steward.ts, src/agent/manager.ts: the context steward's threshold algorithm and decision prompts (compact / start a new segment + handoff), and the frozen memory prefix (adapted from ds-bot/src/host/steward.js and docs/plans/2026-10-09-context-and-memory.md).
-- src/agent/settings.ts: per-bot permission presets and the approach to settings.
+- backend/src/agent/memory.ts: the MEMORY.md + topic-file format of the three memory layers (team / bot / group), size limits and secret-filter patterns (adapted from ds-bot/src/host/memory.js).
+- backend/src/agent/steward.ts, backend/src/agent/manager.ts: the context steward's threshold algorithm and decision prompts (compact / start a new segment + handoff), and the frozen memory prefix (adapted from ds-bot/src/host/steward.js and docs/plans/2026-10-09-context-and-memory.md).
+- backend/src/agent/settings.ts: per-bot permission presets and the approach to settings.
 
 DS Bot's NOTICE (copyright statement excerpted):
 

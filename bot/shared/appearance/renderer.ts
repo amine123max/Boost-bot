@@ -17,6 +17,9 @@ export function mountBotAvatar(svg: SVGSVGElement, preferences: () => BotAppeara
   let visible = true, disposed = false;
   const media = matchMedia('(prefers-reduced-motion: reduce)');
   function darkTheme() { return getComputedStyle(svg).colorScheme.split(' ').includes('dark'); }
+  // Style/layout reads once on theme change, never once per avatar per frame.
+  let dark = darkTheme(), colorKey = '';
+  let colors = { ink: '', eyes: '' };
   function draw(now: number) {
     if (disposed || !visible || document.hidden) return;
     const prefs = preferences();
@@ -33,9 +36,9 @@ export function mountBotAvatar(svg: SVGSVGElement, preferences: () => BotAppeara
     attention += (Number(!!state.active) - attention) * smooth;
     gazeX += (pointerX * tracking - gazeX) * smooth;
     gazeY += (pointerY * tracking - gazeY) * smooth;
-    const dark = darkTheme();
     const pose = sampleSupportAvatar(reduced ? 0 : time, { attention, gazeX, gazeY, thinking: gentle ? false : state.thinking, animation: reduced ? 'still' : gentle ? 'natural' : prefs.animation, contour: gentle && prefs.contour === 'auto' ? 'squircle' : prefs.contour, dark });
-    const colors = avatarColors(prefs, pose.ink, dark);
+    const nextColorKey = `${prefs.palette}:${prefs.customColor}:${dark}:${prefs.palette === 'cycle' ? pose.ink : ''}`;
+    if (nextColorKey !== colorKey) { colorKey = nextColorKey; colors = avatarColors(prefs, pose.ink, dark); }
     body.setAttribute('d', pose.body); clip.setAttribute('d', pose.body);
     body.setAttribute('fill', colors.ink); body.setAttribute('stroke', colors.ink);
     character.setAttribute('transform', pose.bodyTransform);
@@ -56,13 +59,15 @@ export function mountBotAvatar(svg: SVGSVGElement, preferences: () => BotAppeara
     pointerAt = performance.now();
   }
   const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; resume(); });
+  const themeObserver = new MutationObserver(() => { dark = darkTheme(); resume(); });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   observer.observe(svg);
   window.addEventListener('pointermove', pointer, { passive: true });
   document.addEventListener('visibilitychange', resume);
   media.addEventListener('change', resume);
   resume();
   return { refresh: resume, dispose() {
-    disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+    disposed = true; cancelAnimationFrame(frame); observer.disconnect(); themeObserver.disconnect();
     window.removeEventListener('pointermove', pointer);
     document.removeEventListener('visibilitychange', resume);
     media.removeEventListener('change', resume);

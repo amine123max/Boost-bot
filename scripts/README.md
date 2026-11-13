@@ -13,8 +13,6 @@ Run from the repository root. These scripts use `frontend/`, `backend/desktop/`,
 | `rebuild.ps1`, `rebuild-linux.sh`, `rebuild-macos.sh` | Native desktop rebuild helpers / 原生桌面重建 |
 | `check-repository.mjs` | Validate structure, package paths and documentation links / 校验结构与文档链接 |
 | `check-release-version.mjs` | Match source version fields to a release tag / 发布版本一致性 |
-| `verify-boost-bot-live.mjs` | Browser probe of an explicitly selected running application / 真实运行环境浏览器检查 |
-| `verify-api-key-quota-limit.sh` | API-key quota integration probe / 密钥额度验证 |
 | `run-service-app.sh` | Build static UI and service binaries, then launch / 构建并启动服务 |
 | `run-curl-cffi-chatgpt-proxy.sh`, `curl_cffi_chatgpt_proxy.py` | Optional proxy troubleshooting helper / 可选代理排障 |
 | `setup-cloudflare-warp-proxy.sh` | Optional host proxy setup / 可选宿主代理配置 |

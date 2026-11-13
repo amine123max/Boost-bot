@@ -14,7 +14,7 @@ pub(crate) fn prepare(cache: &Path) -> io::Result<PathBuf> {
 
 fn required_files() -> [&'static str; 3] {
     [
-        "dist/src/boost-host.js",
+        "dist/backend/src/boost-host.js",
         "package.json",
         if cfg!(windows) {
             "bin/node.exe"

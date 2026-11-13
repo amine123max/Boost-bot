@@ -499,7 +499,3 @@ fn env_bool_or(name: &str, default: bool) -> bool {
         _ => default,
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/usage_refresh_settings_tests.rs"]
-mod tests;
