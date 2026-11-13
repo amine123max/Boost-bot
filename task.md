@@ -255,13 +255,13 @@ Source: 用户要求右侧任务仿照计划卡片可视化展示，额度重置
 
 ### Batch B006: 同步近期更新并发布 Boost 0.5.1
 Created: 2026-11-13
-Status: open
+Status: completed
 Source: 用户明确要求将近期更新同步 GitHub 并导出 release 0.5.1
 
 - [x] B006-01 P0：审查近期改动、远端状态与构建发布链，统一应用和运行时版本为0.5.1。
 - [x] B006-02 P0：完成前端、Bot、Rust及关键浏览器回归，生成可审阅的双语更新说明。
-- [ ] B006-03 P1：提交并推送近期更新，创建v0.5.1标签，启动既有三平台制品工作流。
-- [ ] B006-04 P1：跟进并修复发布失败，核实Windows安装／免安装和macOS DMG及校验和，完成正式Release。
+- [x] B006-03 P1：提交并推送近期更新，创建v0.5.1标签，启动既有三平台制品工作流。
+- [x] B006-04 P1：跟进并修复发布失败，核实Windows安装／免安装和macOS DMG及校验和，完成正式Release。
 
 <!-- BATCHES_END -->
 
@@ -395,3 +395,12 @@ Source: 用户明确要求将近期更新同步 GitHub 并导出 release 0.5.1
 - 远端 main 与本地起点一致，未发现已有 v0.5.1；使用原发布工作流产出 Windows x64 安装／免安装和 macOS Apple Silicon DMG，三份制品均齐全后才发布正式版。
 - 本地 release 前检查：frontend build:desktop、Bot 完整运行时 prepare、浏览器 UI 回归、真实 Node HTTP/SSE 直接活动检查均通过；Rust workspace 475 项通过、3 项跳过，桌面 66 项通过及 cargo check 通过。
 - 浏览器使用本地隔离 fixture，未声称生产模型／外部渠道可用；无新版本化测试目录、备份分支或子智能体。近期工作区改动纳入本次发布范围。
+
+### 14.1 B006 正式发布验收
+
+- 近期更新已通过提交 `896310ea48db1284e2d1a88fd25a74bb9b6b22ba` 推送到 `main`；注解标签 `v0.5.1` 指向该提交，未创建版本分支。后续验收文档同步至 main，不移动发布标签。
+- GitHub Actions [发布运行 43431988782](https://github.com/amine123max/Boost-bot/actions/runs/43431988782) 的 Windows、macOS 和 publish 三个任务全部成功。
+- [Boost 0.5.1](https://github.com/amine123max/Boost-bot/releases/tag/v0.5.1) 于 2026-11-13 13:45:06 UTC 正式发布；已通过 API 确认非草稿、非预发布，并为最新正式版。
+- 已核实全部附件上传成功且大小非零：免安装单文件 `Boost_0.5.1_x64.exe`（268,815,360 字节）、安装包 `Boost_0.5.1_x64-setup.exe`（159,130,213 字节）、`Boost_0.5.1_aarch64.dmg`（275,410,849 字节）及 `SHA256SUMS.txt`。
+- 已读取远端校验文件，逐项比对三份二进制的 GitHub SHA-256 元数据，并校验该文件自身的 SHA-256，全部一致；未重复下载大型二进制，也未将上传验证表述为目标系统安装／启动验收。
+- 本轮结束时核实没有引用该目录的验证进程，并精确限定 `tmp/release-0.5.1` 尝试清理；自动审批拒绝（`blocked by policy`），目录仍留在本机，未通过替代删除方式绕过，未上传 GitHub，也未触碰其他任务目录。
