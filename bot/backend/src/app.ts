@@ -1164,6 +1164,10 @@ export class App {
     if (ch?.messengerErrors) delete ch.messengerErrors[id];
   }
 
+  qqWebhook(key: string, headers: Record<string, string | string[] | undefined>, body: Buffer) {
+    return this.channels.get(key)?.messengers?.qq?.webhook(headers, body) ?? { status: 404, body: { error: 'channel_unavailable' } };
+  }
+
   /**
    * 连接（或改凭据）：留空的凭据沿用已保存的。凭据被平台拒绝就报错、不保存；一时连不上平台照样保存，渠道自己会重试。
    * 换了一个机器人（凭据变了）：主人对不上了，连上后第一个发消息的人成为主人；Telegram 的收取位置也作废。
@@ -1175,6 +1179,7 @@ export class App {
       credentials[field] = String(input[field] ?? "").trim() || (old?.credentials[field] ?? "");
       if (!credentials[field]) throw new PlatformError(t("channel.messengerMissing", { channel: MESSENGER_LABEL[id] }), true);
     }
+    if (id === 'qq') credentials.sandbox = input.sandbox === undefined ? old?.credentials.sandbox || 'false' : input.sandbox === true ? 'true' : 'false';
     const transport = this.opts.messengerTransport?.(id, key, credentials) ?? createTransport(id, key, credentials, this.store);
     let name = old?.name ?? "";
     try {
@@ -1183,7 +1188,7 @@ export class App {
       if ((e as PlatformError).rejected) throw e;
       log.warn("couldn't verify the credentials now, saving anyway", { channel: id, message: (e as Error).message.slice(0, 200) });
     }
-    const changed = MESSENGER_FIELDS[id].some((f) => f !== "appToken" && credentials[f] !== old?.credentials[f]);
+    const changed = MESSENGER_FIELDS[id].some((f) => f !== "appToken" && credentials[f] !== old?.credentials[f]) || (id === 'qq' && credentials.sandbox !== old?.credentials.sandbox);
     await this.stopMessenger(key, id);
     if (changed) {
       this.access.resetOwner(key, id);
@@ -1373,6 +1378,8 @@ export class App {
       telegram: this.messengerStatus(key, "telegram"),
       slack: this.messengerStatus(key, "slack"),
       discord: this.messengerStatus(key, "discord"),
+      dingtalk: this.messengerStatus(key, 'dingtalk'),
+      qq: this.messengerStatus(key, 'qq'),
     };
   }
 }

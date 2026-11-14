@@ -2,6 +2,12 @@
 
 [Project](../README.md) · [中文首页](../README.zh-CN.md) · [Build guide](../docs/BUILDING.md)
 
+## QQ robot callbacks / QQ 机器人回调
+
+QQ uses the official HTTPS Webhook API with Ed25519 verification. Add the account in Bot Settings → Chat channels, then configure its displayed `/boost-bot/amb/hooks/qq/<account-key>` path under your public HTTPS domain in the QQ console. The old QQ WebSocket event service is no longer maintained by the platform.
+
+Include [qq-webhook.conf.example](qq-webhook.conf.example) inside the HTTPS server block. In a separate server-only file with restricted permissions, define `set $boost_qq_rpc_token "<content of BOOST_RPC_TOKEN_FILE>";` and include it before this location. The example targets the existing `boost_service` upstream on port 12580, keeps the service's RPC authentication, forwards the QQ signature headers, and fixes the actor to the desktop administrator. Use the account owner's configured actor for a service deployment; do not accept actor headers from public clients. Never paste the Boost RPC token into the QQ console or a browser. The Bot verifies the signature, timestamp and App ID, limits callback size, acknowledges challenges/heartbeats and deduplicates events. Unconfigured or disabled accounts do not accept messages. This example requires your actual TLS domain and server secret configuration; copying the repository does not deploy it automatically.
+
 [`nginx.conf`](nginx.conf) is an optional TLS reverse-proxy example for Boost. Normal direct Web access remains **12000**; the example adds HTTPS on 443 in front of it.
 
 `nginx.conf` 是可选的 TLS 代理示例。应用直接访问端口保持 **12000**，示例通过 443 提供 HTTPS。

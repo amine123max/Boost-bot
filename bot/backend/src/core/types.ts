@@ -6,10 +6,10 @@ import type { ActivityStep } from "../agent/activity.js";
 import { t, type MessageKey } from "../i18n/index.js";
 
 /** 同一套接法的聊天平台（channels/messenger）：填 token 连上，单聊，流式靠改消息 */
-export const MESSENGERS = ["telegram", "slack", "discord"] as const;
+export const MESSENGERS = ["telegram", "slack", "discord", "dingtalk", "qq"] as const;
 export type MessengerId = (typeof MESSENGERS)[number];
 /** 平台名（品牌名，不分语言） */
-export const MESSENGER_LABEL: Readonly<Record<MessengerId, string>> = { telegram: "Telegram", slack: "Slack", discord: "Discord" };
+export const MESSENGER_LABEL: Readonly<Record<MessengerId, string>> = { telegram: "Telegram", slack: "Slack", discord: "Discord", dingtalk: "钉钉", qq: "QQ" };
 export const isMessenger = (c: string): c is MessengerId => (MESSENGERS as readonly string[]).includes(c);
 
 export type ChannelId = "feishu" | "weixin" | "web" | MessengerId;

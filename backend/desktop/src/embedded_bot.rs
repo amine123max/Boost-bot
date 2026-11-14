@@ -2,6 +2,8 @@ use std::fs::{self, File};
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
 
+mod cache;
+
 #[cfg(feature = "portable-runtime")]
 pub(crate) fn prepare(cache: &Path) -> io::Result<PathBuf> {
     static ARCHIVE: &[u8] = include_bytes!(env!("BOOST_EMBEDDED_BOT_ARCHIVE"));
@@ -9,6 +11,9 @@ pub(crate) fn prepare(cache: &Path) -> io::Result<PathBuf> {
         .join("bot-runtime")
         .join(env!("BOOST_EMBEDDED_BOT_DIGEST"));
     unpack_runtime(ARCHIVE, &directory)?;
+    // Retire old code only after the new runtime is complete. Bot databases,
+    // sessions, workspaces and download caches live outside this directory.
+    cache::schedule_prune(directory.parent().unwrap().to_path_buf(), directory.clone());
     Ok(directory)
 }
 
@@ -81,12 +86,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    struct TestDirectory {
-        path: PathBuf,
+    pub(super) struct TestDirectory {
+        pub(super) path: PathBuf,
         parent: PathBuf,
     }
     impl TestDirectory {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             let parent = std::env::temp_dir().canonicalize().unwrap();
             let path = parent.join(format!(
                 "boost-embedded-runtime-{}-{}",
@@ -109,7 +114,7 @@ mod tests {
             fs::remove_dir_all(actual).unwrap();
         }
     }
-    fn archive(paths: &[&str]) -> Vec<u8> {
+    pub(super) fn archive(paths: &[&str]) -> Vec<u8> {
         let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
         for path in paths {
             archive

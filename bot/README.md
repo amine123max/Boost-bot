@@ -4,7 +4,9 @@
 
 Boost Bot is the hosted agent workspace: conversations, memory, tasks, approvals, messaging channels, file delivery and specialist bots. Boost supplies authentication and model routing through the existing gateway.
 
-The Company Research, PPT Master and US Stock Research workspaces include interactive previews. Previewing does not install an agent. Select **Message agent** to create or open its conversation, with saved history, streaming replies and generation controls. Select **Back to workspace** to return to its dedicated interface; both views share the same conversation.
+The Company Research, PPT Master and US Stock Research entries open their own functional previews. Browsing never installs an agent. Select **Chat and approvals** to create the instance once and open its conversation beside the dedicated interface; existing instances are reused.
+
+Chat channels support WeChat, Feishu, Telegram, Slack, Discord, DingTalk and QQ. Add independent devices/accounts through the existing **Add channel** dialog, with separate names, enable switches and default Bots. WeChat and Feishu support QR flows; other platforms use official bot credentials. DingTalk uses Stream; QQ uses signed HTTPS callbacks through the [nginx callback configuration](../nginx/README.md#qq-robot-callbacks--qq-机器人回调). Platform-specific concurrent-login limits still apply. **Connections** manages document/tool authorization and links to the shared channel manager without duplicating chat accounts.
 
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 

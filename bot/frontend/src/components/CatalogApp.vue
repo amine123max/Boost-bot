@@ -23,7 +23,7 @@ import BotAvatar from "./BotAvatar.vue";
 import ChatView from "./ChatView.vue";
 import Modal from "./Modal.vue";
 
-const props = defineProps<{ bot: Bot; configure: boolean; models?: string[] }>();
+const props = defineProps<{ bot: Bot; configure: boolean; models?: string[]; initialChat?: boolean }>();
 const emit = defineEmits<{ chat: []; settings: []; edit: []; delete: []; menu: []; refresh: [] }>();
 const route = ref<Route>({ kind: "chat", id: props.bot.id }),
   chat = reactive(useConversation(route, () => {}));
@@ -31,7 +31,7 @@ const frame = ref<HTMLIFrameElement>(),
   source = ref(""),
   error = ref(""),
   loaded = ref(false),
-  showChat = ref(false);
+  showChat = ref(props.initialChat === true);
 const externalUrl = ref("");
 let confirmUrl: ((allowed: boolean) => void) | undefined;
 const controller = new AbortController();

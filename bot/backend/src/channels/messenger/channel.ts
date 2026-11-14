@@ -147,7 +147,7 @@ export class MessengerReply implements ReplySession {
   }
 
   private schedule(): void {
-    if (this.closed || this.timer) return;
+    if (this.closed || this.timer || this.transport.supportsEdit === false) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
       this.inflight = this.inflight.then(() => this.flush());
@@ -251,6 +251,10 @@ export class MessengerChannel {
 
   private get id() {
     return this.transport.id;
+  }
+
+  webhook(headers: Record<string, string | string[] | undefined>, body: Buffer) {
+    return this.running ? this.transport.webhook?.(headers, body) : undefined;
   }
 
   async start(): Promise<void> {

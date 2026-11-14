@@ -1,0 +1,21 @@
+# Include inside the HTTPS server block, alongside the existing /boost-bot/ route.
+# Set $boost_qq_rpc_token in a server-only, access-restricted include file to the
+# content of BOOST_RPC_TOKEN_FILE. Never expose this token to the QQ console.
+location ^~ /boost-bot/amb/hooks/qq/ {
+    limit_except POST { deny all; }
+    client_max_body_size 1m;
+    proxy_pass http://boost_service;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header Cookie "";
+    proxy_set_header Authorization "";
+    proxy_set_header X-Boost-Rpc-Token $boost_qq_rpc_token;
+    proxy_set_header X-Boost-Rpc-Actor-Role admin;
+    proxy_set_header X-Boost-Rpc-Actor-User-Id "";
+    proxy_set_header X-Signature-Ed25519 $http_x_signature_ed25519;
+    proxy_set_header X-Signature-Timestamp $http_x_signature_timestamp;
+    proxy_set_header X-Bot-Appid $http_x_bot_appid;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+}

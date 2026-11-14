@@ -25,7 +25,7 @@ export class WorkspaceStorage {
     if (!parent.trim()) return workspaceRoot(this.config);
     if (!path.isAbsolute(parent) || parent.includes("\0")) throw new Error("请选择运行 Boost 的电脑上的绝对文件夹路径");
     const base = path.resolve(parent.trim());
-    const boost = path.basename(base).toLowerCase() === "boost" ? base : path.join(base, "Boost");
+    const boost = ["boost", ".boost"].includes(path.basename(base).toLowerCase()) ? base : path.join(base, "Boost");
     // Separate users/workspaces sharing the same selected drive or folder.
     const data = fs.existsSync(this.config.dataDir) ? fs.realpathSync(this.config.dataDir) : path.resolve(this.config.dataDir);
     const identity = this.config.workspaceIdentity || data;

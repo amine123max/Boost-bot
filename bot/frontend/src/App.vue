@@ -25,6 +25,7 @@ import BotEditor from "./components/BotEditor.vue";
 import { editorSettings } from './bot-editor-options';
 import ChatView from "./components/ChatView.vue";
 import CatalogApp from "./components/CatalogApp.vue";
+import CatalogPreview from "./components/CatalogPreview.vue";
 import SidebarSearch from "./components/SidebarSearch.vue";
 import InfoPanel from "./components/InfoPanel.vue";
 import SidebarBotRow from "./components/SidebarBotRow.vue";
@@ -46,12 +47,14 @@ function readRoute(): Route {
         "tasks",
         "settings",
         "discover",
+        "catalog",
         "app",
         "conversation",
       ].includes(kind)
         ? (kind as Route["kind"])
         : "chat",
       id,
+      openChat: new URLSearchParams(location.hash.split('?')[1] || '').get('chat') === '1',
     };
   } catch {
     return { kind: "chat", id: "" };
@@ -96,6 +99,8 @@ const bot = computed(() =>
   ),
 );
 const group = computed(() => groups.value.find((g) => g.id === route.value.id));
+const selectedCatalog = computed(() => catalog.value.find(entry => entry.id === route.value.id));
+const catalogPreviewVersion = ref(0);
 const sourceModels = ref<string[]>([]);
 const conversationModels = computed(() => !bot.value || (bot.value.settings.modelSource||'default')==='default' ? models.value : sourceModels.value);
 watch(() => [bot.value?.id,bot.value?.settings.modelSource], async (_value,_old,onCleanup) => {
@@ -149,12 +154,12 @@ function settingsShortcut(event: KeyboardEvent) {
     else go('settings', 'general');
   }
 }
-function go(kind: Route["kind"], id = "") {
+function go(kind: Route["kind"], id = "", openChat = false) {
   if (kind === 'settings' && route.value.kind !== 'settings') {
     settingsReturn.value = { ...route.value };
     settingsBotId.value = bot.value?.id || bots.value[0]?.id || '';
   }
-  location.hash = `/${kind}${id ? "/" + enc(id) : ""}${kind === 'settings' && settingsBotId.value ? '?bot=' + enc(settingsBotId.value) : ''}`;
+  location.hash = `/${kind}${id ? "/" + enc(id) : ""}${kind === 'settings' && settingsBotId.value ? '?bot=' + enc(settingsBotId.value) : kind === 'app' && openChat ? '?chat=1' : ''}`;
   mobileOpen.value = false;
 }
 function changedRoute() {
@@ -251,7 +256,7 @@ function poll() {
 }
 async function loadPanel() {
   const kind = route.value.kind;
-  if (!["tasks", "discover"].includes(kind)) return;
+  if (!["tasks", "discover", "catalog"].includes(kind)) return;
   panelBusy.value = true;
   panelError.value = "";
   try {
@@ -267,6 +272,12 @@ async function loadPanel() {
   } finally {
     panelBusy.value = false;
   }
+}
+async function refreshPage() {
+  if (panelBusy.value) return;
+  panelBusy.value = true;
+  try { await Promise.all([refresh(), loadPanel()]); }
+  finally { panelBusy.value = false; }
 }
 function openBot(value?: Bot) {
   botSourceValid.value = (value?.settings.modelSource || 'default')==='default';
@@ -394,7 +405,7 @@ async function remove() {
 const localized = (value?: string | Record<string, string>) =>
   typeof value === "string" ? value : value?.["zh-CN"] || value?.en || "";
 async function install(entry: CatalogEntry) {
-  if (entry.instanceId) { go('app', entry.instanceId); return; }
+  if (entry.instanceId) { go('app', entry.instanceId, true); return; }
   if (panelBusy.value || !configure.value) return;
   panelBusy.value = true;
   panelError.value = "";
@@ -404,18 +415,15 @@ async function install(entry: CatalogEntry) {
       body: {},
     });
     await refresh();
-    go("app", d.bot.id);
+    go("app", d.bot.id, true);
   } catch (e) {
     panelError.value = (e as Error).message;
   } finally {
     panelBusy.value = false;
   }
 }
-async function browseCatalog(entry: CatalogEntry) {
-  go('discover', entry.id);
-  await nextTick();
-  document.getElementById('catalog-' + entry.id)?.focus({ preventScroll: true });
-  document.getElementById('catalog-' + entry.id)?.scrollIntoView({ block: 'nearest' });
+function browseCatalog(entry: CatalogEntry) {
+  go(entry.instanceId ? 'app' : 'catalog', entry.instanceId || entry.id);
 }
 async function testModel() {
   panelBusy.value = true;
@@ -555,6 +563,7 @@ onBeforeUnmount(() => {
             v-for="entry in catalog.filter((e) => !e.instanceId)"
             :key="entry.id"
             class="thread"
+            :class="{ sel: route.kind === 'catalog' && route.id === entry.id }"
             @click="browseCatalog(entry)"
           >
             <BotAvatar
@@ -618,10 +627,22 @@ onBeforeUnmount(() => {
         @menu="mobileOpen = true"
         @direct="go('chat', selectedConversation.botId)"
       />
+      <CatalogPreview
+        v-else-if="route.kind === 'catalog' && selectedCatalog"
+        :key="selectedCatalog.id + ':' + catalogPreviewVersion"
+        :entry="selectedCatalog"
+        :configure="configure"
+        :busy="panelBusy"
+        :activation-error="panelError"
+        @activate="install(selectedCatalog)"
+        @refresh="catalogPreviewVersion++"
+        @menu="mobileOpen = true"
+      />
       <CatalogApp
         v-else-if="route.kind === 'app' && bot"
         :key="bot.id"
         :bot="bot"
+        :initial-chat="route.openChat"
         :configure="configure"
         :models="conversationModels"
         @chat="go('chat', bot.id)"
@@ -658,7 +679,7 @@ onBeforeUnmount(() => {
             class="icon-button"
             aria-label="刷新"
             :disabled="panelBusy"
-            @click="loadPanel"
+            @click="refreshPage"
           >
             <Icon name="refresh" />
           </button>
@@ -717,10 +738,10 @@ onBeforeUnmount(() => {
                 /></div>
                 <button
                   class="primary-button"
-                  :disabled="!configure || panelBusy"
-                  @click="install(entry)"
+                  :disabled="panelBusy"
+                  @click="browseCatalog(entry)"
                 >
-                  {{ entry.instanceId ? "打开应用" : "添加智能体" }}
+                  {{ entry.instanceId ? "打开应用" : "查看功能" }}
                 </button>
                 </div>
               </article>

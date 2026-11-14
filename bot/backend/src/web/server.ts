@@ -1547,6 +1547,23 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
   });
   function handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = new URL(req.url || "/", "http://localhost");
+    // QQ authenticates callbacks with Ed25519, independently of browser sessions.
+    // The Boost service proxy still requires its existing server-side RPC token.
+    const qqHook = /^\/boost-bot\/amb\/hooks\/qq\/([\w-]{1,80})$/.exec(url.pathname);
+    if (qqHook) {
+      if (req.method !== 'POST') { res.writeHead(405).end(); return; }
+      void (async () => {
+        const chunks: Buffer[] = []; let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 1024 * 1024) { res.writeHead(413).end(); return; }
+          chunks.push(Buffer.from(chunk));
+        }
+        const reply = app.qqWebhook(qqHook[1]!, req.headers, Buffer.concat(chunks));
+        send(res, reply.status, reply.body);
+      })().catch(() => { if (!res.headersSent) send(res, 400, { error: 'invalid_callback' }); });
+      return;
+    }
     // Notion 授权页跳回来：地址是固定的回环地址，浏览器不一定带着控制台的令牌；一次性的 state 就是凭据（notion.ts）
     if (url.pathname === NOTION_CALLBACK && req.method === "GET") {
       void notionCallback(res, url);

@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { api, enc } from "../api";
 import SettingRow from "./SettingRow.vue";
 import Modal from "./Modal.vue";
+const emit = defineEmits<{ channels: [] }>();
 interface Account {
   id: string;
   label: string;
@@ -14,6 +15,8 @@ const accounts = ref<Account[]>([]),
   busy = ref(false),
   error = ref(""),
   removing = ref<Account>();
+const refreshing = ref(false);
+let loadVersion = 0;
 interface Flow {
   id: string;
   state: "create-app" | "authorize" | "done" | "failed";
@@ -26,13 +29,14 @@ const flow = ref<Flow>(),
 let timer: ReturnType<typeof setTimeout> | undefined,
   disposed = false;
 async function load() {
+  const ticket = ++loadVersion;
+  refreshing.value = true; error.value = '';
   try {
-    accounts.value = (
-      await api<{ accounts: Account[] }>("/connections")
-    ).accounts;
+    const result = await api<{ accounts: Account[] }>("/connections");
+    if (!disposed && ticket === loadVersion) accounts.value = result.accounts;
   } catch (e) {
     error.value = (e as Error).message;
-  }
+  } finally { if (ticket === loadVersion) refreshing.value = false; }
 }
 async function connect() {
   if (busy.value || !token.value.trim()) return;
@@ -148,6 +152,7 @@ onMounted(load);
 <template>
   <div class="connected-accounts">
     <p v-if="error" role="alert" class="error-banner">{{ error }}</p>
+    <SettingRow label="聊天渠道" help="微信、飞书、Telegram、Slack、Discord、钉钉和 QQ 的消息连接统一在聊天渠道中管理；这里的已授权账号用于文档和工具访问。"><button class="quiet-button" @click="emit('channels')">添加渠道</button></SettingRow>
     <h3>已授权账号</h3>
     <div class="connection-group">
       <SettingRow
@@ -220,8 +225,8 @@ onMounted(load);
           连接飞书
         </button></SettingRow
       ><SettingRow label="授权状态"
-        ><button class="quiet-button" :disabled="busy" @click="load">
-          刷新账号
+        ><button class="quiet-button" :disabled="busy || refreshing" @click="load">
+          {{ refreshing ? '刷新中…' : '刷新账号' }}
         </button></SettingRow
       >
     </div>

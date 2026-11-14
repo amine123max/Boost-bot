@@ -60,6 +60,8 @@ const settings = ref<RuntimeSettings>(),
   saved = ref(""),
   loadError = ref(false),
   scrollRoot = ref<HTMLElement>();
+const channelRequest = ref(0);
+function addChannel() { jump('channels'); channelRequest.value++; }
 const active = ref(settingsSection(props.section).id);
 const activeSection = computed(() => settingsSection(active.value));
 const showingDirectory = ref(false);
@@ -334,11 +336,11 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
               ><p class="settings-context">
                 渠道账号由工作台共用，可分别选择默认回复的智能体。
               </p>
-              <ChannelSettings v-if="configure" :bots="bots" embedded />
+              <ChannelSettings v-if="configure" :bots="bots" :request="channelRequest" embedded />
               <p v-else class="hint">聊天渠道由管理员配置。</p></template
             >
             <template v-else-if="section.id === 'connections'"
-              ><ConnectedAccounts v-if="configure" />
+               ><ConnectedAccounts v-if="configure" @channels="addChannel" />
               <p v-else class="hint">账号连接由管理员配置。</p></template
             >
             <template v-else-if="settings && section.id === 'network'"

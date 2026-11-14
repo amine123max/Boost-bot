@@ -21,6 +21,8 @@ const channels: Record<string, string> = {
   telegram: "Telegram",
   discord: "Discord",
   slack: "Slack",
+  dingtalk: '钉钉',
+  qq: 'QQ',
 };
 const children = computed(() =>
   props.conversations
@@ -58,10 +60,9 @@ const date = (value: number) =>
       >
         <BotAvatar :bot="bot" :working="working" :size="32" /><span class="body"
           ><span class="line"
-            ><span class="title">{{ bot.name }}</span
-            ><Icon v-if="working" name="clock" :size="14" /></span
+            ><span class="title">{{ bot.name }}</span></span
           ><span v-if="preview" class="snip">{{ preview }}</span></span
-        >
+        ><span v-if="working" class="thread-working" role="status" aria-label="正在处理"><Icon name="clock" :size="14" /></span>
       </button>
       <details v-if="manage" class="bot-row-actions" @click.stop @keydown.esc.stop.prevent="($event.currentTarget as HTMLDetailsElement).open=false">
         <summary :aria-label="`管理${bot.name}`"><Icon name="more" :size="16" /></summary>
@@ -113,6 +114,7 @@ const date = (value: number) =>
   </div>
 </template>
 <style scoped>
+.thread-working { display:flex; align-items:center; align-self:center; flex:none; }
 .thread {
   height: auto;
   min-height: 44px;

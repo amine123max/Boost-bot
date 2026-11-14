@@ -48,6 +48,7 @@ export function settingsFor(entry: Pick<CatalogEntry, "permissions" | "avatar">)
 }
 
 export class BotInstaller {
+  private installing = new Map<string, Promise<Bot>>();
   constructor(readonly o: InstallerOptions) {}
 
   workspace(botId: string): string {
@@ -100,7 +101,15 @@ export class BotInstaller {
   }
 
   /** 第一次使用：建实例。已经有实例就直接返回（重复点击、并发请求都安全） */
-  async install(catalogId: string, lang: string): Promise<Bot> {
+  install(catalogId: string, lang: string): Promise<Bot> {
+    const pending = this.installing.get(catalogId);
+    if (pending) return pending;
+    const installing = this.installOnce(catalogId, lang).finally(() => this.installing.delete(catalogId));
+    this.installing.set(catalogId, installing);
+    return installing;
+  }
+
+  private async installOnce(catalogId: string, lang: string): Promise<Bot> {
     const id = instanceId(catalogId);
     const existing = this.o.store.getBot(id);
     if (existing) return existing;

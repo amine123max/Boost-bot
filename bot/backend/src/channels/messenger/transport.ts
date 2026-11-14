@@ -37,6 +37,9 @@ export interface MessengerTransport {
   readonly id: MessengerId;
   /** 一条消息最多放多少字（留了余量） */
   readonly maxText: number;
+  /** Platforms without edit APIs receive the final answer once, without partial spam. */
+  readonly supportsEdit?: boolean;
+  webhook?(headers: Record<string, string | string[] | undefined>, body: Buffer): { status: number; body: unknown };
   /** 检查凭据，返回平台上机器人的名字；凭据不对抛 rejected 的错误 */
   verify?(): Promise<{ name: string }>;
   start(onMessage: (m: MessengerMessage) => void, onState: StateFn): Promise<void>;

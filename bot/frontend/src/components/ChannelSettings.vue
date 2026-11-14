@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { Bot } from "../types";
 import { api, enc } from "../api";
 import HelpTip from "./HelpTip.vue";
 import SelectControl from "./SelectControl.vue";
 import Modal from "./Modal.vue";
-defineProps<{ bots: Bot[]; embedded?: boolean }>();
+const props = defineProps<{ bots: Bot[]; embedded?: boolean; request?: number }>();
 interface Account {
   key: string;
   channel: string;
@@ -21,39 +21,51 @@ const accounts = ref<Account[]>([]),
   channel = ref("feishu"),
   key = ref(""),
   verifyCode = ref("");
+const feishuMode = ref('qr'), sandbox = ref('false'), defaultBot = ref(''), label = ref('');
+interface FeishuFlow { id: string; state: string; qr: string; url: string; error: string }
+interface Login { state: string; qrContent?: string; qrDataUrl?: string; message?: string }
+const flow = ref<FeishuFlow>();
+let attempt = 0;
+let accountLoad = 0;
 const credentials = reactive({
   appId: "",
   appSecret: "",
   token: "",
   botToken: "",
   appToken: "",
+  clientId: '',
+  clientSecret: '',
 });
-const login = ref<{
-  state: string;
-  qrContent?: string;
-  qrDataUrl?: string;
-  message?: string;
-} | null>(null);
+const login = ref<Login | null>(null);
 const names: Record<string, string> = {
   weixin: "微信",
   feishu: "飞书",
   telegram: "Telegram",
   slack: "Slack",
   discord: "Discord",
+  dingtalk: '钉钉',
+  qq: 'QQ',
 };
+const stateNames: Record<string, string> = { connected: '已连接', connecting: '连接中', disabled: '已停用', error: '连接失败', expired: '已过期', login_required: '待登录', paused: '已暂停' };
 let disposed = false,
-  timer: ReturnType<typeof setTimeout> | undefined;
+  timer: ReturnType<typeof setTimeout> | undefined,
+  accountTimer: ReturnType<typeof setTimeout> | undefined;
 async function load() {
+  const ticket = ++accountLoad;
   try {
     const d = await api<{ accounts: Account[] }>("/channel-accounts");
-    if (!disposed) accounts.value = d.accounts;
+    if (!disposed && ticket === accountLoad) accounts.value = d.accounts;
   } catch (e) {
     error.value = (e as Error).message;
   }
 }
-async function begin() {
+async function begin(kind?: string) {
   error.value = "";
   login.value = null;
+  flow.value = undefined;
+  if (kind) channel.value = kind;
+  defaultBot.value = props.bots[0]?.id || '';
+  label.value = '';
   for (const name of Object.keys(credentials) as Array<
     keyof typeof credentials
   >)
@@ -74,13 +86,26 @@ async function save() {
   if (busy.value) return;
   busy.value = true;
   error.value = "";
+  const ticket = ++attempt;
   try {
+    clearTimeout(timer);
+    if (flow.value) { const previous = flow.value.id; flow.value = undefined; await api(`/connections/flows/${enc(previous)}`, { method: 'DELETE' }).catch(() => {}); }
+    if (channel.value === 'feishu' && feishuMode.value === 'qr') {
+      const response = await api<{ flow: FeishuFlow }>(`/channel-accounts/${enc(key.value)}/feishu/one-click`, { method: 'POST', body: {} });
+      if (ticket !== attempt || disposed) return;
+      flow.value = response.flow;
+      login.value = { state: response.flow.state, qrDataUrl: response.flow.qr, qrContent: response.flow.url };
+      void pollLogin(ticket);
+      return;
+    }
     if (channel.value === "weixin") {
-      login.value = await api(
+      const response = await api<Login>(
         `/channel-accounts/${enc(key.value)}/weixin/login`,
         { method: "POST", body: {} },
       );
-      void pollLogin();
+      if (ticket !== attempt || disposed) return;
+      login.value = response;
+      void pollLogin(ticket);
       return;
     }
     const body =
@@ -88,34 +113,52 @@ async function save() {
         ? { appId: credentials.appId, appSecret: credentials.appSecret }
         : channel.value === "slack"
           ? { botToken: credentials.botToken, appToken: credentials.appToken }
+          : channel.value === 'dingtalk' ? { clientId: credentials.clientId, clientSecret: credentials.clientSecret }
+          : channel.value === 'qq' ? { appId: credentials.appId, clientSecret: credentials.clientSecret, sandbox: sandbox.value === 'true' }
           : { token: credentials.token };
     await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}`, {
       method: "PUT",
       body,
     });
-    adding.value = false;
-    await load();
+    if (ticket === attempt && !disposed) await finish();
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
     busy.value = false;
   }
 }
-async function pollLogin() {
+async function finish() {
+  const patch = { ...(defaultBot.value ? { defaultBot: defaultBot.value } : {}), ...(label.value.trim() ? { label: label.value.trim() } : {}) };
+  if (Object.keys(patch).length) await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}/settings`, { method: 'PUT', body: patch });
+  adding.value = false;
+  await load();
+}
+async function pollLogin(ticket: number) {
   clearTimeout(timer);
-  if (!adding.value || disposed) return;
+  if (!adding.value || disposed || ticket !== attempt) return;
   try {
-    login.value = await api(`/channel-accounts/${enc(key.value)}/weixin/login`);
+    if (flow.value) {
+      const response = await api<{ flow: FeishuFlow }>(`/connections/flows/${enc(flow.value.id)}`);
+      if (ticket !== attempt || disposed) return;
+      flow.value = response.flow;
+      login.value = { state: response.flow.state, qrDataUrl: response.flow.qr, qrContent: response.flow.url, message: response.flow.error || (response.flow.state === 'create-app' ? '使用飞书扫码创建应用' : '请完成飞书授权') };
+      if (response.flow.state === 'done') { await finish(); return; }
+      if (response.flow.state === 'failed') return;
+    } else {
+      const response = await api<Login>(`/channel-accounts/${enc(key.value)}/weixin/login`);
+      if (ticket !== attempt || disposed) return;
+      login.value = response;
+    }
     if (login.value?.state === "confirmed") {
-      adding.value = false;
-      await load();
+      await finish();
       return;
     }
+    if (['expired', 'error', 'failed', 'cancelled', 'canceled'].includes(login.value?.state || '')) return;
   } catch (e) {
     error.value = (e as Error).message;
     return;
   }
-  timer = setTimeout(pollLogin, 2000);
+  timer = setTimeout(() => pollLogin(ticket), 2000);
 }
 async function verify() {
   try {
@@ -145,17 +188,40 @@ async function update(
   }
 }
 async function close() {
+  ++attempt;
   clearTimeout(timer);
   adding.value = false;
+  const previousFlow = flow.value;
+  flow.value = undefined;
+  if (previousFlow) await api(`/connections/flows/${enc(previousFlow.id)}`, { method: 'DELETE' }).catch(() => {});
   if (channel.value === "weixin" && key.value)
     await api(`/channel-accounts/${enc(key.value)}/weixin/cancel`, {
       method: "POST",
       body: {},
     }).catch(() => {});
 }
-onMounted(load);
+watch(channel, async (_value, previous) => {
+  ++attempt; clearTimeout(timer);
+  const previousFlow = flow.value;
+  flow.value = undefined; login.value = null; verifyCode.value = '';
+  if (previousFlow) await api(`/connections/flows/${enc(previousFlow.id)}`, { method: 'DELETE' }).catch(() => {});
+  if (previous === 'weixin' && key.value) await api(`/channel-accounts/${enc(key.value)}/weixin/cancel`, { method: 'POST', body: {} }).catch(() => {});
+});
+watch(() => props.request, value => { if (value) void begin(); });
+watch(feishuMode, async () => {
+  if (!adding.value || channel.value !== 'feishu') return;
+  ++attempt; clearTimeout(timer);
+  const previous = flow.value; flow.value = undefined; login.value = null;
+  if (previous) await api(`/connections/flows/${enc(previous.id)}`, { method: 'DELETE' }).catch(() => {});
+});
+async function refreshAccounts() {
+  await load();
+  if (!disposed) accountTimer = setTimeout(refreshAccounts, 5000);
+}
+onMounted(refreshAccounts);
 onBeforeUnmount(() => {
   disposed = true;
+  clearTimeout(accountTimer);
   void close();
 });
 </script>
@@ -174,7 +240,7 @@ onBeforeUnmount(() => {
     >
       <span
         >{{ account.label || names[account.channel]
-        }}<small>{{ account.status?.state || "未连接" }}</small></span
+        }}<small><span v-if="account.label && account.label !== names[account.channel]">{{ names[account.channel] }} · </span><span :class="{ 'connected-state': account.status?.state === 'connected' }">{{ stateNames[account.status?.state || ''] || '未连接' }}</span></small></span
       ><SelectControl
         :model-value="account.defaultBot"
         :options="bots.map((bot) => ({ value: bot.id, label: bot.name }))"
@@ -190,21 +256,24 @@ onBeforeUnmount(() => {
         {{ account.enabled ? "停用" : "启用" }}
       </button>
     </div>
-    <button class="quiet-button" :disabled="busy" @click="begin">
+    <button class="quiet-button" :disabled="busy" @click="begin()">
       添加渠道
     </button>
   </section>
-  <Modal v-if="adding" title="添加聊天渠道" @close="close"
+  <Modal v-if="adding" :busy="busy" title="添加聊天渠道" @close="close"
     ><form class="editor-form" @submit.prevent="save">
       <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
       <label
         >渠道<SelectControl
           v-model="channel"
+          :disabled="busy"
           label="渠道"
           :options="
             Object.entries(names).map(([value, label]) => ({ value, label }))
           " /></label
-      ><template v-if="channel === 'feishu'"
+      ><label>设备／账号名称<HelpTip text="同一渠道可添加多个独立设备或账号，分别命名、启停和选择默认智能体。平台对同一账号的同时在线限制仍然适用。" /><input v-model="label" placeholder="例如：工作手机、团队机器人" maxlength="40" autocomplete="off" /></label>
+      <label v-if="channel === 'feishu'">连接方式<SelectControl v-model="feishuMode" label="飞书连接方式" :disabled="busy" :options="[{ value: 'qr', label: '扫码连接' }, { value: 'manual', label: '应用凭据' }]" /></label>
+      <template v-if="channel === 'feishu' && feishuMode === 'manual'"
         ><label
           >App ID<input
             v-model="credentials.appId"
@@ -229,18 +298,25 @@ onBeforeUnmount(() => {
             required
             type="password"
             autocomplete="new-password" /></label></template
-      ><label v-else-if="channel !== 'weixin'"
+      ><template v-else-if="channel === 'dingtalk' || channel === 'qq'">
+        <p>{{ channel === 'dingtalk' ? '使用钉钉企业内部应用，开启机器人 Stream 模式。' : '使用 QQ 开放平台的机器人应用凭据。' }}<HelpTip text="微信与飞书支持扫码连接；钉钉和 QQ 官方机器人使用应用凭据，不使用个人账号扫码令牌。" /></p>
+        <label>{{ channel === 'dingtalk' ? 'Client ID' : 'App ID' }}<input v-if="channel === 'dingtalk'" v-model="credentials.clientId" required autocomplete="off" /><input v-else v-model="credentials.appId" required autocomplete="off" /></label>
+        <label>Client Secret<input v-model="credentials.clientSecret" required type="password" autocomplete="new-password" /></label>
+        <label v-if="channel === 'qq'">运行环境<SelectControl v-model="sandbox" label="QQ 运行环境" :options="[{ value: 'false', label: '正式环境' }, { value: 'true', label: '沙箱环境' }]" /></label>
+        <label v-if="channel === 'qq'">回调路径<HelpTip text="在 QQ 开放平台填写经 Nginx 映射后的公网 HTTPS 地址。此入口校验平台 Ed25519 签名，服务代理仍需要服务器端 RPC 鉴权。" /><input :value="'/boost-bot/amb/hooks/qq/' + key" readonly /></label>
+      </template><label v-else-if="channel !== 'weixin' && channel !== 'feishu'"
         >Token<input
           v-model="credentials.token"
           required
           type="password"
           autocomplete="new-password"
       /></label>
+      <label v-if="bots.length">默认智能体<SelectControl v-model="defaultBot" label="默认智能体" :options="bots.map(bot => ({ value: bot.id, label: bot.name }))" /></label>
       <div v-if="login" role="status">
         <img
           v-if="login.qrDataUrl"
           :src="login.qrDataUrl"
-          alt="微信登录二维码"
+          :alt="(names[channel] || '') + '登录二维码'"
         />
         <p>{{ login.message || login.state }}</p>
         <label v-if="login.state === 'need_verifycode'"
@@ -255,19 +331,20 @@ onBeforeUnmount(() => {
           :href="login.qrContent"
           target="_blank"
           rel="noopener noreferrer"
-          >打开微信登录</a
+          >打开{{ names[channel] }}登录</a
         >
       </div>
       <footer class="dialog-actions">
-        <button data-dialog-close type="button" class="quiet-button" @click="close">取消</button
+        <button data-dialog-close type="button" class="quiet-button" :disabled="busy" @click="close">取消</button
         ><button type="submit" class="primary-button" :disabled="busy">
-          {{ busy ? "连接中…" : channel === "weixin" ? "获取二维码" : "连接" }}
+          {{ busy ? "连接中…" : channel === "weixin" || (channel === 'feishu' && feishuMode === 'qr') ? "获取二维码" : "连接" }}
         </button>
       </footer>
     </form></Modal
   >
 </template>
 <style scoped>
+.connected-state { color: var(--green, #22a06b); background: color-mix(in srgb, var(--green, #22a06b) 14%, transparent); border-radius: 4px; padding: 1px 6px; }
 .channel-setting-row > .select-control {
   width: 280px;
   max-width: 60%;

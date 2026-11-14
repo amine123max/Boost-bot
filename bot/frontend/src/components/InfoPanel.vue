@@ -117,6 +117,8 @@ const channelName = (channel: string) =>
       telegram: "Telegram",
       slack: "Slack",
       discord: "Discord",
+      dingtalk: '钉钉',
+      qq: 'QQ',
     }) as Record<string, string>
   )[channel] || channel;
 </script>

@@ -144,9 +144,11 @@ export interface Route {
     | "tasks"
     | "settings"
     | "discover"
+    | "catalog"
     | "app"
     | "conversation";
   id: string;
+  openChat?: boolean;
 }
 export interface StreamEvents {
   snapshot: LiveTurn;

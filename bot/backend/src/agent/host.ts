@@ -21,6 +21,7 @@ import { acceptsImages } from "../llm/client.js";
 import { CUA_SKILL, MEDIA_SKILL, TASK_RULES, agentPersona, botPrompt } from "./prompts/index.js";
 import { t, t as tr } from "../i18n/index.js";
 import { dirBytes, taskSessionDirs } from "../tasks/retention.js";
+import { rebaseSessionWorkspace } from './session-workspace.js';
 
 const log = logger("agent.host");
 
@@ -1448,15 +1449,23 @@ exec "$REAL" "$@"
     const stored = this.o.store.getAgentSession(conversationId);
     if (stored && this.opened.has(stored)) return h.session(stored);
     if (stored) {
+      rebaseSessionWorkspace(this.home, stored, this.workspace);
+      let restored: SdkSession | undefined;
       try {
-        const s = await h.resumeSession(stored);
-        this.opened.add(stored);
-        return s;
+        restored = await h.resumeSession(stored);
       } catch (e) {
         log.warn("session resume failed, starting new", { message: (e as Error).message.slice(0, 200) });
       }
+      if (restored) {
+        // Use the SDK transaction as well: a live DSH storage cache can restore
+        // its earlier cwd even after the persisted snapshot was relocated.
+        await restored.setWorkingDirectory(this.workspace);
+        this.opened.add(stored);
+        return restored;
+      }
     }
     const s = h.session();
+    await s.setWorkingDirectory(this.workspace);
     this.o.store.setAgentSession(conversationId, this.o.botId, s.id);
     this.opened.add(s.id);
     return s;
@@ -1553,6 +1562,8 @@ exec "$REAL" "$@"
 
   private async runClaimed(input: TurnInput): Promise<TurnResult> {
     const route = await this.routeFor(input.model);
+    const persisted = this.o.store.getAgentSession(input.conversationId);
+    if (persisted) rebaseSessionWorkspace(this.home, persisted, this.workspace);
     let s = await this.sessionFor(await this.ensure(input.model), input.conversationId);
     // 在等进程 / 会话时就被中止了：消息还没交出去，不用动子进程
     if (input.signal?.aborted) throw stopReason(input.signal);

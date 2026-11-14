@@ -134,6 +134,8 @@ For desktop installers, Docker, development hot reload, and persistent storage, 
 
 Desktop user data, logs, runtimes and updates are organized under `~/.boost`; Windows/Linux WebView profiles use `~/.boost/cache/webview`. Upgrades migrate existing application data. See the [storage layout](docs/BUILDING.md#desktop-user-storage--桌面用户存储).
 
+All Bots share one runtime per content version. Portable rebuilds reuse unchanged runtime files, and unused older versions are retired in the background after a successful startup; sessions and workspaces stay separate.
+
 ## Repository
 
 | Directory | Responsibility |
