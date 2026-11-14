@@ -283,7 +283,7 @@ onMounted(() => perform(load));
 <style scoped>
 .pricing-filters { flex: 1 0 auto; min-width: 0; gap: 10px; }
 .pricing-filters .search-field { flex: 0 0 184px; width:184px; }
-.pricing-filters .search-field input { width:100%; min-width:0; max-width:none; }
+.pricing-filters .search-field input { width:100%; min-width:0; max-width:none; height:36px; }
 .pricing-filters select { flex:none; width:140px; }
 .pricing-actions { flex:none; white-space:nowrap; }
 .model-pricing-section .page-primary-toolbar { overflow-x:auto; scrollbar-width:none; gap:12px; }

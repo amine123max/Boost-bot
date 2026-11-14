@@ -725,8 +725,8 @@ onBeforeUnmount(() => {
                 </div>
               </article>
               <div class="catalog-card create-card">
-                <button class="create-bot-button" :disabled="!configure" @click="openBot()"><Icon name="plus" :size="16" /><span>自定义智能体</span></button>
-                <HelpTip text="设置角色、外观与模型" label="自定义智能体说明" />
+                <svg class="catalog-placeholder" width="54" height="54" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M20 9h24c6 0 9 4 11 11l4 17c1 5-1 9-6 12l-12 7c-6 3-12 3-18 0l-12-7c-5-3-7-7-6-12l4-17c2-7 5-11 11-11Z" stroke="currentColor" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round"/><path d="M25 26v10m14-10v10" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+                <div class="catalog-card-body"><div class="catalog-card-title"><h3>自定义</h3><HelpTip text="设置角色、外观与模型" label="自定义说明" /></div><button class="primary-button" :disabled="!configure" @click="openBot()"><Icon name="plus" :size="12" />自定义</button></div>
               </div>
             </div></template
           >

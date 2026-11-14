@@ -632,6 +632,7 @@
   .catalog-card {
     flex: 0 0 184px;
     max-width: 100%;
+    min-height: 82px;
     padding: 12px;
     border: 0;
     background: var(--well);
@@ -661,17 +662,9 @@
   .catalog-card-body { min-width: 0; flex: 1; }
   .catalog-card-body h3 { font-size: 13px; line-height: 1.4; margin: 0; }
   .create-card {
-    flex: 0 0 auto;
-    width: fit-content;
-    max-width: 100%;
-    min-height: 48px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 0 10px 0 0;
+    flex: 0 0 184px;
   }
-  .create-bot-button { display:inline-flex; align-items:center; gap:7px; min-height:48px; padding:10px 0 10px 12px; border:0; background:transparent; color:var(--text); font-size:12px; font-weight:600; white-space:nowrap; }
+  .catalog-placeholder { flex:none; color:var(--muted); }
   .panel-toggle, .panel-toggle:focus-visible { border:0; box-shadow:none; outline:none; }
   .panel-toggle:focus-visible { background:var(--hover); }
   .catalog-app-view {
