@@ -15,6 +15,7 @@ import BoostDialog from "@/components/BoostDialog.vue";
 import GatewayLogsPanel from "@/components/GatewayLogsPanel.vue";
 import RequestLogTable from "@/components/RequestLogTable.vue";
 import ModelLabel from "@/components/ModelLabel.vue";
+import PageTabs from "@/components/PageTabs.vue";
 import {
   boost,
   formatNumber,
@@ -31,6 +32,8 @@ import {
 } from "@/lib/utils/request-latency";
 const query = ref("");
 const mode = ref("requests");
+const logTabs = computed(() => [{ value: 'requests', label: '请求日志' }, ...(isAdmin.value ? [{ value: 'gateway', label: '网关日志' }] : [])]);
+function selectLogMode(value: string) { mode.value = value; }
 const filter = ref("all");
 const page = ref(1);
 const pageSize = ref(20),
@@ -141,23 +144,10 @@ async function clear() {
 </script>
 <template>
   <div>
-    <div v-spring-switch class="tabs">
-      <button
-        :class="{ selected: mode === 'requests' }"
-        @click="mode = 'requests'"
-      >
-        请求日志</button
-      ><button
-        v-if="isAdmin"
-        :class="{ selected: mode === 'gateway' }"
-        @click="mode = 'gateway'"
-      >
-        网关日志
-      </button>
-    </div>
-    <GatewayLogsPanel v-if="mode === 'gateway' && isAdmin" /><template v-else>
-      <div class="page-toolbar">
+    <GatewayLogsPanel v-if="mode === 'gateway' && isAdmin"><template #heading><PageTabs label="日志分类" :selected="mode" :items="logTabs" @select="selectLogMode" /></template></GatewayLogsPanel><template v-else>
+      <div class="page-toolbar page-primary-toolbar">
         <div class="toolbar-group">
+          <PageTabs label="日志分类" :selected="mode" :items="logTabs" @select="selectLogMode" />
           <span class="eyebrow">REQUEST LOGS</span
           ><span class="badge">{{ formatNumber(result.total) }} 条记录</span>
         </div>

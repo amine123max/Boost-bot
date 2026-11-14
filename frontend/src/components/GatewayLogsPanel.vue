@@ -68,8 +68,9 @@ async function clear() {
 </script>
 <template>
   <div>
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
+        <slot name="heading" />
         <span class="muted">{{ result.total }} 条</span
         ><select v-model="stage" aria-label="筛选网关日志阶段">
           <option value="all">全部阶段</option>

@@ -4,7 +4,7 @@ import type { Activity, Message, FileItem } from "../types";
 import { api, enc, downloadFile } from "../api";
 import Modal from "./Modal.vue";
 import ConversationLabel from "./ConversationLabel.vue";
-import Markdown from "./Markdown.vue";
+import MessageBubble from "./MessageBubble.vue";
 import ActivityTrace from "./ActivityTrace.vue";
 import Icon from "./Icon.vue";
 const props = defineProps<{
@@ -93,16 +93,8 @@ onBeforeUnmount(() => {
           :count="message.steps"
           :conversation-id="conversation.id"
           :message-id="message.id"
-        /><Markdown :text="message.content" />
-        <div class="hint">
-          {{
-            message.createdAt
-              ? new Date(message.createdAt).toLocaleString("zh-CN", {
-                  hour12: false,
-                })
-              : ""
-          }}
-        </div>
+        />
+        <MessageBubble :text="message.content" :role="message.role" :created-at="message.createdAt">
         <button
           v-for="file in message.files"
           :key="file.path"
@@ -112,17 +104,12 @@ onBeforeUnmount(() => {
         >
           <Icon name="file" />{{ file.name }}
         </button>
+        </MessageBubble>
       </article>
       <section v-if="turn" class="activity-panel">
         <span role="status">{{ stopping ? "正在停止" : "处理中" }}</span>
-        <div v-for="step in turn.steps" :key="step.id" class="activity-step">
-          {{ step.label || step.title || step.kind }}
-        </div>
-        <Markdown
-          v-for="(text, index) in turn.interim"
-          :key="index"
-          :text="text"
-        />
+        <ActivityTrace :steps="turn.steps" running />
+        <MessageBubble v-if="turn.interim.length" :text="turn.interim.join('\n\n')" />
         <div class="button-row">
           <button class="danger-button" :disabled="stopping" @click="stop">
             停止
@@ -144,8 +131,5 @@ onBeforeUnmount(() => {
 .history-message.user {
   justify-self: end;
   max-width: 85%;
-  border-radius: var(--r-bubble);
-  padding: var(--space-2-5) var(--space-4);
-  background: var(--bubble-user);
 }
 </style>

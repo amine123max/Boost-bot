@@ -18,6 +18,8 @@ Vue 3, TypeScript and Vite provide the management interface for desktop and Web.
 
 `boost-theme.js` restores appearance before first paint. The Bot avatar renderer is shared with `../bot/shared/appearance/`. UI preferences use versioned device storage; service policy remains backend-owned.
 
+Primary management toolbars share the sidebar search centerline and a 42px control row. Search keeps 14px above and below it. `PageTabs` places log/model/test categories beside their actions, supports arrow/Home/End keys and restores focus across panel changes. Narrow layouts keep horizontal access to the row without shrinking controls.
+
 ## Build and validation
 
 From the repository root:

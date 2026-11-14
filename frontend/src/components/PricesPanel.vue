@@ -104,8 +104,9 @@ onMounted(() => perform(load));
 </script>
 <template>
   <section class="model-pricing-section">
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
+        <slot name="heading" />
         <div class="search-field">
           <BoostIcon name="search" :size="16" /><input
             v-model="query"

@@ -204,7 +204,7 @@ async function remove() {
 </script>
 <template>
   <div class="keys-page">
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
         <div class="key-page-heading">
           <h2>平台密钥</h2>

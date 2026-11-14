@@ -7,6 +7,9 @@
   font-display: swap;
 }
 :root {
+  --boost-controls-gap: 14px;
+  --boost-search-height: 36px;
+  --boost-controls-height: 42px;
   --font-scale: 0.9285714286;
   --data-font-scale: 0.8666666667;
   --ui-body-weight: 400;
@@ -4972,5 +4975,25 @@ html[data-theme-transition="light"]::view-transition-old(root) {
 .topbar { min-height: var(--boost-shell-heading-height); height: var(--boost-shell-heading-height); padding-block: 0; background:var(--boost-shell-heading-surface); border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent); }
 .topbar .page-heading h1 { font-size: 22px; line-height: 1.3; font-weight: 700; }
 .sidebar { padding-top: 0; background:linear-gradient(to bottom,var(--boost-shell-heading-surface) 0 var(--boost-shell-heading-height),var(--sidebar) var(--boost-shell-heading-height)); }
+.sidebar-collapsed .sidebar { padding-top: 0; }
 .sidebar .brand { height: var(--boost-shell-heading-height); min-height: var(--boost-shell-heading-height); padding-top: 0; padding-bottom: 0; align-items: center; }
 .nav-item { letter-spacing: calc(var(--ui-letter-spacing) + 0.5px); }
+
+/* Share one centerline for sidebar search and each page's primary controls. */
+.page-content { padding-top: calc(var(--boost-controls-gap) - (var(--boost-controls-height) - var(--boost-search-height)) / 2); }
+.page-content .page-primary-toolbar {
+  height: var(--boost-controls-height);
+  min-height: var(--boost-controls-height);
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.page-primary-toolbar > .toolbar-group { flex-wrap: nowrap; }
+.page-control-tabs { flex: none; margin-bottom: 0; height: var(--boost-controls-height); white-space: nowrap; }
+.page-control-tabs button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.page-primary-toolbar :is(.badge, .muted, .section-title) { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 1200px) {
+  .page-content .page-primary-toolbar { overflow-x: auto; scrollbar-width: none; }
+  .page-primary-toolbar::-webkit-scrollbar { display: none; }
+  .page-primary-toolbar > .toolbar-group { flex-shrink: 0; }
+}

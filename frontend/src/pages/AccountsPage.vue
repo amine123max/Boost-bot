@@ -302,7 +302,7 @@ async function refreshUsage() {
 </script>
 <template>
   <div class="accounts-page">
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
         <span class="eyebrow">OPENAI ACCOUNTS</span
         ><span class="badge">{{ boost.accounts.length }} 个账号</span>

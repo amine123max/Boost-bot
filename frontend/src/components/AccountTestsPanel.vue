@@ -77,8 +77,9 @@ async function automatic(
 </script>
 <template>
   <div class="tests-page">
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
+        <slot name="heading" />
         <span class="eyebrow">ACCOUNT AVAILABILITY</span
         ><span class="badge">{{ eligibleAccounts.length }} 个可测试</span>
       </div>

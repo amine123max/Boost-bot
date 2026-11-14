@@ -8,6 +8,8 @@ The Company Research, PPT Master and US Stock Research workspaces include intera
 
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 
+Direct chat, channel views and history share theme-colored reply bubbles. Timestamps and reply-copy controls sit below the bubble; user bubble colors and geometry remain unchanged. Copy preserves the original text, reports clipboard failures and offers a compatible fallback without including processing traces.
+
 ## Components
 
 | Directory | Responsibility |

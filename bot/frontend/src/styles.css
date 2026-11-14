@@ -178,9 +178,7 @@
     max-width: min(var(--bubble-w), 80%);
   }
   .message.is-user .message-body {
-    border-radius: var(--r-bubble);
-    padding: var(--space-2-5) var(--space-4);
-    background: var(--bubble-user);
+    flex: initial;
   }
   .message.is-user .message-meta {
     display: none;

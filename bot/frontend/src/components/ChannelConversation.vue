@@ -4,7 +4,7 @@ import type { Activity, ChannelConversation, Message } from "../types";
 import { api, enc, downloadFile } from "../api";
 import ConversationLabel from "./ConversationLabel.vue";
 import ActivityTrace from "./ActivityTrace.vue";
-import Markdown from "./Markdown.vue";
+import MessageBubble from "./MessageBubble.vue";
 import HelpTip from "./HelpTip.vue";
 import Icon from "./Icon.vue";
 const props = defineProps<{ conversation: ChannelConversation }>();
@@ -110,16 +110,8 @@ onBeforeUnmount(() => {
               :count="message.steps"
               :conversation-id="conversation.id"
               :message-id="message.id"
-            /><Markdown :text="message.content" />
-            <div class="hint">
-              {{
-                message.createdAt
-                  ? new Date(message.createdAt).toLocaleString("zh-CN", {
-                      hour12: false,
-                    })
-                  : ""
-              }}
-            </div>
+            />
+            <MessageBubble :text="message.content" :role="message.role" :created-at="message.createdAt">
             <button
               v-for="f in message.files"
               :key="f.path"
@@ -129,13 +121,12 @@ onBeforeUnmount(() => {
             >
               <Icon name="file" />{{ f.name }}
             </button>
+            </MessageBubble>
           </div>
         </article>
         <section v-if="turn">
-          <ActivityTrace :steps="turn.steps" running /><Markdown
-            v-for="(text, index) in turn.interim"
-            :key="index"
-            :text="text"
+          <ActivityTrace :steps="turn.steps" running /><MessageBubble
+            v-if="turn.interim.length" :text="turn.interim.join('\n\n')"
           /><button class="danger-button" :disabled="stopping" @click="stop">
             {{ stopping ? "正在停止" : "停止" }}
           </button>

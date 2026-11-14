@@ -19,6 +19,7 @@ const icons: Record<string, string> = {
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   tasks: "M9 5h11M9 12h11M9 19h11m-7-1 2 2 3-3M3 5h.01M3 12h.01",
   check: "m5 12 4 4L19 6",
+  copy: "M9 5V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1M4 7h9a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z",
   info: "M12 7v6M12 16h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
   refresh:
     "M20 7v5h-5M4 17v-5h5M6.1 6a8 8 0 0 1 13.2 3M4.7 15a8 8 0 0 0 13.2 3",

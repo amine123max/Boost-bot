@@ -323,7 +323,7 @@ function rowAction(api: AggregateApi, action: string) {
 </script>
 <template>
   <div v-if="isAdmin" class="connections-page">
-    <div class="page-toolbar">
+    <div class="page-toolbar page-primary-toolbar">
       <div class="toolbar-group">
         <span class="eyebrow">UPSTREAM CONNECTIONS</span
         ><span class="badge">{{ boost.connections.length }} 个聚合 API</span>

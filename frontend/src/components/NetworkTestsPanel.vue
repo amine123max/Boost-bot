@@ -215,8 +215,9 @@ onBeforeUnmount(() => clearInterval(timer));
 
 <template>
   <section class="network-workbench" aria-label="网速测试面板">
-    <div class="page-toolbar network-toolbar">
+    <div class="page-toolbar network-toolbar page-primary-toolbar">
       <div class="toolbar-group">
+        <slot name="heading" />
         <span class="eyebrow">NETWORK BENCHMARK</span
         ><span class="badge">{{ nodes.length }} 个节点</span>
       </div>

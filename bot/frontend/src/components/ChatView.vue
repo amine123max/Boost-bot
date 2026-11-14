@@ -8,13 +8,14 @@ import ComposerModelMenu from './ComposerModelMenu.vue';
 import BotPermissionControl from './BotPermissionControl.vue';
 import Markdown from "./Markdown.vue";
 import ActivityTrace from "./ActivityTrace.vue";
+import MessageBubble from "./MessageBubble.vue";
 import type { Bot, Group, Approval, FileItem } from "../types";
 import type { Conversation } from "../conversation";
 import { defineComponent, type PropType } from "vue";
 import { downloadFile } from "../api";
 
 export default defineComponent({
-  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ActivityTrace },
+  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ActivityTrace, MessageBubble },
   props: {
     chat: { type: Object as PropType<Conversation>, required: true },
     bot: Object as PropType<Bot>,
@@ -38,13 +39,6 @@ export default defineComponent({
     const title = computed(
       () => props.group?.name || props.bot?.name || "智能体",
     );
-    const time = (value?: number) =>
-      value
-        ? new Date(value).toLocaleTimeString("zh-CN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "";
     async function scroll() {
       await nextTick();
       if (nearBottom.value && scroller.value)
@@ -102,7 +96,6 @@ export default defineComponent({
       members,
       botOf,
       title,
-      time,
       mention,
       keydown,
       file,
@@ -238,22 +231,22 @@ export default defineComponent({
             :size="30"
           />
           <div class="message-body">
-            <div class="message-meta">
-              <strong v-if="group || m.role === 'system'">{{
+            <div v-if="group || m.role === 'system'" class="message-meta">
+              <strong>{{
                 m.role === "user"
                   ? "你"
                   : m.role === "system"
                     ? "系统"
                     : botOf(m.botId)?.name || "智能体"
-              }}</strong
-              ><time>{{ time(m.createdAt) }}</time>
+              }}</strong>
             </div>
             <ActivityTrace
               v-if="m.steps"
               :count="m.steps"
               :conversation-id="m.conversationId || chat.conversationId"
               :message-id="m.id"
-            /><Markdown :text="m.content" />
+            />
+            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt">
             <button
               v-for="f in m.files"
               :key="f.path"
@@ -264,13 +257,13 @@ export default defineComponent({
               <Icon name="file" />{{ f.name
               }}{{ f.gone === true ? "（文件已移除）" : "" }}
             </button>
+            </MessageBubble>
           </div>
         </article>
         <template v-if="chat.live">
           <article v-if="chat.live.userText && !group" class="message is-user">
             <div class="message-body">
-              <div class="message-meta"><strong>你</strong></div>
-              <Markdown :text="chat.live.userText" />
+              <MessageBubble :text="chat.live.userText" role="user" />
             </div>
           </article>
           <article class="message is-live">
@@ -296,26 +289,18 @@ export default defineComponent({
                 :steps="chat.live.steps"
                 :running="chat.running"
               />
-              <Markdown
-                v-for="(text, i) in chat.live.interim"
-                :key="i"
-                :text="text"
-              />
-              <Markdown v-if="chat.live.text" :text="chat.live.text" /><span
-                v-else
-                class="stream-placeholder"
-                >{{ chat.stopping ? "正在结束当前处理…" : "等待回复…" }}</span
-              >
+              <MessageBubble v-if="chat.live.text || chat.live.interim?.length || chat.live.files?.length" :text="chat.live.text" :interim="chat.live.interim">
               <button
                 v-for="f in chat.live.files"
                 :key="f.path"
                 class="file-button"
-                @click="
-                  file(chat.live.conversationId || chat.conversationId, f)
-                "
+                @click="file(chat.live.conversationId || chat.conversationId, f)"
+              ><Icon name="file" />{{ f.name }}</button>
+              </MessageBubble><span
+                v-else
+                class="stream-placeholder"
+                >{{ chat.stopping ? "正在结束当前处理…" : "等待回复…" }}</span
               >
-                <Icon name="file" />{{ f.name }}
-              </button>
             </div>
           </article>
         </template>

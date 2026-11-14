@@ -253,8 +253,8 @@ function reasoning(model: ManagedModelInfo) {
 </script>
 <template>
   <div>
-    <div class="page-toolbar">
-      <h2 class="section-title">模型目录明细</h2>
+    <div class="page-toolbar page-primary-toolbar">
+      <slot name="heading"><h2 class="section-title">模型目录明细</h2></slot>
       <div class="toolbar-group catalog-actions">
         <button v-if="writable" class="secondary" @click="remoteImport = true">
           <BoostIcon name="download" :size="16" />并入远端模型
