@@ -9,7 +9,7 @@ import {
 } from "vue";
 import type { Bot, Status } from "../types";
 import { api } from "../api";
-import { back } from "../host";
+import { back, canShowDirectory, showDirectory } from "../host";
 import { preferences, savePreferences } from "../preferences";
 import { settingsSection, settingsSections } from "../settings-navigation";
 import SettingsNavigation from "./SettingsNavigation.vue";
@@ -49,6 +49,7 @@ interface RuntimeSettings {
   dataDir: string;
   desktop: boolean;
   workspace?: { parent: string; root: string; pendingRoot: string; restartRequired: boolean; error: string };
+  dataStorage?: { parent: string; root: string; pendingRoot: string; restartRequired: boolean; error: string };
   webSearch: { provider: string; url?: string; hasKey?: boolean };
 }
 const settings = ref<RuntimeSettings>(),
@@ -61,6 +62,17 @@ const settings = ref<RuntimeSettings>(),
   scrollRoot = ref<HTMLElement>();
 const active = ref(settingsSection(props.section).id);
 const activeSection = computed(() => settingsSection(active.value));
+const showingDirectory = ref(false);
+async function revealDataDirectory() {
+  if (showingDirectory.value) return;
+  showingDirectory.value = true; error.value = '';
+  try {
+    if (canShowDirectory.value) await showDirectory(settings.value?.dataStorage?.root || settings.value?.dataDir || '');
+    else if (settings.value?.desktop) await api('/desktop/open-data-dir', { method: 'POST', body: {} });
+    else throw new Error('请在 Boost 桌面版中显示目录');
+  } catch (e) { error.value = (e as Error).message; }
+  finally { showingDirectory.value = false; }
+}
 let frame = 0,
   navigating = false;
 function jump(id: string) {
@@ -145,6 +157,7 @@ async function save() {
         defaultModel: snapshot.defaultModel,
         reasoningEffort: snapshot.reasoningEffort,
         ...(snapshot.workspace ? { workspaceParent: snapshot.workspace.parent } : {}),
+        ...(snapshot.dataStorage ? { dataParent: snapshot.dataStorage.parent } : {}),
         webSearch: {
           provider: snapshot.webSearch.provider,
           ...(snapshot.webSearch.provider === "searxng"
@@ -156,7 +169,7 @@ async function save() {
     });
     searchKey.value = "";
     settings.value = result;
-    saved.value = result.workspace?.restartRequired ? "设置已保存，重启 Boost 后迁移沙箱" : "设置已保存";
+    saved.value = result.workspace?.restartRequired || result.dataStorage?.restartRequired ? "设置已保存，重启 Boost 后迁移所选目录" : "设置已保存";
     emit("saved");
   } catch (e) {
     error.value = (e as Error).message;
@@ -406,12 +419,16 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
                 </dl>
                 <p v-if="settings.workspace.error" class="error-banner" role="alert">{{ settings.workspace.error }}</p>
               </div>
-              <div class="preferences-group">
+              <div class="preferences-group storage-preferences">
                 <SettingRow
                   label="数据位置"
-                  :help="settings?.dataDir || '尚未读取数据目录'"
-                  ><span>当前账号的本地数据目录</span></SettingRow
-                ><SettingRow
+                  help="当前工作台的会话、渠道配置和凭据。保存新位置后，退出并重启 Boost 完成迁移；Boost账号池和计费数据保持原位置。"
+                  ><input v-if="settings?.dataStorage" v-model="settings.dataStorage.parent" aria-label="数据父文件夹" placeholder="留空保留当前目录" :disabled="!configure" autocomplete="off" spellcheck="false" /><span v-else>当前账号的本地数据目录</span></SettingRow>
+                <div class="data-location-details"><p class="data-location-path">{{ settings?.dataStorage?.root || settings?.dataDir || '尚未读取数据目录' }}</p><button class="quiet-button" :disabled="showingDirectory || (!canShowDirectory && !settings?.desktop)" :title="!canShowDirectory && !settings?.desktop ? '网页版请在服务所在电脑访问此目录' : '在文件管理器中显示当前数据目录'" @click="revealDataDirectory">显示目录</button></div>
+                <p v-if="!canShowDirectory && !settings?.desktop" class="settings-context">网页版请在服务所在电脑访问此目录。</p>
+                <p v-if="settings?.dataStorage?.restartRequired" class="settings-context data-location-path">重启后：{{ settings.dataStorage.pendingRoot }}</p>
+                <p v-if="settings?.dataStorage?.error" class="error-banner" role="alert">{{ settings.dataStorage.error }}</p>
+                <SettingRow
                   label="模型与计费数据"
                   help="账户、请求日志和模型计费由 Boost 管理。"
                   ><button class="quiet-button" @click="back">
@@ -545,6 +562,9 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
   margin: 0 0 8px;
 }
 .workspace-location { margin-bottom: 12px; }
+.data-location-details { display:flex; align-items:center; gap:12px; padding:2px 0 10px; }
+.data-location-path { margin:0; min-width:0; overflow-wrap:anywhere; white-space:normal; word-break:break-word; font-size:11px; line-height:1.6; color:var(--muted); flex:1; }
+.data-location-details > button { flex:none; white-space:nowrap; }
 .workspace-paths { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 8px 0; font-size: 11px; line-height: 1.5; }
 .workspace-paths dt { color: var(--muted); }
 .workspace-paths dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); }

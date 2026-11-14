@@ -14,6 +14,25 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 use std::time::Duration;
 
+enum HostStartup {
+    Migrating,
+    Ready(Option<u16>),
+    Failed(String),
+}
+
+fn wait_for_host(rx: std::sync::mpsc::Receiver<HostStartup>) -> Result<u16, String> {
+    let started = std::time::Instant::now();
+    let mut limit = Duration::from_secs(45);
+    loop {
+        let remaining = limit.checked_sub(started.elapsed()).ok_or("Boost Bot启动超时")?;
+        match rx.recv_timeout(remaining).map_err(|_| "Boost Bot启动未完成")? {
+            HostStartup::Migrating => limit = Duration::from_secs(600),
+            HostStartup::Ready(port) => return port.filter(|port| *port > 0).ok_or_else(|| "Boost Bot启动端口无效".into()),
+            HostStartup::Failed(error) => return Err(error),
+        }
+    }
+}
+
 struct Host {
     child: Child,
     port: u16,
@@ -262,24 +281,30 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         // Keep draining stdout after readiness so logs cannot fill a pipe.
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if let Ok(value) = serde_json::from_str::<Value>(&line) {
+                if value.get("boostBotMigration").and_then(Value::as_bool) == Some(true) {
+                    let _ = tx.try_send(HostStartup::Migrating);
+                }
+                if let Some(error) = value.get("boostBotError").and_then(Value::as_str) {
+                    let _ = tx.send(HostStartup::Failed(error.chars().take(1000).collect()));
+                }
                 if value.get("boostBotReady").and_then(Value::as_bool) == Some(true) {
-                    let _ = tx.try_send(
+                    let _ = tx.send(HostStartup::Ready(
                         value
                             .get("port")
                             .and_then(Value::as_u64)
                             .and_then(|p| u16::try_from(p).ok()),
-                    );
+                    ));
                 }
             }
         }
     });
-    let port = match rx.recv_timeout(Duration::from_secs(45)) {
-        Ok(Some(port)) if port > 0 => port,
-        _ => {
+    let port = match wait_for_host(rx) {
+        Ok(port) => port,
+        Err(error) => {
             let _ = child.kill();
             let _ = child.wait();
             return Err(format!(
-                "Boost Bot 启动失败，请查看 {}",
+                "{error}，请查看 {}",
                 data_dir.join("logs/app.log").display()
             ));
         }
@@ -339,6 +364,22 @@ pub(crate) fn shutdown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn migration_notice_keeps_waiting_for_readiness_and_rejects_invalid_ports() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(HostStartup::Migrating).unwrap();
+        tx.send(HostStartup::Ready(Some(12345))).unwrap();
+        assert_eq!(wait_for_host(rx), Ok(12345));
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(HostStartup::Ready(Some(0))).unwrap();
+        assert!(wait_for_host(rx).is_err());
+        let (tx, rx) = std::sync::mpsc::channel();
+        drop(tx);
+        assert!(wait_for_host(rx).is_err());
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(HostStartup::Failed("目标目录冲突".into())).unwrap();
+        assert_eq!(wait_for_host(rx), Err("目标目录冲突".into()));
+    }
     #[test]
     fn actor_startup_locks_deduplicate_one_actor_without_blocking_another() {
         let a = start_lock("startup-test-alice").unwrap();

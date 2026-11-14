@@ -5,6 +5,7 @@ import { App } from './app.js';
 import { loadConfig } from './config.js';
 import { registerSecret } from './log.js';
 import { findAppRoot } from './magpie/supervisor.js';
+import { BotDataStorage } from './core/data-storage.js';
 
 const input = await new Promise<string>((resolve, reject) => {
   let text = '';
@@ -40,13 +41,23 @@ process.env.AMB_CUA_DRIVER_DIR = path.join(findAppRoot(), 'bin', 'cua-driver');
 const scratch = process.env.TMPDIR || path.join(host.dataDir, 'tmp', 'runtime');
 fs.mkdirSync(scratch, { recursive: true });
 for (const name of ['TEMP', 'TMP', 'TMPDIR']) process.env[name] = scratch;
+const dataStorage = new BotDataStorage(host.dataDir);
+const dataDirLock = (() => {
+  try {
+    if (fs.existsSync(host.dataDir + '.data-migration.json') || dataStorage.view().restartRequired) fs.writeSync(1, JSON.stringify({ boostBotMigration: true }) + '\n');
+    return dataStorage.prepare();
+  } catch (error) {
+    fs.writeSync(1, JSON.stringify({ boostBotError: (error as Error).message }) + '\n');
+    throw error;
+  }
+})();
 const config = loadConfig({ dataDir: host.dataDir, env: {} });
 config.ui = { ...config.ui, host: '127.0.0.1', port: 0, token: host.token, lang: config.ui.lang === 'system' ? 'zh-CN' : config.ui.lang };
 config.magpie = { mode: 'external', binPath: '', externalBaseUrl: host.baseUrl, externalApiKey: host.apiKey };
 config.agent.mode = host.allowTools ? 'dsh' : 'off';
 if (host.defaultModel && !config.llm.defaultModel) config.llm.defaultModel = host.defaultModel;
 if(host.sourceBroker && host.sourceBroker.url !== host.baseUrl.replace(/\/v1$/, '')+'/_boost/bot/model-sources')throw new Error('Invalid Boost source broker');
-const app = new App(config,{sourceBroker:host.sourceBroker});
+const app = new App(config,{sourceBroker:host.sourceBroker,dataStorage,dataDirLock});
 if (host.allowTools) {
   const bundled = path.join(findAppRoot(), 'bots');
   for (const entry of fs.readdirSync(bundled, { withFileTypes: true })) {

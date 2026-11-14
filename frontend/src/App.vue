@@ -71,6 +71,9 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
     :class="{ 'sidebar-collapsed': uiPreferences.compactSidebar, 'app-booting': !startupReady }"
   >
     <aside class="sidebar">
+      <span class="sidebar-divider" aria-hidden="true" />
+      <span class="sidebar-toggle-zone" aria-hidden="true" />
+      <button class="sidebar-toggle" type="button" :aria-expanded="!uiPreferences.compactSidebar" aria-controls="boost-sidebar-content" :aria-label="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" :title="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" @click="uiPreferences.compactSidebar = !uiPreferences.compactSidebar"><BoostIcon :name="uiPreferences.compactSidebar ? 'sidebar-collapsed' : 'sidebar-expanded'" :size="20" /></button>
       <RouterLink class="brand" to="/bot/" aria-label="Boost 智能体" title="双击左上角动态智能体进入 Bot" @click.prevent @keydown.enter.prevent="openBotFromKeyboard"
         ><span class="brand-avatar-trigger" aria-hidden="true" @click.stop.prevent @dblclick.stop.prevent="openBot"><BoostBotAvatar ambient /></span><span
           class="brand-word"
@@ -139,7 +142,6 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
     </aside>
     <div class="workspace">
       <header class="topbar" data-tauri-drag-region>
-        <button class="sidebar-toggle" type="button" :aria-expanded="!uiPreferences.compactSidebar" aria-controls="boost-sidebar-content" :aria-label="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" :title="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" @click="uiPreferences.compactSidebar = !uiPreferences.compactSidebar"><BoostIcon :name="uiPreferences.compactSidebar ? 'sidebar-collapsed' : 'sidebar-expanded'" :size="20" /></button>
         <div class="page-heading">
           <h1>{{ route.meta.title }}</h1>
         </div>

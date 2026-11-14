@@ -3,6 +3,8 @@ import { onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BoostBotAvatar from '@/components/BoostBotAvatar.vue';
 import { botClient } from '@/lib/api/bot-client';
+import { appClient } from '@/lib/api/app-client';
+import { isTauriRuntime } from '@/lib/api/transport-runtime';
 import { getAppErrorMessage } from '@/lib/api/transport';
 import { botAppearance, setBotAppearance } from '@/composables/useBotAppearance';
 import { consumeBotLaunch } from '@/composables/useBotLaunch';
@@ -51,7 +53,7 @@ async function connect() {
 function sync() {
   if (!source.value) return;
   const themeMode = boost.settings?.theme === 'business' ? 'light' : boost.settings?.theme === 'tech' ? 'system' : 'dark';
-  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: themeMode, accent: uiPreferences.themeColor }, new URL(source.value).origin);
+  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: themeMode, accent: uiPreferences.themeColor, canShowDirectory: isTauriRuntime() }, new URL(source.value).origin);
 }
 function onFrameLoad() {
   loaded.value = true;
@@ -59,6 +61,13 @@ function onFrameLoad() {
 }
 function message(event: MessageEvent) {
   if (!source.value || event.source !== frame.value?.contentWindow || event.origin !== new URL(source.value).origin) return;
+  if (event.data?.type === 'boost:directory:show') {
+    const id = event.data.id, directory = event.data.path;
+    const result = (error?: string) => frame.value?.contentWindow?.postMessage({ type: 'boost:directory:result', id, error }, event.origin);
+    if (!isTauriRuntime() || typeof id !== 'string' || typeof directory !== 'string' || !directory || directory.length > 4096 || directory.includes('\0')) { result('当前环境不支持显示本地目录'); return; }
+    void appClient.openInFileManager(directory).then(() => result()).catch(e => result(getAppErrorMessage(e)));
+    return;
+  }
   if (event.data?.type === 'boost:bot:ready') { loaded.value = true; sync(); }
   if (event.data?.type === 'boost:workspace:content-ready') void signalContentReady();
   if (event.data?.type === 'boost:appearance:open') void router.push('/settings/?tab=bot');

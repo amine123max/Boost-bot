@@ -110,6 +110,8 @@ Web replies use a borderless layout; channel replies keep theme-matched bubbles 
 
 Bot settings can relocate sandbox files into `Boost/bots/<workspace>/workspaces/<bot>` on another drive or folder. The change takes effect on restart and preserves historical file paths. See the [sandbox directory guide](docs/zh-CN/report/Bot沙箱与目录管理.md).
 
+The current Bot workspace's conversation database and channel settings can also move to a separate `Boost/bots/<workspace>/data` directory on restart. Existing paths remain compatible; desktop users can reveal the active directory in the file manager. Boost account-pool and billing storage remain separate.
+
 ![Bot sandbox storage](docs/images/bot-storage.png)
 
 </details>

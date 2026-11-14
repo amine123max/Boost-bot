@@ -10,6 +10,7 @@ import { CollaborationService } from './core/collaboration.js';
 import { BotManagement } from './core/bot-management.js';
 import { ChannelDelivery } from './core/channel-delivery.js';
 import { WorkspaceStorage, workspaceRoot } from './core/workspace-storage.js';
+import type { BotDataStorage } from './core/data-storage.js';
 import { deferNotice, interruptedText, takeInterrupted, type Interrupted } from "./core/recovery.js";
 import { Outbox } from "./core/outbox.js";
 import { Delivery, type DeliveryOptions } from "./core/delivery.js";
@@ -134,6 +135,8 @@ export interface OfficialView {
 export type OfficialConnectResult = { ok: true; models: string[] } | { ok: false; code: OfficialFailure; message: string };
 
 export interface AppOptions {
+  dataStorage?: BotDataStorage;
+  dataDirLock?: DataDirLock;
   sourceBroker?: SourceBroker;
   /** 测试注入：替换飞书传输层 */
   feishuTransport?: (account: { id: string; feishuAppId: string; feishuAppSecret: string; brand: "feishu" | "lark" }) => FeishuTransport;
@@ -737,7 +740,7 @@ export class App {
 
   async start(): Promise<void> {
     // 同一个数据目录只能有一个宿主（两个调度器会把规则跑两遍、两个渠道连接抢同一个微信）：桌面版另有单实例锁
-    this.lock ??= lockDataDir(this.config.dataDir);
+    this.lock ??= this.opts.dataDirLock ?? lockDataDir(this.config.dataDir);
     this.workspaceStorage.activate();
     if (this.workspaceStorage.view().error) this.notice("warn", this.workspaceStorage.view().error);
     if (this.magpie) {

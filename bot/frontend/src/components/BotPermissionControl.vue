@@ -247,6 +247,8 @@ onBeforeUnmount(() => {
   overflow: auto;
   scrollbar-width: none;
   padding: 9px;
+  display: grid;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
@@ -266,10 +268,10 @@ onBeforeUnmount(() => {
 }
 .bot-permission-menu > button {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 8px 6px;
+  padding: 6px 8px;
   border-radius: 7px;
   text-align: left;
   border: 0;
@@ -283,7 +285,7 @@ onBeforeUnmount(() => {
 }
 .bot-permission-menu > button > svg {
   flex: none;
-  margin-top: 2px;
+  align-self: center;
 }
 .bot-permission-menu > button > span:not(.loading-ring) {
   display: grid;

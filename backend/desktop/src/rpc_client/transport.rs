@@ -39,7 +39,7 @@ fn rpc_io_timeout(method: &str, params: Option<&serde_json::Value>) -> Duration 
 
 fn rpc_execution_timeout(method: &str, params: Option<&serde_json::Value>) -> Duration {
     if matches!(method, "bot/open" | "bot/openDesktop") {
-        return Duration::from_secs(60);
+        return Duration::from_secs(600);
     }
     if method == "apikey/modelSourceSync" {
         return Duration::from_secs(180);
@@ -283,6 +283,18 @@ mod tests {
         assert!(
             rpc_io_timeout("quota/modelPriceRules/syncOpenai", None)
                 >= std::time::Duration::from_secs(40)
+        );
+    }
+
+    #[test]
+    fn bot_open_covers_migration_and_queue_wait_without_extending_other_commands() {
+        assert_eq!(
+            rpc_io_timeout("bot/openDesktop", None),
+            std::time::Duration::from_secs(600) + RPC_QUEUE_WAIT_ALLOWANCE
+        );
+        assert_eq!(
+            rpc_io_timeout("account/list", None),
+            RPC_DEFAULT_IO_TIMEOUT + RPC_QUEUE_WAIT_ALLOWANCE
         );
     }
 

@@ -104,6 +104,8 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 
 Bot 设置支持将沙箱工作文件迁移到其他磁盘或文件夹内的 `Boost/bots/<工作台>/workspaces/<智能体>`，重启生效并保留历史文件路径。参见[沙箱目录说明](docs/zh-CN/report/Bot沙箱与目录管理.md)。
 
+当前Bot工作台的会话数据库、渠道配置等也支持迁移到独立的 `Boost/bots/<工作台>/data`，重启时应用并保留旧路径兼容。桌面版可一键显示实际目录；Boost账号池和计费存储保持独立。
+
 ![Bot 沙箱存储设置](docs/images/bot-storage.png)
 
 </details>

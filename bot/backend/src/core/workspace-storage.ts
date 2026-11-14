@@ -28,7 +28,8 @@ export class WorkspaceStorage {
     const boost = path.basename(base).toLowerCase() === "boost" ? base : path.join(base, "Boost");
     // Separate users/workspaces sharing the same selected drive or folder.
     const data = fs.existsSync(this.config.dataDir) ? fs.realpathSync(this.config.dataDir) : path.resolve(this.config.dataDir);
-    const scope = createHash("sha256").update(process.platform === "win32" ? data.toLowerCase() : data).digest("hex").slice(0, 16);
+    const identity = this.config.workspaceIdentity || data;
+    const scope = createHash("sha256").update(process.platform === "win32" ? identity.toLowerCase() : identity).digest("hex").slice(0, 16);
     const target = path.join(boost, "bots", scope, "workspaces");
     if (within(data, target)) throw new Error("自定义沙箱不能放入当前内部数据目录，请选择其他文件夹");
     const source = workspaceRoot(this.config);

@@ -235,9 +235,13 @@ code {
 }
 .brand-avatar-trigger { display: inline-flex; flex: 0 0 auto; border-radius: 50%; cursor: pointer; }
 .brand-avatar-trigger:hover { filter: brightness(1.12); }
-.sidebar-toggle { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; flex:none; padding:0; margin-right:10px; border:0; box-shadow:none; color:var(--muted); background:transparent; }
-.topbar .page-heading { flex:1; min-width:0; }
-.sidebar-toggle:hover, .sidebar-toggle:focus-visible { outline:none; color:var(--text); background:var(--hover); border-color:transparent; box-shadow:none; }
+.sidebar-divider { position:absolute; top:var(--boost-shell-heading-height,60px); bottom:12px; right:0; width:1px; background:var(--border); pointer-events:none; }
+.sidebar-toggle-zone { position:absolute; z-index:19; top:calc(50% - 32px); right:-18px; width:36px; height:64px; }
+.sidebar-toggle { position:absolute; z-index:20; top:50%; right:-15px; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:50%; box-shadow:none; color:var(--muted); background:transparent; transform:translateY(-50%); opacity:0; transition:opacity 140ms ease,color 140ms ease; }
+.sidebar-toggle-zone:hover + .sidebar-toggle, .sidebar-toggle:hover, .sidebar-toggle:focus-visible { opacity:1; }
+.sidebar-toggle:hover, .sidebar-toggle:active { transform:translateY(-50%); }
+.sidebar-toggle:hover, .sidebar-toggle:focus-visible { outline:none; color:var(--text); background:transparent; border-color:transparent; box-shadow:none; }
+@media (hover: none) and (min-width: 761px) { .sidebar-toggle { opacity:1; } }
 @media (max-width: 760px) { .sidebar-toggle { display: none; } }
 .brand img {
   width: 35px;

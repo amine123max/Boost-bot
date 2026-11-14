@@ -296,6 +296,9 @@
     z-index: var(--z-tip, 1000);
     width: max-content;
     max-width: min(330px, calc(100vw - 24px));
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
     background: var(--glass-sheet);
     color: var(--fg);
     font-size: var(--fs-sm);
@@ -653,7 +656,7 @@
     font-size: 12px;
     color: var(--muted);
   }
-  .catalog-card .primary-button {
+  .catalog-card :is(.primary-button, .custom-create-button) {
     margin-top: 6px;
     padding: 5px 10px;
     min-height: 28px;
@@ -665,8 +668,11 @@
     flex: 0 0 184px;
   }
   .catalog-placeholder { flex:none; color:var(--muted); }
-  .panel-toggle, .panel-toggle:focus-visible { border:0; box-shadow:none; outline:none; }
-  .panel-toggle:focus-visible { background:var(--hover); }
+  .create-card .custom-create-button { background:var(--pill); color:var(--fg); border:0; }
+  .create-card .custom-create-button:hover:not(:disabled) { background:var(--pill-hover); }
+  .create-card .custom-create-button:active:not(:disabled) { background:var(--pill-press); }
+  .panel-toggle, .panel-toggle:hover, .panel-toggle:focus-visible { border:0; border-radius:50%; box-shadow:none; outline:none; background:transparent; }
+  .panel-toggle:focus-visible { color:var(--accent); }
   .catalog-app-view {
     display: flex;
     flex-direction: column;

@@ -29,6 +29,17 @@ function savedTheme() {
   }
 }
 export const theme = ref(savedTheme());
+export const canShowDirectory = ref(false);
+const directoryRequests = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+export function showDirectory(path: string): Promise<void> {
+  if (!canShowDirectory.value || parent === window) return Promise.reject(new Error('请在 Boost 桌面版中显示目录'));
+  const id = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { directoryRequests.delete(id); reject(new Error('显示目录超时，请重试')); }, 10000);
+    directoryRequests.set(id, { resolve, reject, timer });
+    post({ type: 'boost:directory:show', id, path });
+  });
+}
 const media = matchMedia("(prefers-color-scheme: dark)");
 function applyTheme() {
   document.documentElement.dataset.theme =
@@ -76,9 +87,17 @@ export async function ready() {
   });
 }
 window.addEventListener("message", (event) => {
+  if (event.source === parent && event.data?.type === 'boost:directory:result') {
+    const request = directoryRequests.get(event.data.id);
+    if (!request) return;
+    directoryRequests.delete(event.data.id); clearTimeout(request.timer);
+    if (event.data.error) request.reject(new Error(String(event.data.error))); else request.resolve();
+    return;
+  }
   if (event.source !== parent || event.data?.type !== "boost:appearance")
     return;
   brandAppearance.value = normalizeBotAppearance(event.data.preferences);
+  canShowDirectory.value = event.data.canShowDirectory === true;
   if (event.data.accent !== undefined) applyAccent(event.data.accent);
   if (["light", "dark", "system"].includes(event.data.theme))
     setTheme(event.data.theme, true);

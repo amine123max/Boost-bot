@@ -584,6 +584,11 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     if (p === "/settings") {
       if (m === "PUT") {
         const b = await readJson(req);
+        if (b.dataParent !== undefined) {
+          if (typeof b.dataParent !== 'string' || !app.opts.dataStorage) throw new HttpError(400, '当前宿主不支持数据目录迁移');
+          try { app.opts.dataStorage.validate(b.dataParent); }
+          catch (error) { throw new HttpError(400, (error as Error).message); }
+        }
         if (b.workspaceParent !== undefined) {
           if (typeof b.workspaceParent !== "string") throw new HttpError(400, "沙箱路径必须为文件夹路径");
           try { app.workspaceStorage.validate(b.workspaceParent); }
@@ -635,6 +640,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           });
         }
         if (typeof b.workspaceParent === "string") app.workspaceStorage.schedule(b.workspaceParent);
+        if (typeof b.dataParent === 'string') app.opts.dataStorage!.schedule(b.dataParent);
       } else if (m !== "GET") throw new HttpError(405, "method not allowed");
       return send(res, 200, {
         defaultModel: cfg.llm.defaultModel,
@@ -649,6 +655,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         listen: { host, port: boundPort, tokenRequired: !!token },
         dataDir: cfg.dataDir,
         workspace: app.workspaceStorage.view(),
+        dataStorage: app.opts.dataStorage?.view(),
         webSearch: app.webSearchView(),
       });
     }

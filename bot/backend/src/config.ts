@@ -17,6 +17,8 @@ export interface AppConfig {
   workspaceRoot?: string;
   /** User-selected parent folder. Applied on the next host restart. */
   workspaceParent?: string;
+  /** Internal stable identity so relocating data never relocates an existing sandbox. */
+  workspaceIdentity?: string;
   ui: {
     host: string;
     port: number;
@@ -86,6 +88,7 @@ export function loadConfig(overrides: { dataDir?: string; env?: NodeJS.ProcessEn
     dataDir,
     workspaceRoot: typeof file.workspaceRoot === "string" && path.isAbsolute(file.workspaceRoot) ? file.workspaceRoot : undefined,
     workspaceParent: typeof file.workspaceParent === "string" ? file.workspaceParent : "",
+    workspaceIdentity: typeof file.workspaceIdentity === "string" && path.isAbsolute(file.workspaceIdentity) ? file.workspaceIdentity : undefined,
     ui: {
       host: env.AMB_UI_HOST || file.ui?.host || "127.0.0.1",
       port: num(env.AMB_UI_PORT, file.ui?.port ?? 3600),
