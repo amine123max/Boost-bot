@@ -125,7 +125,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", shortcut));
   width: 100%;
   min-height: 34px;
   padding: 7px 10px;
-  margin: 0 0 14px;
+  margin: 14px 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--input);
