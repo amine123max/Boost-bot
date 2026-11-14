@@ -782,6 +782,7 @@ onBeforeUnmount(() => {
       @approvals="infoOpen = false"
       @task="selectedTask = $event"
       @tasks="go('tasks')"
+      @saved="refresh"
     />
     <aside v-if="route.kind === 'settings'" ref="settingsPanel" class="settings-side" :class="{ 'is-open': mobileOpen }" aria-label="设置导航面板" :role="mobileOpen ? 'dialog' : undefined" :aria-modal="mobileOpen || undefined" @keydown="settingsKeydown">
       <header class="settings-side-head"><Icon name="settings" :size="20" /><h2>设置</h2><button class="icon-btn settings-nav-close" aria-label="关闭设置导航" @click="mobileOpen = false"><Icon name="close" /></button></header>

@@ -30,6 +30,16 @@ const plan = computed(() =>
   taskPlan(activity.value[detail.value?.runs[0]?.id || ""] || []),
 );
 const loadingRuns = new Set<string>();
+const followup = ref('');
+async function action(kind: 'retry' | 'message') {
+  if (busy.value) return;
+  busy.value = true; error.value = '';
+  try {
+    await api(`/tasks/${enc(props.task.id)}/${kind}`, { method: 'POST', body: kind === 'message' ? { text: followup.value } : {} });
+    followup.value = ''; clearTimeout(timer); await load();
+  } catch (e) { error.value = (e as Error).message; }
+  finally { busy.value = false; }
+}
 async function load() {
   try {
     const d = await api<NonNullable<typeof detail.value>>(
@@ -102,7 +112,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <Modal :title="task.title" @close="$emit('close')"
+  <Modal :title="task.title" :busy="busy" @close="$emit('close')"
     ><div class="editor-form">
       <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
       <span class="state-chip">{{
@@ -135,9 +145,10 @@ onBeforeUnmount(() => {
           :steps="activity[run.id]"
         />
       </details>
+      <form v-if="configure && detail?.task.stage?.key !== 'stopped'" class="editor-form task-followup" @submit.prevent="action('message')"><label>补充要求<textarea v-model="followup" required maxlength="4000" rows="2" /></label><button class="quiet-button" :disabled="busy || !followup.trim()">发送补充</button></form>
       <footer class="dialog-actions">
         <button class="quiet-button" @click="exportTask">导出记录</button
-        ><button
+        ><button v-if="configure && detail?.task.stage?.key === 'failed'" class="quiet-button" :disabled="busy" @click="action('retry')">重试任务</button><button
           v-if="configure && detail?.task.stage?.group === 'working'"
           class="danger-button"
           :disabled="busy"
@@ -149,3 +160,7 @@ onBeforeUnmount(() => {
     </div></Modal
   >
 </template>
+<style scoped>
+.task-followup { padding: 0; gap: 8px; }
+.task-followup > button { justify-self: end; }
+</style>

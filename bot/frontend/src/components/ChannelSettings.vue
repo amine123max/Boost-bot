@@ -5,6 +5,8 @@ import { api, enc } from "../api";
 import HelpTip from "./HelpTip.vue";
 import SelectControl from "./SelectControl.vue";
 import Modal from "./Modal.vue";
+import Icon from './Icon.vue';
+import ChannelIcon from './ChannelIcon.vue';
 import { channelNames as names, channelStateNames as stateNames, type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
 const props = defineProps<{ bots: Bot[]; embedded?: boolean; request?: number; dialogOnly?: boolean }>();
 const emit = defineEmits<{ changed: []; error: [message: string] }>();
@@ -20,6 +22,8 @@ interface FeishuFlow { id: string; state: string; qr: string; url: string; error
 interface Login { state: string; qrContent?: string; qrDataUrl?: string; message?: string }
 const flow = ref<FeishuFlow>();
 const reconnecting = ref(false);
+const settingsOnly = ref(false);
+const directEntry = ref(false), qrOnly = ref(false);
 let attempt = 0;
 let accountLoad = 0;
 const credentials = reactive({
@@ -45,13 +49,16 @@ async function load() {
   }
 }
 let opening = false;
-async function begin(kind?: ChatChannel, account?: Account, botId?: string, autoQr = false) {
+async function begin(kind?: ChatChannel, account?: Account, botId?: string, autoQr = false, editOnly = false) {
   if (opening || busy.value || adding.value || disposed) return;
   opening = true;
   error.value = "";
   login.value = null;
   flow.value = undefined;
   reconnecting.value = !!account;
+  settingsOnly.value = editOnly;
+  directEntry.value = autoQr;
+  qrOnly.value = autoQr && (kind === 'weixin' || kind === 'feishu');
   if (kind) channel.value = kind;
   feishuMode.value = 'qr';
   sandbox.value = 'false';
@@ -78,13 +85,18 @@ async function begin(kind?: ChatChannel, account?: Account, botId?: string, auto
     opening = false;
   }
 }
-defineExpose({ begin });
+function editAccount(account: Account) { return begin(account.channel as ChatChannel, account, account.defaultBot, false, true); }
+defineExpose({ begin, editAccount });
 async function save() {
   if (busy.value) return;
   busy.value = true;
   error.value = "";
   const ticket = ++attempt;
   try {
+    if (settingsOnly.value) {
+      if (!label.value.trim()) throw new Error('请输入设备名称');
+      await finish(); return;
+    }
     clearTimeout(timer);
     if (flow.value) { const previous = flow.value.id; flow.value = undefined; await api(`/connections/flows/${enc(previous)}`, { method: 'DELETE' }).catch(() => {}); }
     if (channel.value === 'feishu' && feishuMode.value === 'qr') {
@@ -195,7 +207,7 @@ async function close() {
   const previousFlow = flow.value;
   flow.value = undefined;
   if (previousFlow) await api(`/connections/flows/${enc(previousFlow.id)}`, { method: 'DELETE' }).catch(() => {});
-  if (channel.value === "weixin" && key.value)
+  if (!settingsOnly.value && channel.value === "weixin" && key.value)
     await api(`/channel-accounts/${enc(key.value)}/weixin/cancel`, {
       method: "POST",
       body: {},
@@ -262,18 +274,20 @@ onBeforeUnmount(() => {
       添加渠道
     </button>
   </section>
-  <Modal v-if="adding" :busy="busy" :title="reconnecting ? '重新连接聊天渠道' : '添加聊天渠道'" @close="close"
-    ><form class="editor-form" @submit.prevent="save">
+  <Modal v-if="adding" compact :qr="qrOnly" :busy="busy && !qrOnly" :title="settingsOnly ? '设备设置' : qrOnly ? names[channel] + '扫码连接' : directEntry ? '连接' + names[channel] : reconnecting ? '重新连接聊天渠道' : '添加聊天渠道'" @close="close"
+    ><template v-if="!settingsOnly" #heading><span class="channel-auth-heading"><ChannelIcon :channel="channel" :size="19" />{{ names[channel] }}授权</span></template><form class="editor-form" :class="{ 'channel-qr-form': qrOnly }" @submit.prevent="save">
       <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
-      <label
+      <template v-if="!qrOnly">
+      <label v-if="!directEntry"
         >渠道<SelectControl
           v-model="channel"
           :disabled="busy || reconnecting"
           label="渠道"
           :options="
-            Object.entries(names).map(([value, label]) => ({ value, label }))
+            Object.entries(names).map(([value, label]) => ({ value, label, channel: value }))
           " /></label
-      ><label>设备／账号名称<HelpTip text="同一渠道可添加多个独立设备或账号，分别命名、启停和选择默认智能体。平台对同一账号的同时在线限制仍然适用。" /><input v-model="label" placeholder="例如：工作手机、团队机器人" maxlength="40" autocomplete="off" /></label>
+      ><label><span>设备／账号名称<HelpTip text="同一渠道可添加多个独立设备或账号，分别命名、启停和选择默认智能体。平台对同一账号的同时在线限制仍然适用。" /></span><input v-model="label" :required="settingsOnly" placeholder="例如：工作手机、团队机器人" maxlength="40" autocomplete="off" /></label>
+      <template v-if="!settingsOnly">
       <label v-if="channel === 'feishu'">连接方式<SelectControl v-model="feishuMode" label="飞书连接方式" :disabled="busy" :options="[{ value: 'qr', label: '扫码连接' }, { value: 'manual', label: '应用凭据' }]" /></label>
       <template v-if="channel === 'feishu' && feishuMode === 'manual'"
         ><label
@@ -313,8 +327,11 @@ onBeforeUnmount(() => {
           type="password"
           autocomplete="new-password"
       /></label>
+      </template>
       <label v-if="bots.length">默认智能体<SelectControl v-model="defaultBot" label="默认智能体" :options="bots.map(bot => ({ value: bot.id, label: bot.name }))" /></label>
-      <div v-if="login" role="status">
+      </template>
+      <div v-if="qrOnly && !login && !error" class="channel-qr-stage" role="status"><Icon name="refresh" class="qr-loading" :size="24" /><p>正在获取二维码…</p></div>
+      <div v-if="login" role="status" :class="{ 'channel-qr-stage': qrOnly }">
         <img
           v-if="login.qrDataUrl"
           :src="login.qrDataUrl"
@@ -337,15 +354,23 @@ onBeforeUnmount(() => {
         >
       </div>
       <footer class="dialog-actions">
-        <button data-dialog-close type="button" class="quiet-button" :disabled="busy" @click="close">取消</button
+        <button v-if="qrOnly && channel === 'feishu'" type="button" class="quiet-button" :disabled="busy" @click="qrOnly = false; feishuMode = 'manual'">使用应用凭据</button>
+        <button data-dialog-close type="button" class="quiet-button" :disabled="busy && !qrOnly" @click="close">取消</button
         ><button type="submit" class="primary-button" :disabled="busy">
-          {{ busy ? "连接中…" : channel === "weixin" || (channel === 'feishu' && feishuMode === 'qr') ? "获取二维码" : "连接" }}
+          {{ busy ? (settingsOnly ? '保存中…' : "连接中…") : settingsOnly ? '保存' : qrOnly ? '刷新二维码' : channel === "weixin" || (channel === 'feishu' && feishuMode === 'qr') ? "获取二维码" : "连接" }}
         </button>
       </footer>
     </form></Modal
   >
 </template>
 <style scoped>
+.channel-auth-heading { display:inline-flex; align-items:center; gap:7px; }
+.channel-qr-stage { display: grid; justify-items: center; gap: 10px; padding: 16px 0; text-align: center; }
+.channel-qr-stage p { margin: 0; color: var(--muted); font-size: 12px; }
+.channel-qr-stage img { width: 200px; height: 200px; border-radius: 8px; padding: 6px; }
+.qr-loading { animation: qr-spin 1s linear infinite; }
+@keyframes qr-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .qr-loading { animation: none; } }
 .connected-state { color: var(--green, #22a06b); background: color-mix(in srgb, var(--green, #22a06b) 14%, transparent); border-radius: 4px; padding: 1px 6px; }
 .channel-setting-row > .select-control {
   width: 280px;

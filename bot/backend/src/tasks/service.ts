@@ -467,7 +467,7 @@ export class TaskService {
   // ---------- 建任务、追加、停止 ----------
 
   /** 新任务（聊天代理的 task_start）：用户原话、说明、最近的对话、附件和记忆快照作为第一条输入，排进队列 */
-  create(o: { botId: string; conversationId: string; title: string; brief: string; budgetUsd?: number; anytime?: boolean }): { task?: TaskRow; error?: string } {
+  create(o: { botId: string; conversationId: string; title: string; brief: string; budgetUsd?: number; anytime?: boolean; source?: 'panel' }): { task?: TaskRow; error?: string } {
     const conv = this.store.getConversation(o.conversationId);
     const bot = this.store.getBot(o.botId);
     if (!conv || !bot) return { error: "conversation not found" };
@@ -477,8 +477,10 @@ export class TaskService {
     if (working >= MAX_WORKING_TASKS) return { error: `This bot already has ${working} background tasks running; finish or stop one first (the user can send /tasks).` };
     const msgs = this.store.listMessages(conv.id, 40);
     const at = msgs.findLastIndex((m) => m.role === "user");
-    const origin = at >= 0 ? msgs[at] : undefined;
-    const recent = msgs
+    // Panel launches carry their own explicit instruction, independent of the
+    // last chat turn. Agent launches retain their original conversational context.
+    const origin = o.source === 'panel' ? undefined : at >= 0 ? msgs[at] : undefined;
+    const recent = o.source === 'panel' ? [] : msgs
       .slice(0, Math.max(0, at))
       .filter((m) => m.role === "user" || m.role === "assistant")
       .slice(-6)

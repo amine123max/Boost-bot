@@ -205,10 +205,10 @@ export class MemoryStore {
   }
 
   /** 按内容片段删除；多条匹配且未指定 all 时报错并列出候选。 */
-  forget(s: Scope, match: string, opts: { topic?: string; all?: boolean; by: string }): string {
+  forget(s: Scope, match: string, opts: { topic?: string; all?: boolean; mainOnly?: boolean; by: string }): string {
     const key = squash(match);
     if (!key) throw new MemoryError(msg("agent.memForgetEmpty"));
-    const topics = opts.topic ? [validTopic(opts.topic)] : [undefined, ...this.topics(s)];
+    const topics = opts.mainOnly ? [undefined] : opts.topic ? [validTopic(opts.topic)] : [undefined, ...this.topics(s)];
     const hits: Array<{ topic?: string; e: Entry }> = [];
     for (const t of topics) for (const e of this.entries(s, t)) if (squash(e.text).includes(key)) hits.push({ topic: t, e });
     if (!hits.length) throw new MemoryError(msg("agent.memForgetNone", { scope: scopeLabel(s), match }));

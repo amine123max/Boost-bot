@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { api, enc } from "../api";
 import SettingRow from "./SettingRow.vue";
 import Modal from "./Modal.vue";
+import ChannelIcon from "./ChannelIcon.vue";
 const emit = defineEmits<{ channels: [] }>();
 interface Account {
   id: string;
@@ -230,8 +231,8 @@ onMounted(load);
         </button></SettingRow
       >
     </div>
-    <Modal v-if="flow" title="飞书账号授权" @close="closeFlow"
-      ><div class="flow-content">
+    <Modal v-if="flow" compact qr title="飞书账号授权" @close="closeFlow"
+      ><template #heading><span class="channel-auth-heading"><ChannelIcon channel="feishu" :size="19" />飞书授权</span></template><div class="flow-content">
         <p v-if="flow.error" class="error-banner" role="alert">
           {{ flow.error }}
         </p>
@@ -284,6 +285,7 @@ onMounted(load);
   </div>
 </template>
 <style scoped>
+.channel-auth-heading { display:inline-flex; align-items:center; gap:7px; }
 .connected-accounts h3 {
   margin: 12px 0 6px;
   font-size: 12px;

@@ -321,3 +321,8 @@ Copyright Mozilla Foundation and contributors. Licensed under the Apache License
 Source: https://github.com/lobehub/lobe-icons
 
 Copyright (c) 2023 LobeHub. MIT License; the full license is included in [LICENSES/lobe-icons-MIT.txt](LICENSES/lobe-icons-MIT.txt). Eight static SVG provider marks are bundled locally for Bot model selection and Boost model labels (DeepSeek, Zhipu, OpenAI, Claude, Gemini, Qwen, Moonshot and Grok). Unknown models use a neutral fallback. Product marks retain their respective owners.
+
+
+## Chat channel brand SVGs
+
+WeChat, Telegram, Discord, Slack and QQ marks are from Simple Icons (CC0); DingTalk is from Ant Design Icons (MIT); Feishu is from AnyModelBot (MIT). Full notices are included in [LICENSES/channel-icons.txt](LICENSES/channel-icons.txt). Brand marks remain the property of their respective owners.

@@ -1,5 +1,6 @@
 import http from "node:http";
 import { validateBotInput } from '../core/bot-management.js';
+import { createPanelTask, rememberPanelEntry, PanelActionError } from './panel-actions.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
 import { conversationMetrics } from "../core/conversation-metrics.js";
 import { workspaceRoot } from "../core/workspace-storage.js";
@@ -990,6 +991,19 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         if (!ok) throw new HttpError(409, tr("web.taskAlreadyStopped"));
         return send(res, 200, { task: app.tasks.get(task.id) });
       }
+      if (seg.length === 3 && seg[2] === 'retry' && m === 'POST') {
+        if (task.stage.key !== 'failed') throw new HttpError(409, '只有失败任务可以重试');
+        const result = await app.tasks.retry(task.id);
+        if (result.error) throw new HttpError(409, result.error);
+        return send(res, 200, { task: app.tasks.get(task.id) });
+      }
+      if (seg.length === 3 && seg[2] === 'message' && m === 'POST') {
+        const body = await readJson(req);
+        if (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 4000) throw new HttpError(400, '请输入补充要求（最多4000字）');
+        const result = await app.tasks.message(task.id, body.text);
+        if (result.error) throw new HttpError(409, result.error);
+        return send(res, 200, { task: app.tasks.get(task.id) });
+      }
       throw new HttpError(404, "not found");
     }
     // —— 规则（3d）：列表、新建、改（原话、时间表、模式、发到哪）、删、立即运行、运行记录与一次运行的步骤 ——
@@ -1390,6 +1404,14 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const next = await accountCall(() => app.setBotBudget(id, normalizeSettings({ budget: { enabled: !!b.enabled, limitUsd } }).budget));
         return send(res, 200, { settings: next.settings });
       }
+      if (sub === 'tasks' && m === 'POST') {
+        try { return send(res, 200, { task: createPanelTask(app, id, await readJson(req)) }); }
+        catch (error) { if (error instanceof PanelActionError) throw new HttpError(error.status, error.message); throw error; }
+      }
+      if (sub === 'memory' && m === 'POST') {
+        try { return send(res, 200, { ok: true, message: rememberPanelEntry(app, id, await readJson(req)) }); }
+        catch (error) { if (error instanceof PanelActionError) throw new HttpError(error.status, error.message); throw error; }
+      }
       if (sub === "memory" && m === "GET") {
         const scopes = [
           { kind: "team" as const, id: "" },
@@ -1417,7 +1439,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const scope = kind === "team" ? { kind: "team" as const, id: "" } : kind === "group" ? { kind: "group" as const, id: String(b.id ?? "") } : { kind: "bot" as const, id };
         if (scope.kind === "group" && !scope.id.startsWith(id + ":")) throw new HttpError(400, t("web.groupNotOwned"));
         try {
-          const text = app.agent.memory.forget(scope, String(b.match ?? ""), { topic: b.topic ? String(b.topic) : undefined, by: "web" });
+          const text = app.agent.memory.forget(scope, String(b.match ?? ""), { topic: b.topic ? String(b.topic) : undefined, mainOnly: b.mainOnly === true, by: "web" });
           return send(res, 200, { ok: true, text });
         } catch (e) {
           throw new HttpError(400, (e as Error).message);

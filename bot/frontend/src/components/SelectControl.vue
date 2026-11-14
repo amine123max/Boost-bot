@@ -10,6 +10,7 @@ import {
 } from "vue";
 import Icon from "./Icon.vue";
 import ProviderIcon from "./ProviderIcon.vue";
+import ChannelIcon from './ChannelIcon.vue';
 import SpringSurface from '../../../../frontend/src/components/SpringSurface.vue';
 const props = withDefaults(
   defineProps<{
@@ -19,6 +20,7 @@ const props = withDefaults(
       label: string;
       group?: string;
       model?: string;
+      channel?: string;
     }[];
     label: string;
     searchable?: boolean;
@@ -170,7 +172,7 @@ onBeforeUnmount(() => {
         v-if="chosen?.model"
         :model="chosen.model"
         :size="16"
-      /><span class="select-value">{{
+      /><ChannelIcon v-else-if="chosen?.channel" :channel="chosen.channel" :size="16" /><span class="select-value">{{
         chosen?.label || modelValue || placeholder
       }}</span
       ><Icon name="chevron" :size="13" class="select-chevron" />
@@ -236,7 +238,7 @@ onBeforeUnmount(() => {
                 v-if="option.model"
                 :model="option.model"
                 :size="16"
-              /><span class="select-value">{{ option.label }}</span
+              /><ChannelIcon v-else-if="option.channel" :channel="option.channel" :size="16" /><span class="select-value">{{ option.label }}</span
               ><Icon
                 v-if="modelValue === option.value"
                 name="check"

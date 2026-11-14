@@ -8,7 +8,9 @@ The Company Research, PPT Master and US Stock Research entries open their own fu
 
 Chat channels support WeChat, Feishu, Telegram, Slack, Discord, DingTalk and QQ. Add independent devices/accounts through the existing **Add channel** dialog, with separate names, enable switches and default Bots. WeChat and Feishu support QR flows; other platforms use official bot credentials. DingTalk uses Stream; QQ uses signed HTTPS callbacks through the [nginx callback configuration](../nginx/README.md#qq-robot-callbacks--qq-机器人回调). Platform-specific concurrent-login limits still apply. **Connections** manages document/tool authorization and links to the shared channel manager without duplicating chat accounts.
 
-The Bot information panel also exposes all seven platform connection entries and the current Bot's account statuses. Connect opens the same dialog, defaults to the current Bot, and starts the QR flow where supported. Use the platform's plus button to add another independent account; reconnecting preserves the existing account key.
+The Bot information panel keeps WeChat, Feishu and Telegram visible, alongside other connected platforms. Its plus button opens the shared channel dialog; platform details expand to show devices and connect another account. Connection details stay in help tooltips. Direct WeChat/Feishu connections open compact QR authorization pages. Device names can be customized without reauthentication. Locally bundled brand SVGs appear beside platform names and authorization headings.
+
+Create, enable/pause and monitor background tasks directly in the information panel. Tasks use the existing persisted queue, isolated sessions/folders, per-Bot concurrency limits and budgets; excess work queues without blocking chat. The memory section reads stored entries and topics, supports scoped search, manual additions and explicit deletion, and retains the existing sensitive-data checks. Turning memory off preserves saved entries while excluding them from model context.
 
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 
