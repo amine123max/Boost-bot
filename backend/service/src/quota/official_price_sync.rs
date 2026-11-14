@@ -19,6 +19,7 @@ pub(crate) struct PriceSyncResult {
     rule_count: usize,
     synced_at: i64,
     source_url: &'static str,
+    source_note: Option<String>,
 }
 
 pub(crate) fn sync_openai_prices() -> Result<PriceSyncResult, String> {
@@ -33,10 +34,16 @@ pub(crate) fn sync_provider_prices(provider: &str) -> Result<PriceSyncResult, St
         "openai" => ("openai", PRICE_URL),
         "anthropic" => ("anthropic", super::provider_prices::CLAUDE_URL),
         "google" => ("google", super::provider_prices::GEMINI_URL),
+        "tokenrhythm" => ("tokenrhythm", super::tokenrhythm_prices::SOURCE_URL),
         _ => return Err("不支持的官方价格提供商".into()),
     };
     let document = download_prices(url)?;
     let rules = match provider {
+        "tokenrhythm" => super::tokenrhythm_prices::parse(
+            &document,
+            &download_prices(super::tokenrhythm_prices::FX_URL)?,
+            now_ts(),
+        )?,
         "anthropic" => super::provider_prices::claude(&document, now_ts())?,
         "google" => super::provider_prices::gemini(&document, now_ts())?,
         _ => parse_official_prices(&document, now_ts())?,
@@ -107,10 +114,14 @@ fn apply_provider_prices(
         rule_count: rules.len(),
         synced_at: rules[0].updated_at,
         source_url: match provider {
+            "tokenrhythm" => super::tokenrhythm_prices::SOURCE_URL,
             "anthropic" => super::provider_prices::CLAUDE_SOURCE,
             "google" => super::provider_prices::GEMINI_SOURCE,
             _ => SOURCE_URL,
         },
+        source_note: (provider == "tokenrhythm")
+            .then(|| rules[0].seed_version.clone())
+            .flatten(),
     })
 }
 

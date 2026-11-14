@@ -127,12 +127,11 @@ watch(error, value => { if (value) markStartupContentReady(); });
 </script>
 <template>
   <section class="bot-workspace" :style="opening" aria-label="Boost 智能体工作台" data-bot-workspace :data-bot-origin="launch.origin" :data-bot-revealing="revealing">
-    <div ref="surface" class="bot-workspace-surface" :class="{ 'is-visible': revealing || revealed }" data-bot-surface>
+    <div ref="surface" class="bot-workspace-surface" :class="{ 'is-visible': launch.origin === 'center' || revealing || revealed }" data-bot-surface>
     <iframe v-if="source" ref="frame" :src="source" title="Boost Bot" class="bot-runtime-frame" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer" @load="onFrameLoad" />
     </div>
     <div v-if="waitingForGesture" class="bot-connecting" role="status"><BoostBotAvatar :size="90" /><h2>双击 Boost 动态智能体进入 Bot</h2><p>进入后，双击 Bot 左上角的 Boost 动态智能体即可返回。</p><button class="primary" @click="back">返回 Boost</button></div>
     <div v-else-if="error" class="bot-connecting" role="alert"><BoostBotAvatar :size="90" /><h2>智能体暂时无法启动</h2><p>{{ error }}</p><button class="primary" @click="connect">重试连接</button></div>
-    <div v-else-if="!loaded || (!revealed && launch.origin === 'center')" class="bot-connecting" role="status" aria-label="正在打开 Boost 智能体"><span class="boost-loading-ring bot-startup-mark" aria-hidden="true" /></div>
   </section>
 </template>
 <style scoped>

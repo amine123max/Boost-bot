@@ -174,7 +174,7 @@ const channelName = (channel: string) =>
               {{ account.status?.detail || "默认由这个机器人回复" }}
             </div>
           </div>
-          <span class="hint">{{
+          <span class="channel-state" :class="{ 'is-connected': account.status?.state === 'connected' }">{{
             account.status?.state === "connected"
               ? "已连接"
               : account.status?.state || "未连接"
@@ -249,6 +249,8 @@ const channelName = (channel: string) =>
 </template>
 
 <style scoped>
+.channel-state { flex:none; white-space:nowrap; padding:3px 8px; border-radius:5px; color:var(--muted); font-size:12px; }
+.channel-state.is-connected { color:var(--green); background:var(--green-soft); }
 .channel-manage-label { display:inline-flex; align-items:center; gap:5px; }
 .channel-manage {
   flex: 0 1 auto;

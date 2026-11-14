@@ -37,6 +37,7 @@ const providers = [
   { id: "openai", name: "OpenAI" },
   { id: "google", name: "Gemini" },
   { id: "anthropic", name: "Claude" },
+  { id: "tokenrhythm", name: "TokenRhythm" },
 ] as const;
 type Provider = (typeof providers)[number]["id"];
 const busy = ref(false),
@@ -52,7 +53,7 @@ const visible = computed(() =>
   ),
 );
 const label = (id: string) => providers.find((p) => p.id === id)?.name || id;
-const money = (value?: number | null) => (value == null ? "—" : "$" + value);
+const money = (value?: number | null) => (value == null ? "—" : "$" + new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 }).format(value));
 const tier = (mode?: string) =>
   ({
     standard: "Standard",
@@ -69,6 +70,7 @@ const summary = computed(() =>
       ...p,
       count: new Set(rows.map((r) => r.modelPattern)).size,
       updated: Math.max(0, ...rows.map((r) => r.updatedAt || 0)),
+      note: rows.find(r => r.sourceNote)?.sourceNote,
     };
   }),
 );
@@ -105,7 +107,7 @@ onMounted(() => perform(load));
 <template>
   <section class="model-pricing-section">
     <div class="page-toolbar page-primary-toolbar">
-      <div class="toolbar-group">
+      <div class="toolbar-group pricing-filters">
         <slot name="heading" />
         <div class="search-field">
           <BoostIcon name="search" :size="16" /><input
@@ -121,7 +123,7 @@ onMounted(() => perform(load));
           </option>
         </select>
       </div>
-      <div class="toolbar-group">
+      <div class="toolbar-group pricing-actions">
         <button v-if="isAdmin" class="secondary" :disabled="busy" @click="sync">
           <BoostIcon
             name="rotate-ccw"
@@ -136,7 +138,7 @@ onMounted(() => perform(load));
     </div>
     <div class="price-providers">
       <div v-for="p in summary" :key="p.id" class="price-provider">
-        <strong>{{ p.name }}</strong
+        <strong>{{ p.name }}<HelpHint v-if="p.note" :text="p.note" :label="p.name + '汇率'" /></strong
         ><span>{{ p.count ? p.count + " 个模型" : "尚未同步" }}</span
         ><small>{{ p.updated ? formatTime(p.updated) : "等待首次同步" }}</small>
       </div>
@@ -223,7 +225,7 @@ onMounted(() => perform(load));
                   :href="r.sourceUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  :title="formatTime(r.updatedAt || 0)"
+                  :title="[formatTime(r.updatedAt || 0), r.sourceNote].filter(Boolean).join(' · ')"
                   >官方同步</a
                 ><span v-else class="badge">自定义</span>
               </td>
@@ -278,3 +280,11 @@ onMounted(() => perform(load));
     >
   </section>
 </template>
+<style scoped>
+.pricing-filters { flex: 1 0 auto; min-width: 0; gap: 10px; }
+.pricing-filters .search-field { flex: 0 0 184px; width:184px; }
+.pricing-filters .search-field input { width:100%; min-width:0; max-width:none; }
+.pricing-filters select { flex:none; width:140px; }
+.pricing-actions { flex:none; white-space:nowrap; }
+.model-pricing-section .page-primary-toolbar { overflow-x:auto; scrollbar-width:none; gap:12px; }
+</style>

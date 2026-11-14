@@ -56,6 +56,8 @@ These are the packaging targets defined by the release workflow. Download availa
 
 Protocol capabilities depend on the configured upstream and model. See the [documentation](docs/README.md) for deployment and authorization boundaries.
 
+Model billing can sync TokenRhythm prices for the three configured DeepSeek/GLM models. CNY quotes are converted to USD using the latest published Frankfurter/ECB reference rate at synchronization; the rate and its date remain available beside the provider name. Failed synchronization preserves existing prices and custom overrides.
+
 Management controls track pending operations independently. Each service process shares one FIFO management RPC queue across all browsers and users: six active requests, up to 256 waiting, and a 60-second queue wait limit. Local packages use the same queue in their local service. Each client also limits outstanding RPCs to six; waiting does not lock unrelated controls. Usage history details start collapsed. These limits are separate from gateway inference limits; Nginx forwards RPCs with a longer timeout and no automatic replay.
 
 Home and Keys display separate usage cards with signed changes over the previous day. Cache hit rate changes use percentage points (pp); equal values show unchanged, and unavailable comparisons are explicitly labelled. Sparse days with no dated activity count as zero unless undated legacy records make the baseline unknown. Usage details start collapsed, including when returning to the page.

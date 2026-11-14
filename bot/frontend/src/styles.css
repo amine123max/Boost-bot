@@ -624,11 +624,14 @@
     font-size: 24px;
   }
   .catalog-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(184px, 100%), 184px));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 12px;
   }
   .catalog-card {
+    flex: 0 0 184px;
+    max-width: 100%;
     padding: 12px;
     border: 0;
     background: var(--well);
@@ -658,20 +661,19 @@
   .catalog-card-body { min-width: 0; flex: 1; }
   .catalog-card-body h3 { font-size: 13px; line-height: 1.4; margin: 0; }
   .create-card {
-    grid-column: 1 / -1;
-    width: max-content;
+    flex: 0 0 auto;
+    width: fit-content;
     max-width: 100%;
     min-height: 48px;
-    align-self: start;
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    padding: 12px;
+    padding: 0 10px 0 0;
   }
-  .create-card > svg {flex:none;}
-  .create-card > h3 {flex:none;font-size:12px;white-space:nowrap;margin:0;}
-  .create-card > span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
+  .create-bot-button { display:inline-flex; align-items:center; gap:7px; min-height:48px; padding:10px 0 10px 12px; border:0; background:transparent; color:var(--text); font-size:12px; font-weight:600; white-space:nowrap; }
+  .panel-toggle, .panel-toggle:focus-visible { border:0; box-shadow:none; outline:none; }
+  .panel-toggle:focus-visible { background:var(--hover); }
   .catalog-app-view {
     display: flex;
     flex-direction: column;

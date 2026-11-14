@@ -141,12 +141,12 @@ export default defineComponent({
       <SettingsButton label="智能体设置" @click="$emit('edit')" />
       <button
         v-if="!group"
-        class="icon-btn"
+        class="icon-btn panel-toggle"
         aria-label="信息面板"
         :aria-pressed="infoOpen"
         @click="$emit('info')"
       >
-        <Icon name="panel" />
+        <Icon :name="infoOpen ? 'panel-open' : 'panel-closed'" />
       </button>
     </header>
     <div v-if="group" class="member-strip">

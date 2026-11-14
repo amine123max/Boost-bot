@@ -394,6 +394,8 @@ async function remove() {
 const localized = (value?: string | Record<string, string>) =>
   typeof value === "string" ? value : value?.["zh-CN"] || value?.en || "";
 async function install(entry: CatalogEntry) {
+  if (entry.instanceId) { go('app', entry.instanceId); return; }
+  if (panelBusy.value || !configure.value) return;
   panelBusy.value = true;
   panelError.value = "";
   try {
@@ -408,6 +410,12 @@ async function install(entry: CatalogEntry) {
   } finally {
     panelBusy.value = false;
   }
+}
+async function browseCatalog(entry: CatalogEntry) {
+  go('discover', entry.id);
+  await nextTick();
+  document.getElementById('catalog-' + entry.id)?.focus({ preventScroll: true });
+  document.getElementById('catalog-' + entry.id)?.scrollIntoView({ block: 'nearest' });
 }
 async function testModel() {
   panelBusy.value = true;
@@ -547,8 +555,7 @@ onBeforeUnmount(() => {
             v-for="entry in catalog.filter((e) => !e.instanceId)"
             :key="entry.id"
             class="thread"
-            :disabled="!configure || panelBusy"
-            @click="install(entry)"
+            @click="browseCatalog(entry)"
           >
             <BotAvatar
               :bot="{ id: entry.id, name: localized(entry.name) } as Bot"
@@ -698,6 +705,8 @@ onBeforeUnmount(() => {
               <article
                 v-for="entry in catalog"
                 :key="entry.id"
+                :id="'catalog-' + entry.id"
+                tabindex="-1"
                 class="catalog-card"
               >
                 <BotAvatar :bot="bots.find((item) => item.id === entry.instanceId) || { id: entry.id, name: localized(entry.name) } as Bot" :size="54" />
@@ -715,11 +724,10 @@ onBeforeUnmount(() => {
                 </button>
                 </div>
               </article>
-              <button class="catalog-card create-card" @click="openBot()">
-                <Icon name="plus" :size="16" />
-                <h3>自定义智能体</h3>
-                <span title="设置角色、外观与模型">设置角色、外观与模型</span>
-              </button>
+              <div class="catalog-card create-card">
+                <button class="create-bot-button" :disabled="!configure" @click="openBot()"><Icon name="plus" :size="16" /><span>自定义智能体</span></button>
+                <HelpTip text="设置角色、外观与模型" label="自定义智能体说明" />
+              </div>
             </div></template
           >
           <div v-else class="empty-state">

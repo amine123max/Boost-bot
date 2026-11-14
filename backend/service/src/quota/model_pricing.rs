@@ -64,6 +64,9 @@ fn rule_matches(rule: &ModelPriceRule, normalized_model: &str) -> bool {
         return false;
     }
     if rule.source == "official_sync" {
+        if rule.provider == "tokenrhythm" {
+            return normalized_model == pattern;
+        }
         // Website rows identify specific models. Do not price a future version or
         // Codex/Pro variant using a shorter, unrelated model row.
         return normalized_model == pattern

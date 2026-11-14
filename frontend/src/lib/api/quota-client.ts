@@ -235,6 +235,7 @@ function normalizeModelPriceRule(payload: unknown): ModelPriceRule {
     id: asString(source.id),
     billingMode: asString(source.billingMode) || "standard",
     sourceUrl: asString(source.sourceUrl) || null,
+    sourceNote: asString(source.sourceNote) || null,
     updatedAt: toNullableNumber(source.updatedAt) ?? 0,
     longContextThresholdTokens: toNullableNumber(
       source.longContextThresholdTokens,
@@ -569,13 +570,13 @@ function normalizeOverview(payload: unknown): QuotaOverviewResult {
 
 export const quotaClient = {
   async syncOfficialPrices(
-    provider: "openai" | "google" | "anthropic",
+    provider: "openai" | "google" | "anthropic" | "tokenrhythm",
   ): Promise<OfficialPriceSyncResult> {
     const result = asRecord(
       await invoke<unknown>(
         "service_quota_model_prices_sync_official",
         withAddr({ provider }),
-        { timeoutMs: 45_000, retries: 0 },
+        { timeoutMs: provider === "tokenrhythm" ? 75_000 : 45_000, retries: 0 },
       ),
     );
     return {
@@ -583,6 +584,7 @@ export const quotaClient = {
       ruleCount: toNullableNumber(result.ruleCount) ?? 0,
       syncedAt: toNullableNumber(result.syncedAt) ?? 0,
       sourceUrl: asString(result.sourceUrl),
+      sourceNote: asString(result.sourceNote) || null,
     };
   },
   async overview(): Promise<QuotaOverviewResult> {

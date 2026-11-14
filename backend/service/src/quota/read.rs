@@ -78,6 +78,7 @@ pub(crate) struct ModelPriceRuleResult {
     enabled: bool,
     priority: i64,
     source_url: Option<String>,
+    source_note: Option<String>,
     updated_at: i64,
     long_context_threshold_tokens: Option<i64>,
     long_context_input_price_per_1m: Option<f64>,
@@ -86,6 +87,9 @@ pub(crate) struct ModelPriceRuleResult {
 }
 
 fn model_price_rule_result(rule: ModelPriceRule) -> ModelPriceRuleResult {
+    let source_note = (rule.provider == "tokenrhythm" && rule.source == "official_sync")
+        .then(|| rule.seed_version.clone())
+        .flatten();
     ModelPriceRuleResult {
         id: rule.id,
         provider: rule.provider,
@@ -102,6 +106,7 @@ fn model_price_rule_result(rule: ModelPriceRule) -> ModelPriceRuleResult {
         enabled: rule.enabled,
         priority: rule.priority,
         source_url: rule.source_url,
+        source_note,
         updated_at: rule.updated_at,
         long_context_threshold_tokens: rule.long_context_threshold_tokens,
         long_context_input_price_per_1m: rule.long_context_input_price_per_1m,

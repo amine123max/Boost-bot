@@ -14,7 +14,7 @@ impl Storage {
         rules: &[ModelPriceRule],
     ) -> Result<()> {
         if rules.is_empty()
-            || !matches!(provider, "openai" | "anthropic" | "google")
+            || !matches!(provider, "openai" | "anthropic" | "google" | "tokenrhythm")
             || rules
                 .iter()
                 .any(|rule| rule.source != "official_sync" || rule.provider != provider)

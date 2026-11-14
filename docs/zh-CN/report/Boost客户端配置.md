@@ -49,6 +49,7 @@ requires_openai_auth = false
 - 模型目录的远端并入默认选择账号池，并按每个所选账号分别拉取。聚合 API 在自己的模型池中使用「拉取远端模型」；请求路径即使配置为图片生成或编辑，模型拉取仍访问模型列表端点。
 - 不再安装或使用内置价格。未同步的模型、未发布的服务档位显示价格缺失。官网文本 token 价格用于估算，图片、音频、工具、存储、区域及其他特殊计费需以提供商账单为准。
 - Gemini 采用 Standard 价格，按官网生效日期及上下文分档；Claude 同步 Standard 输入、输出、缓存读取和缓存写入价格；OpenAI 同步官网提供的 Standard / Flex / Fast / Ultrafast 档位。
+- TokenRhythm同步当前接入的三款型号：DeepSeek V4.1 Flash 1017、DeepSeek V4 Pro 0813、GLM-5.3-FlashX。读取官网模型目录的有效人民币输入／缓存读取／输出价，以同步时Frankfurter/ECB最新公布的CNY→USD参考汇率换算；周末和节假日保留最近公布日期。汇率及日期在提供商标题后的说明中查看，单价为USD／百万Token，不是上游账单结算承诺。汇率超过7日、币种／单位变化或三款报价缺失时整批保留旧价格；不覆盖用户自定义价格，不修改账号池或模型调用来源。
 
 配置字段依据：[Codex 官方配置参考](https://developers.openai.com/codex/config-reference/)。价格来源：[OpenAI](https://developers.openai.com/api/docs/pricing)、[Gemini](https://ai.google.dev/gemini-api/docs/pricing)、[Claude](https://platform.claude.com/docs/en/about-claude/pricing)。
 

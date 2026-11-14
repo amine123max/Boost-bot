@@ -9,6 +9,7 @@
   document.documentElement.dataset.theme = mode;
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   var root = document.documentElement;
+  root.dataset.boostRoute = /^\/bot(?:\/|$)/.test(location.pathname) ? 'bot' : 'main';
   root.style.backgroundColor = dark ? '#0e0e0e' : '#f5f5f6';
   root.style.setProperty('--bg', dark ? '#0e0e0e' : '#f5f5f6');
   root.style.setProperty('--sidebar', dark ? '#0e0e0e' : '#f5f5f6');

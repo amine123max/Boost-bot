@@ -80,6 +80,7 @@ export interface ModelPriceRule {
   priority: number;
   billingMode?: string;
   sourceUrl?: string | null;
+  sourceNote?: string | null;
   updatedAt?: number;
   longContextThresholdTokens?: number | null;
   longContextInputPricePer1m?: number | null;
@@ -92,6 +93,7 @@ export interface OfficialPriceSyncResult {
   ruleCount: number;
   syncedAt: number;
   sourceUrl: string;
+  sourceNote?: string | null;
 }
 
 export interface ModelPriceRuleUpsertParams {
