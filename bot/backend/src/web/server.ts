@@ -1,5 +1,7 @@
 import http from "node:http";
+import { validateBotInput } from '../core/bot-management.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
+import { conversationMetrics } from "../core/conversation-metrics.js";
 import { progressSnapshot, type TaskProgress } from "../agent/progress.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -317,6 +319,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       return { text: replies.map((m) => m.content).join("\n\n"), ok: !failure && replies.length > 0 && replies.every(m => !m.content.startsWith('⚠️')) };
     },
   });
+  app.collaboration.bind(groups);
   function publicGroup(g: BotGroup) {
     const last = app.store.listGroupMessages(g.id, 5).filter((m) => m.role !== "system").at(-1);
     return {
@@ -438,7 +441,13 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       });
     }
     if (p === "/update" && m === "GET") return send(res, 200, app.updates.status());
+    if (p === '/model-sources' && m === 'GET') {
+      const sources=await app.modelSources.list(true);
+      return send(res,200,{sources,managed:!!app.opts.sourceBroker});
+    }
     if (p === "/models" && m === "GET") {
+      const source=url.searchParams.get('source');
+      if(source && source!=='default')return send(res,200,{models:await app.modelSources.models(source)});
       try {
         if (app.account instanceof NewApiAccountManager && app.account.active) await app.account.groupList();
         const models = await app.runtime.listModels(true);
@@ -680,7 +689,13 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         .filter(botId => ![...app.agent.turnsInProgress.values()].some(turn => turn.botId === botId))
         .filter(botId => !direct.some(task => task.id === botId && task.state === 'working'))
         .map((id): TaskProgress => ({ id, state: "working", percent: null, updatedAt: now }));
-      return send(res, 200, progressSnapshot([...foreground, ...direct, ...background, ...pending], now));
+      const snapshot = progressSnapshot([...foreground, ...direct, ...background, ...pending], now);
+      const measured = app.agent.bridge.usage.snapshot(now);
+      if (measured.tokensPerSecond !== null) {
+        const directRate = direct.reduce((sum, task) => sum + (task.tokensPerSecond || 0), 0);
+        Object.assign(snapshot, measured, { tokensPerSecond: measured.tokensPerSecond + directRate });
+      }
+      return send(res, 200, snapshot);
     }
     if (p === "/agent" && m === "GET") {
       const items = app.attention.list();
@@ -1284,14 +1299,9 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         if (m === "GET") return send(res, 200, { bots: app.store.listBots().map(publicBot) });
         if (m === "POST") {
           const b = await readJson(req);
-          if (!String(b.name || "").trim()) throw new HttpError(400, t("web.nameRequired"));
-          const bot = app.store.createBot({
-            name: String(b.name).trim(),
-            systemPrompt: String(b.systemPrompt ?? ""),
-            defaultModel: String(b.defaultModel ?? ""),
-            settings: normalizeSettings({ avatar: b.avatar, appearance: b.appearance, modelProtocol: b.modelProtocol, modelStreaming: b.modelStreaming }),
-          });
-          await app.startBot(bot.id);
+          try { validateBotInput(b, true); } catch (error) { throw new HttpError(400, (error as Error).message); }
+          if(b.modelSource!==undefined){try{await app.modelSources.prepare(String(b.modelSource),[String(b.defaultModel||'')]);}catch(error){throw new HttpError(400,(error as Error).message);}}
+          const bot = await app.botManagement.create(b);
           return send(res, 201, { bot: publicBot(bot) });
         }
       }
@@ -1301,15 +1311,21 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       if (seg.length === 2) {
         if (m === "GET") return send(res, 200, { bot: publicBot(bot) });
         if (m === "PUT") {
-          const b = await readJson(req);
+          let b: Record<string, unknown>;
+          try { b = validateBotInput(await readJson(req)); } catch (error) { throw new HttpError(400, (error as Error).message); }
+          const sourceChanged=b.modelSource!==undefined && b.modelSource!==bot.settings.modelSource;
+          if(sourceChanged&&(app.runtime.busyBots().includes(id)||app.tasks.busy(id)||[...app.agent.turnsInProgress.values()].some(turn=>turn.botId===id)))throw new HttpError(409,'请先停止当前智能体任务，再切换模型来源');
+          if(b.modelSource!==undefined){try{await app.modelSources.prepare(String(b.modelSource),[String(b.defaultModel??bot.defaultModel)]);}catch(error){throw new HttpError(400,(error as Error).message);}}
+          if(sourceChanged)await app.agent.stopBot(id);
           // 目录 Bot 的人设被用户改过：之后不再跟随目录升级
           if (bot.app && b.systemPrompt !== undefined && String(b.systemPrompt) !== bot.systemPrompt) app.botInstaller.markCustomized(id);
           const next = app.store.updateBot(id, {
             ...(b.name !== undefined ? { name: String(b.name) } : {}),
             ...(b.systemPrompt !== undefined ? { systemPrompt: String(b.systemPrompt) } : {}),
             ...(b.defaultModel !== undefined ? { defaultModel: String(b.defaultModel) } : {}),
-            ...((b.appearance !== undefined || b.modelProtocol !== undefined || b.modelStreaming !== undefined) ? { settings: normalizeSettings({ ...bot.settings, ...(b.appearance !== undefined ? { appearance: b.appearance } : {}), ...(b.modelProtocol !== undefined ? { modelProtocol: b.modelProtocol } : {}), ...(b.modelStreaming !== undefined ? { modelStreaming: b.modelStreaming } : {}) }) } : {}),
+            ...((b.appearance !== undefined || b.modelProtocol !== undefined || b.modelStreaming !== undefined || b.modelSource !== undefined) ? { settings: normalizeSettings({ ...bot.settings, ...(b.appearance !== undefined ? { appearance: b.appearance } : {}), ...(b.modelProtocol !== undefined ? { modelProtocol: b.modelProtocol } : {}), ...(b.modelStreaming !== undefined ? { modelStreaming: b.modelStreaming } : {}), ...(b.modelSource !== undefined ? { modelSource: b.modelSource } : {}) }) } : {}),
           })!;
+          if(sourceChanged)for(const conversation of app.store.listConversations(id))app.store.setConversationModel(conversation.id,'');
           return send(res, 200, { bot: publicBot(next) });
         }
         if (m === "DELETE") {
@@ -1321,12 +1337,20 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       if (sub === "settings" && m === "GET") return send(res, 200, { settings: bot.settings, computerUse: app.agent.computerUse(id) });
       if (sub === "settings" && m === "PUT") {
         const b = await readJson(req);
+        if (b.permission !== undefined && !["readonly", "workspace", "full"].includes(b.permission)) throw new HttpError(400, "执行权限无效");
+        if (b.reasoningEffort !== undefined && !REASONING_EFFORTS.includes(b.reasoningEffort)) throw new HttpError(400, "推理强度无效");
+        if(bot.settings.modelSource!=='default'&&typeof b.utilityModel==='string'&&b.utilityModel&&!(await app.modelSources.models(bot.settings.modelSource)).includes(b.utilityModel))throw new HttpError(400,'辅助模型不在当前来源目录中');
+        if (b.taskSlots !== undefined && (!Number.isInteger(b.taskSlots) || b.taskSlots < 1 || b.taskSlots > 8)) throw new HttpError(400, '后台并行任务数必须是 1–8 的整数');
+        if (b.collaboration !== undefined && (typeof b.collaboration !== 'object' || b.collaboration === null || typeof b.collaboration.enabled !== 'boolean')) throw new HttpError(400, '自动协作开关必须是布尔值');
         // 只接受已知字段；未给出的沿用当前值
         const cur = bot.settings;
         const merged = normalizeSettings({
           ...cur,
           ...(b.permission !== undefined ? { permission: b.permission } : {}),
+          ...(b.reasoningEffort !== undefined ? { reasoningEffort: b.reasoningEffort } : {}),
           ...(b.utilityModel !== undefined ? { utilityModel: b.utilityModel } : {}),
+          ...(b.taskSlots !== undefined ? { taskSlots: b.taskSlots } : {}),
+          ...(b.collaboration !== undefined ? { collaboration: { ...cur.collaboration, ...b.collaboration } } : {}),
           ...(b.avatar !== undefined ? { avatar: b.avatar } : {}),
           ...(b.computerUse !== undefined ? { computerUse: { ...cur.computerUse, ...b.computerUse } } : {}),
           ...(b.media !== undefined ? { media: { ...cur.media, ...b.media } } : {}),
@@ -1335,6 +1359,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           memory: { ...cur.memory, ...(b.memory ?? {}) },
           steward: { ...cur.steward, ...(b.steward ?? {}) },
         });
+        // Recheck after asynchronous validation, immediately before persisting.
+        if (b.permission !== undefined && b.permission !== app.store.getBot(id)?.settings.permission && (app.runtime.busyBots().includes(id) || app.tasks.busy(id) || [...app.agent.turnsInProgress.values()].some(turn=>turn.botId===id))) throw new HttpError(409, "请先停止当前Bot的对话和后台任务，再更改执行权限");
         app.store.updateBot(id, { settings: merged });
         // 暂停 / 恢复后台工作：恢复时排着的 run、主动消息要放出来，经任务服务改
         if (typeof b.paused === "boolean") app.tasks.setPaused(id, b.paused, "web");
@@ -1382,6 +1408,20 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         }
       }
       // —— 谁能使用：主人、允许名单、使用请求 ——
+      if (sub === "chat/metrics" && m === "GET") {
+        const convId = consoleConvId(id);
+        const conv = app.store.getConversation(convId);
+        const model = conv?.model || bot.defaultModel || app.config.llm.defaultModel;
+        // Hosted catalogs currently omit capability metadata: unknown stays unknown.
+        const info = bot.settings.modelSource === "default" ? (await app.modelInfo())[model] : undefined;
+        return send(res, 200, {
+          model,
+          reasoning: {value: bot.settings.reasoningEffort, supported: info?.effort ?? null},
+          windowTokens: info?.context ?? null,
+          agentAvailable: app.agent.available,
+          ...conversationMetrics(app.store, bot, convId, model, live.list(convId)[0]?.afterMessageId),
+        });
+      }
       if (sub === "chat" && m === "GET") {
         const conv = app.store.getConversation(consoleConvId(id));
         // 进行中的消息由 live 显示（用户消息、到目前为止的回复与步骤）；它开始之后存下的消息先不列，免得重复
@@ -1410,6 +1450,9 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
       if (sub === "chat/model" && m === "PUT") {
         const b = await readJson(req);
+        if(typeof b.model!=="string"||b.model.length>200)throw new HttpError(400,"模型标识无效");
+        if(b.model && bot.settings.modelSource!=="default" && !(await app.modelSources.models(bot.settings.modelSource)).includes(b.model))throw new HttpError(400,"模型不在当前来源目录中");
+        if(live.list(consoleConvId(id)).length || app.agent.turnsInProgress.has(consoleConvId(id)))throw new HttpError(409,"请先停止当前对话，再切换模型");
         const conv = app.store.ensureConversation(id, "web", "console", "控制台");
         app.store.setConversationModel(conv.id, String(b.model ?? ""));
         return send(res, 200, { conversationId: conv.id, model: String(b.model ?? "") });

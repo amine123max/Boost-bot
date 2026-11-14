@@ -31,21 +31,23 @@ const usage = computed(() =>
 );
 const comparisonHint = computed(() =>
   props.daily
-    ? "今日截至当前与前1日全天比较，显示绝对增量；缓存命中率显示百分点（pp）变化。无增长或缺少可比数据时显示 --。"
-    : "当前累计值与截至前1日的累计值比较，显示绝对增量；缓存命中率显示百分点（pp）变化。无增长或缺少可比数据时显示 --。",
+    ? "今日截至当前与前1日全天比较，显示增减量；缓存命中率显示百分点（pp）变化。数值相同显示持平，缺少可比数据时显示暂无对比或暂无样本。"
+    : "当前累计值与截至前1日的累计值比较，显示增减量；缓存命中率显示百分点（pp）变化。数值相同显示持平，缺少可比数据时显示暂无对比或暂无样本。",
 );
 function growthLabel(metric: UsageMetric, growth: number | null) {
-  if (growth == null) return "--";
-  if (metric === "cost") return growth < 0.01 ? "< $0.01" : `+${usd(growth)}`;
-  if (metric === "requests") return `+${fullNumber(growth)} 次`;
-  if (metric === "tokens") return `+${compactTokens(growth)}`;
-  return growth < 0.1 ? "< 0.1 pp" : `+${growth.toFixed(1)} pp`;
+  if (growth == null) return metric === "cache" ? "暂无样本" : "暂无对比";
+  if (growth === 0) return "持平";
+  const magnitude = Math.abs(growth), sign = growth > 0 ? "+" : "−";
+  if (metric === "cost") return magnitude < 0.01 ? `${sign}< $0.01` : `${sign}${usd(magnitude)}`;
+  if (metric === "requests") return `${sign}${fullNumber(magnitude)} 次`;
+  if (metric === "tokens") return `${sign}${compactTokens(magnitude)}`;
+  return magnitude < 0.1 ? `${sign}< 0.1 pp` : `${sign}${magnitude.toFixed(1)} pp`;
 }
 const metrics = computed(() =>
   [
     {
       id: "cost" as const,
-      icon: "dollar-sign",
+
       unit: "USD",
       label: props.daily ? "今日成本" : "总成本",
       value: usage.value ? usd(usage.value.estimatedCostUsd) : "—",
@@ -53,7 +55,7 @@ const metrics = computed(() =>
     },
     {
       id: "requests" as const,
-      icon: "activity",
+
       unit: "次",
       label: props.daily ? "今日请求数" : "总请求数",
       value: usage.value
@@ -66,7 +68,7 @@ const metrics = computed(() =>
     },
     {
       id: "tokens" as const,
-      icon: "database",
+
       unit: "Tokens",
       label: "真实消耗 Tokens",
       value: usage.value ? compactTokens(usage.value.totalTokens) : "—",
@@ -74,7 +76,7 @@ const metrics = computed(() =>
     },
     {
       id: "cache" as const,
-      icon: "zap",
+
       unit: "",
       label: "缓存命中率",
       value: usage.value ? cacheHitRate(usage.value) : "—",
@@ -259,9 +261,6 @@ function moveCell(event: KeyboardEvent) {
               :label="metric.label"
               :text="`${metric.hint} ${comparisonHint}`"
           /></span>
-          <span class="usage-metric-icon"
-            ><BoostIcon :name="metric.icon" :size="16"
-          /></span>
         </div>
         <component
           :is="daily ? 'div' : 'button'"
@@ -281,14 +280,15 @@ function moveCell(event: KeyboardEvent) {
           <b
             class="usage-growth-value"
             :class="{
-              positive: metric.growth != null,
+              positive: metric.growth != null && metric.growth > 0,
+              negative: metric.growth != null && metric.growth < 0,
             }"
           >
-            <BoostIcon
-              v-if="metric.growth != null"
-              name="arrow-up-right"
-              :size="13"
-            />{{ metric.growthLabel }}
+            <svg
+              v-if="metric.growth != null && metric.growth !== 0"
+              width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"
+              class="usage-change-triangle"
+            ><path :d="metric.growth > 0 ? 'M5 1 9.5 8H.5Z' : 'M.5 2h9L5 9Z'" fill="currentColor" /></svg>{{ metric.growthLabel }}
           </b>
         </div>
       </article>
@@ -475,17 +475,6 @@ function moveCell(event: KeyboardEvent) {
   gap: 8px;
   width: 100%;
 }
-.usage-metric-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  border: 1px solid color-mix(in srgb, var(--blue) 12%, var(--border));
-  border-radius: 8px;
-  color: var(--blue);
-  background: var(--blue-soft);
-}
 .usage-summary-metric.selected {
   border-color: color-mix(in srgb, var(--blue) 60%, var(--border));
 }
@@ -561,7 +550,7 @@ button.usage-metric-value:focus-visible {
 .usage-growth-value.positive {
   color: var(--red);
 }
-.usage-summary-metric[data-metric="cache"] .usage-growth-value.positive {
+.usage-growth-value.negative {
   color: var(--green);
 }
 .usage-expand-line {
@@ -778,9 +767,6 @@ button.usage-cell:focus-visible {
   .usage-summary-metric {
     padding: 15px 14px 12px;
   }
-  .usage-metric-icon {
-    display: none;
-  }
 }
 @media (max-width: 760px) {
   .usage-summary-row {
@@ -792,9 +778,6 @@ button.usage-cell:focus-visible {
   }
   .usage-summary-metric strong {
     font-size: 24px;
-  }
-  .usage-metric-icon {
-    display: grid;
   }
   .usage-history-content {
     padding: 25px 16px 16px;
@@ -813,9 +796,6 @@ button.usage-cell:focus-visible {
   }
 }
 @media (max-width: 420px) {
-  .usage-metric-icon {
-    display: none;
-  }
   .usage-summary-metric {
     padding: 14px 12px 11px;
   }

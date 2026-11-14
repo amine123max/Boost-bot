@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import Icon from "./Icon.vue";
+import TaskStepStatus from "./TaskStepStatus.vue";
 import type { TaskPlan } from "../lib/task-plan";
 const props = withDefaults(
-  defineProps<{ plan: TaskPlan; limit?: number; loading?: boolean }>(),
-  { limit: 3 },
+  defineProps<{
+    plan: TaskPlan;
+    limit?: number;
+    loading?: boolean;
+    heading?: boolean;
+  }>(),
+  { limit: 5, heading: true },
 );
 const expanded = ref(false);
 const shown = computed(() =>
@@ -13,7 +19,7 @@ const shown = computed(() =>
 </script>
 <template>
   <div class="task-checklist">
-    <div class="checklist-heading">
+    <div v-if="heading" class="checklist-heading">
       <span
         ><Icon name="tasks" :size="13" />{{
           plan.kind === "plan" ? "任务清单" : "执行记录"
@@ -22,12 +28,10 @@ const shown = computed(() =>
     </div>
     <ol v-if="shown.length" class="checklist-items">
       <li v-for="item in shown" :key="item.id" :class="`step-${item.state}`">
-        <span class="step-mark" aria-hidden="true"
-          ><Icon v-if="item.state === 'done'" name="check" :size="12" /><Icon
-            v-else-if="item.state === 'failed'"
-            name="close"
-            :size="11" /><span v-else class="step-circle" /></span
-        ><span class="step-text" :title="item.text">{{ item.text }}</span
+        <TaskStepStatus :state="item.state" /><span
+          class="step-text"
+          :title="item.text"
+          >{{ item.text }}</span
         ><span class="sr-only">{{
           {
             pending: "待处理",
@@ -55,9 +59,8 @@ const shown = computed(() =>
 </template>
 <style scoped>
 .task-checklist {
-  background: color-mix(in srgb, var(--bg) 80%, var(--surface));
-  border-radius: 8px;
-  padding: 10px;
+  background: transparent;
+  padding: 0;
   min-width: 0;
 }
 .checklist-heading {
@@ -82,51 +85,23 @@ const shown = computed(() =>
   padding: 0;
   margin: 9px 0 0;
   display: grid;
-  gap: 9px;
+  gap: 5px;
 }
 .checklist-items li {
   display: flex;
   gap: 7px;
-  align-items: flex-start;
+  align-items: center;
+  min-height: 24px;
   min-width: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
-}
-.step-mark {
-  width: 13px;
-  height: 15px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  color: var(--muted);
 }
 .step-text {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.step-circle {
-  width: 9px;
-  height: 9px;
-  border: 1px dashed var(--muted);
-  border-radius: 50%;
-  opacity: 0.6;
-}
-.step-working .step-circle {
-  border-style: solid;
-  border-right-color: transparent;
-  border-color: var(--accent);
-  border-right-color: transparent;
-  opacity: 1;
-  animation: step-spin 1s linear infinite;
-}
-.step-done .step-mark {
-  color: var(--green, #4aaf85);
-}
 .step-done .step-text {
   color: var(--muted);
-}
-.step-failed .step-mark {
-  color: var(--danger, #e17c79);
 }
 .checklist-empty {
   color: var(--muted);
@@ -154,15 +129,5 @@ const shown = computed(() =>
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
-}
-@keyframes step-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .step-working .step-circle {
-    animation: none;
-  }
 }
 </style>

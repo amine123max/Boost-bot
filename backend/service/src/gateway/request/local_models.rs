@@ -1,4 +1,5 @@
 use boost_core::rpc::types::{ModelInfo, ModelsResponse};
+use std::collections::HashSet;
 const MODEL_CACHE_SCOPE_DEFAULT: &str = "default";
 
 #[derive(serde::Serialize)]
@@ -48,8 +49,14 @@ fn serialize_models_response(models: &ModelsResponse) -> String {
 fn filter_models_for_key(
     storage: &boost_core::storage::Storage,
     key_id: &str,
-    models: ModelsResponse,
+    mut models: ModelsResponse,
+    aggregate_slugs: Option<&HashSet<String>>,
 ) -> Result<(ModelsResponse, bool), String> {
+    if let Some(slugs) = aggregate_slugs {
+        models.models.retain(|model| slugs.contains(&model.slug));
+        // A catalog-wide ETag does not describe this source-specific view.
+        models.extra.remove("etag");
+    }
     let Some(allowed_slugs) = crate::allowed_model_slugs_for_api_key(storage, key_id)? else {
         return Ok((models, true));
     };
@@ -64,6 +71,46 @@ fn filter_models_for_key(
         },
         false,
     ))
+}
+
+fn aggregate_model_slugs_for_key(
+    storage: &boost_core::storage::Storage,
+    key_id: &str,
+) -> Result<Option<HashSet<String>>, String> {
+    let key = storage
+        .find_api_key_by_id(key_id)
+        .map_err(|err| err.to_string())?
+        .ok_or("API key unavailable")?;
+    if key.rotation_strategy != crate::apikey_profile::ROTATION_AGGREGATE_API {
+        return Ok(None);
+    }
+    let provider = match key.protocol_type.as_str() {
+        "anthropic_native" => "claude",
+        "gemini_native" => "gemini",
+        _ => "codex",
+    };
+    let source_ids: HashSet<_> = storage
+        .list_aggregate_apis()
+        .map_err(|err| err.to_string())?
+        .into_iter()
+        .filter(|api| {
+            api.status == "active"
+                && api.provider_type == provider
+                && key
+                    .aggregate_api_id
+                    .as_deref()
+                    .map_or(true, |id| id == api.id)
+        })
+        .map(|api| api.id)
+        .collect();
+    let slugs = storage
+        .list_model_source_models(Some("aggregate_api"), key.aggregate_api_id.as_deref())
+        .map_err(|err| err.to_string())?
+        .into_iter()
+        .filter(|model| model.status == "available" && source_ids.contains(&model.source_id))
+        .map(|model| model.upstream_model)
+        .collect();
+    Ok(Some(slugs))
 }
 
 fn models_etag_header(models: &ModelsResponse) -> Result<Option<tiny_http::Header>, String> {
@@ -131,8 +178,10 @@ pub(super) fn maybe_respond_local_models(
         reasoning_for_log,
         storage,
     };
-    let cached = match read_cached_models_response(storage) {
-        Ok(models) => models,
+    let (cached, aggregate_scope) = match read_cached_models_response(storage).and_then(|models| {
+        aggregate_model_slugs_for_key(storage, key_id).map(|scope| (models, scope))
+    }) {
+        Ok(result) => result,
         Err(err) => {
             let message = crate::gateway::bilingual_error(
                 "读取模型缓存失败",
@@ -143,7 +192,9 @@ pub(super) fn maybe_respond_local_models(
         }
     };
 
-    let models = if !cached.is_empty() {
+    // Aggregate sources are explicitly managed locally. An empty selection must
+    // not trigger discovery that exposes the upstream provider's entire catalog.
+    let models = if !cached.is_empty() || aggregate_scope.is_some() {
         cached
     } else {
         match super::fetch_models_for_picker() {
@@ -183,7 +234,8 @@ pub(super) fn maybe_respond_local_models(
         }
     };
 
-    let (output_models, include_implicit_models) = filter_models_for_key(storage, key_id, models)?;
+    let (output_models, include_implicit_models) =
+        filter_models_for_key(storage, key_id, models, aggregate_scope.as_ref())?;
     let output = if include_implicit_models {
         serialize_models_response(&output_models)
     } else {
@@ -198,4 +250,157 @@ pub(super) fn maybe_respond_local_models(
         extra_headers,
     )?;
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use boost_core::storage::{AggregateApi, ApiKey, Storage};
+
+    fn fixture(source: Option<&str>) -> Storage {
+        let storage = Storage::open_in_memory().unwrap();
+        storage.init().unwrap();
+        storage
+            .insert_api_key(&ApiKey {
+                id: "directory-key".into(),
+                name: None,
+                model_slug: None,
+                reasoning_effort: None,
+                service_tier: None,
+                rotation_strategy: crate::apikey_profile::ROTATION_AGGREGATE_API.into(),
+                aggregate_api_id: source.map(str::to_string),
+                account_plan_filter: None,
+                aggregate_api_url: None,
+                client_type: "codex".into(),
+                protocol_type: "openai_compat".into(),
+                auth_scheme: "authorization_bearer".into(),
+                upstream_base_url: None,
+                static_headers_json: None,
+                key_hash: "directory-test-hash".into(),
+                status: "active".into(),
+                created_at: 1,
+                last_used_at: None,
+            })
+            .unwrap();
+        for (id, provider, status, models) in [
+            ("selected", "codex", "active", vec!["flash", "pro", "glm"]),
+            ("other", "codex", "active", vec!["unselected"]),
+            ("disabled", "codex", "disabled", vec!["disabled-model"]),
+            ("wrong-protocol", "claude", "active", vec!["claude-only"]),
+        ] {
+            storage
+                .insert_aggregate_api(&AggregateApi {
+                    id: id.into(),
+                    provider_type: provider.into(),
+                    supplier_name: Some(id.into()),
+                    sort: 0,
+                    url: "http://127.0.0.1:1/v1".into(),
+                    auth_type: "apikey".into(),
+                    auth_params_json: None,
+                    action: Some("/chat/completions".into()),
+                    model_override: None,
+                    status: status.into(),
+                    created_at: 1,
+                    updated_at: 1,
+                    last_test_at: None,
+                    last_test_status: None,
+                    last_test_error: None,
+                    balance_query_enabled: false,
+                    balance_query_template: None,
+                    balance_query_base_url: None,
+                    balance_query_user_id: None,
+                    balance_query_config_json: None,
+                    last_balance_at: None,
+                    last_balance_status: None,
+                    last_balance_error: None,
+                    last_balance_json: None,
+                })
+                .unwrap();
+            storage
+                .upsert_discovered_model_source_models(
+                    "aggregate_api",
+                    id,
+                    &models.into_iter().map(str::to_string).collect::<Vec<_>>(),
+                    "manual",
+                )
+                .unwrap();
+        }
+        storage
+    }
+
+    #[test]
+    fn aggregate_directory_lists_only_configured_models_for_selected_source() {
+        let storage = fixture(Some("selected"));
+        let slugs = aggregate_model_slugs_for_key(&storage, "directory-key")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            slugs,
+            HashSet::from(["flash".into(), "pro".into(), "glm".into()])
+        );
+        let models = ModelsResponse {
+            models: ["flash", "pro", "glm", "unselected", "account-only"]
+                .into_iter()
+                .map(|slug| ModelInfo {
+                    slug: slug.into(),
+                    display_name: slug.into(),
+                    ..Default::default()
+                })
+                .collect(),
+            extra: [("etag".into(), serde_json::json!("global-catalog"))].into(),
+        };
+        let (filtered, _) =
+            filter_models_for_key(&storage, "directory-key", models, Some(&slugs)).unwrap();
+        assert_eq!(filtered.models.len(), 3);
+        assert!(!filtered.extra.contains_key("etag"));
+        let serialized: serde_json::Value =
+            serde_json::from_str(&serialize_models_response(&filtered)).unwrap();
+        assert_eq!(serialized["data"].as_array().unwrap().len(), 3);
+        assert_eq!(serialized["models"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn aggregate_directory_excludes_disabled_missing_and_other_protocol_sources() {
+        for source in ["disabled", "wrong-protocol", "missing"] {
+            let storage = fixture(Some(source));
+            assert!(aggregate_model_slugs_for_key(&storage, "directory-key")
+                .unwrap()
+                .unwrap()
+                .is_empty());
+        }
+        let storage = fixture(None);
+        let slugs = aggregate_model_slugs_for_key(&storage, "directory-key")
+            .unwrap()
+            .unwrap();
+        assert_eq!(slugs.len(), 4);
+        assert!(!slugs.contains("disabled-model"));
+        assert!(!slugs.contains("claude-only"));
+    }
+
+    #[test]
+    fn aggregate_directory_does_not_change_account_key_catalog_behavior() {
+        let storage = fixture(Some("selected"));
+        storage
+            .update_api_key_rotation_config(
+                "directory-key",
+                crate::apikey_profile::ROTATION_ACCOUNT,
+                None,
+                None,
+            )
+            .unwrap();
+        assert!(aggregate_model_slugs_for_key(&storage, "directory-key")
+            .unwrap()
+            .is_none());
+        storage
+            .update_api_key_rotation_config(
+                "directory-key",
+                crate::apikey_profile::ROTATION_HYBRID,
+                None,
+                None,
+            )
+            .unwrap();
+        assert!(aggregate_model_slugs_for_key(&storage, "directory-key")
+            .unwrap()
+            .is_none());
+    }
 }

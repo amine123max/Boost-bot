@@ -19,6 +19,7 @@ const input = await new Promise<string>((resolve, reject) => {
 const host = JSON.parse(input) as {
   dataDir: string; token: string; baseUrl: string; apiKey: string;
   allowTools: boolean; parentPid: number; defaultModel?: string;
+  sourceBroker?: import('./core/model-sources.js').SourceBroker;
 };
 if (!host.token || !host.apiKey || !host.dataDir || !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+\/v1$/.test(host.baseUrl)) {
   throw new Error('Invalid Boost host configuration');
@@ -44,7 +45,8 @@ config.ui = { ...config.ui, host: '127.0.0.1', port: 0, token: host.token, lang:
 config.magpie = { mode: 'external', binPath: '', externalBaseUrl: host.baseUrl, externalApiKey: host.apiKey };
 config.agent.mode = host.allowTools ? 'dsh' : 'off';
 if (host.defaultModel && !config.llm.defaultModel) config.llm.defaultModel = host.defaultModel;
-const app = new App(config);
+if(host.sourceBroker && host.sourceBroker.url !== host.baseUrl.replace(/\/v1$/, '')+'/_boost/bot/model-sources')throw new Error('Invalid Boost source broker');
+const app = new App(config,{sourceBroker:host.sourceBroker});
 if (host.allowTools) {
   const bundled = path.join(findAppRoot(), 'bots');
   for (const entry of fs.readdirSync(bundled, { withFileTypes: true })) {

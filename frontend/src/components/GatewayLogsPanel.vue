@@ -207,16 +207,16 @@ async function clear() {
           @click="perform(() => copyText(JSON.stringify(detail, null, 2)))"
         >
           <BoostIcon name="copy" :size="16" />复制详情</button
-        ><button class="primary" @click="detail = null">关闭</button></template
+        ><button data-dialog-close class="primary" @click="detail = null">关闭</button></template
       ></BoostDialog
     >
     <BoostDialog
       v-if="confirming"
       title="清空网关日志"
-      @close="!clearingBusy && (confirming = false)"
+      :busy="clearingBusy" @close="!clearingBusy && (confirming = false)"
       ><p>确认移除所有网关错误日志？</p>
       <DialogActions>
-        <button class="secondary" :disabled="clearingBusy" @click="confirming = false">
+        <button data-dialog-close class="secondary" :disabled="clearingBusy" @click="confirming = false">
           取消</button
         ><button class="danger-button" :disabled="clearingBusy" @click="clear">
           清空

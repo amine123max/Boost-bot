@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { Activity, Task } from "../types";
-import { api, download, enc } from "../api";
+import { api, enc } from "../api";
 import { taskPlan } from "../lib/task-plan";
 import PlanOverview from "./PlanOverview.vue";
 const props = defineProps<{ task: Task; inspect: boolean }>();
@@ -65,16 +65,6 @@ watch(
   { immediate: true },
 );
 onBeforeUnmount(() => controller?.abort());
-async function exportTask() {
-  try {
-    await download(
-      `/tasks/${enc(props.task.id)}/export?lang=zh-CN`,
-      `${props.task.title}.md`,
-    );
-  } catch (e) {
-    error.value = (e as Error).message;
-  }
-}
 </script>
 <template>
   <PlanOverview
@@ -88,7 +78,6 @@ async function exportTask() {
     :error="error"
     :question="task.question?.text"
     @open="emit('open', task)"
-    @export="exportTask"
     @retry="load"
   />
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModelLabel from "./ModelLabel.vue";
 import { computed } from "vue";
 import type { AggregateApi } from "@/types";
 import type { QuotaModelPoolItem } from "@/types/quota";
@@ -77,15 +78,14 @@ const records = computed(() => {
               class="record-subtext"
               :title="row.api.modelOverride"
             >
-              model: {{ row.api.modelOverride }}
+              <ModelLabel :model="row.api.modelOverride" />
             </p>
             <p
               class="record-subtext record-all-models"
               :title="row.models.join(', ')"
             >
-              额度模型：{{
-                row.models.length ? row.models.join(", ") : "全部 API 模型"
-              }}
+              <span v-if="!row.models.length">全部 API 模型</span>
+              <span v-else class="record-model-labels"><ModelLabel v-for="model in row.models" :key="model" :model="model" /></span>
             </p>
             <p v-if="importedCounts[row.api.id] != null" class="record-subtext">
               {{ importedCounts[row.api.id] }} 个模型已导入

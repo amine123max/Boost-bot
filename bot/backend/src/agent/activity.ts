@@ -67,9 +67,10 @@ function prettyArgs(args: string): string {
 export class ActivityLog {
   readonly steps: ActivityStep[] = [];
   progress: number | null = null;
+  private pendingProgress = new Map<string,number>();
   outputTps(now = Date.now()): number | null {
     const step = this.steps.findLast(s => s.kind === "model" && s.status === "ok" && s.tokens?.output && s.ms && s.ms >= 100);
-    if (!step || !step.ms || !step.tokens || now - step.at - step.ms > 5000) return null;
+    if (!step || !step.ms || !step.tokens || now - step.at - step.ms >= 60_000) return null;
     return (step.tokens.output ?? 0) * 1000 / step.ms;
   }
 
@@ -137,7 +138,7 @@ export class ActivityLog {
         const name = String(data.name ?? "tool");
         const args = String(data.arguments ?? "");
         const progress = reportedProgress(name, args);
-        if (progress !== null) this.progress = progress;
+        if (progress !== null && this.pendingProgress.size < 128) this.pendingProgress.set(String(data.callId),progress);
         const sum = summarizeCall(name, args);
         this.put({
           id: String(data.callId),
@@ -154,6 +155,9 @@ export class ActivityLog {
         const msg = data.message ?? {};
         const prev = this.find(String(msg.toolCallId ?? ""));
         if (!prev) return true;
+        const progress = this.pendingProgress.get(String(msg.toolCallId));
+        if (progress !== undefined && !msg.isError) this.progress = progress;
+        this.pendingProgress.delete(String(msg.toolCallId));
         this.put({ ...prev, status: msg.isError ? "error" : "ok", ms: Math.max(0, time - prev.at), output: clip(textOf(msg.content), MAX_OUTPUT) || undefined });
         // 命令跑得太久，转到了后台：单独记一步，结束时（job/settled 或结束通知）更新
         const job = promotedJob(data);

@@ -4,7 +4,6 @@ import type { Approval, LiveTurn, Message, Activity } from "../types";
 import { api, enc } from "../api";
 import { taskPlan } from "../lib/task-plan";
 import PlanOverview from "./PlanOverview.vue";
-import TaskPlanChecklist from "./TaskPlanChecklist.vue";
 import Modal from "./Modal.vue";
 import ActivityTrace from "./ActivityTrace.vue";
 const props = defineProps<{
@@ -73,21 +72,10 @@ watch(
   { immediate: true },
 );
 onBeforeUnmount(() => controller?.abort());
-function exportPlan() {
-  const text = `# ${title.value}\n\n${plan.value.items.map((item) => `- [${item.state === "done" ? "x" : " "}] ${item.text}`).join("\n")}\n`;
-  const url = URL.createObjectURL(
-    new Blob([text], { type: "text/markdown;charset=utf-8" }),
-  );
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "会话任务计划.md";
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 </script>
 <template>
   <PlanOverview
-    v-if="error || (plan.items.length && (plan.kind === 'plan' || live))"
+    v-if="error || (plan.items.length && plan.kind === 'plan')"
     :title="title.slice(0, 90)"
     caption="会话计划"
     :status="status"
@@ -106,16 +94,14 @@ function exportPlan() {
     inspect
     :error="error"
     @open="open = true"
-    @export="exportPlan"
     @retry="load"
   />
   <Modal v-if="open" title="会话任务计划" @close="open = false"
     ><div class="conversation-plan-detail">
       <h3>{{ title }}</h3>
-      <TaskPlanChecklist :plan="plan" :limit="1000" /><ActivityTrace
+      <ActivityTrace
         :steps="steps"
         :running="!!live"
-        :overview="false"
       /></div
   ></Modal>
 </template>

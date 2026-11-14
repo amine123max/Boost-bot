@@ -117,7 +117,6 @@ onBeforeUnmount(() => {
           ''
         "
       />
-      <TaskPlanChecklist v-if="detail" :plan="plan" :limit="1000" />
       <details
         v-for="run in detail?.runs"
         :key="run.id"
@@ -134,7 +133,6 @@ onBeforeUnmount(() => {
         <ActivityTrace
           v-if="activity[run.id]"
           :steps="activity[run.id]"
-          :overview="false"
         />
       </details>
       <footer class="dialog-actions">

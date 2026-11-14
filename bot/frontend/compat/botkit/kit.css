@@ -3,8 +3,9 @@
 @import url("./design/index.css");
 
 @layer components {
-  html, body { height: 100%; background: transparent; }
-  body { margin: 0; color: var(--fg); font-family: var(--font); font-size: var(--fs-md); }
+  html { height: 100%; background: transparent; overflow-y: auto; overscroll-behavior: contain; }
+  body { min-height: 100%; height: auto; overflow: visible; background: transparent; margin: 0; color: var(--fg); font-family: var(--font); font-size: var(--fs-md); }
+  #app { min-height: 100%; }
   .kit-page { display: grid; gap: var(--space-5); padding: var(--space-6); }
   .kit-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
   .kit-head-text { display: grid; gap: var(--space-1); min-width: 0; }

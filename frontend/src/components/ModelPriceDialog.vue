@@ -5,6 +5,7 @@ import { quotaClient } from "@/lib/api/quota-client";
 import { notify, perform } from "@/composables/useBoost";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
+import ModelSelect from "./ModelSelect.vue";
 const props = defineProps<{ rule?: ModelPriceRule | null }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 const busy = ref(false);
@@ -58,10 +59,10 @@ async function save() {
 <template>
   <BoostDialog
     :title="rule?.source === 'custom' ? '编辑价格' : '新增价格'"
-    @close="!busy && emit('close')"
+    :busy="busy" @close="!busy && emit('close')"
     ><form class="form-stack" @submit.prevent="save">
       <label class="form-field"
-        >模型匹配<input
+        >模型匹配<ModelSelect label="模型匹配"
           v-model="draft.modelPattern"
           required
           placeholder="模型 ID 或匹配规则"
@@ -118,7 +119,7 @@ async function save() {
         >
       </div>
       <DialogActions
-        ><button
+        ><button data-dialog-close
           type="button"
           class="secondary"
           :disabled="busy"

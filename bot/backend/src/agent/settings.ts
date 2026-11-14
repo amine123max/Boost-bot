@@ -11,6 +11,8 @@ export const BOT_AVATARS = ["blue", "yellow", "green", "red", "purple", "orange"
 export type BotAvatarKey = (typeof BOT_AVATARS)[number];
 
 export interface BotSettings {
+  /** Allow application-local collaboration tools; writes still require a writable permission preset. */
+  collaboration: { enabled: boolean };
   /**
    * 权限预设：readonly = 只读（不能改文件、命令只读沙箱）；workspace = 可写本机器人工作区（默认），越界操作需审批；
    * full = 完全权限：命令不进沙箱、不再请求提权，以用户身份读写任何文件，只有递归删除仍要用户确认
@@ -48,6 +50,9 @@ export interface BotSettings {
   /** Transport preferences for direct chat/fallback; agent tools retain their model-native adapters. */
   modelProtocol: 'auto' | 'chat' | 'responses' | 'messages';
   modelStreaming: boolean;
+  modelSource: string;
+  /** Auto inherits the configured global default; overrides stay local to this bot. */
+  reasoningEffort: "auto" | "low" | "medium" | "high";
   /**
    * 预算（需要登录 OKINTO 账户）：开启后机器人用自己的 API Key，最多花 limitUsd 美元
    * （包括这把 Key 已经花掉的）；关闭时与其他机器人共用本机的 Key。
@@ -67,6 +72,7 @@ export interface BotSettings {
 }
 
 export const DEFAULT_SETTINGS: BotSettings = {
+  collaboration: { enabled: true },
   permission: "workspace",
   memory: { enabled: true, review: true, teamWrite: false },
   steward: { enabled: true },
@@ -77,6 +83,8 @@ export const DEFAULT_SETTINGS: BotSettings = {
   appearance: null,
   modelProtocol: 'auto',
   modelStreaming: true,
+  modelSource: 'default',
+  reasoningEffort: 'auto',
   budget: { enabled: false, limitUsd: 5 },
   taskSlots: 2,
   quietHours: { ...DEFAULT_QUIET },
@@ -96,6 +104,7 @@ export function normalizeSettings(raw: unknown): BotSettings {
   const slots = Number(r.taskSlots);
   const b = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
   return {
+    collaboration: { enabled: b(r.collaboration?.enabled, true) },
     permission: r.permission === "readonly" || r.permission === "full" ? r.permission : "workspace",
     memory: {
       enabled: b(m.enabled, DEFAULT_SETTINGS.memory.enabled),
@@ -116,6 +125,8 @@ export function normalizeSettings(raw: unknown): BotSettings {
     appearance: r.appearance && typeof r.appearance === 'object' ? normalizeBotAppearance(r.appearance) : null,
     modelProtocol: ['chat', 'responses', 'messages'].includes(r.modelProtocol) ? r.modelProtocol : 'auto',
     modelStreaming: b(r.modelStreaming, true),
+    modelSource: typeof r.modelSource==='string' && (r.modelSource==='account_pool'||/^aggregate:[A-Za-z0-9_-]{1,128}$/.test(r.modelSource)) ? r.modelSource : 'default',
+    reasoningEffort: ["low", "medium", "high"].includes(r.reasoningEffort) ? r.reasoningEffort : "auto",
     budget: {
       enabled: b(bg.enabled, DEFAULT_SETTINGS.budget.enabled),
       limitUsd: Number.isFinite(limit) && limit >= 0 && limit <= 100_000 ? Math.round(limit * 100) / 100 : DEFAULT_SETTINGS.budget.limitUsd,

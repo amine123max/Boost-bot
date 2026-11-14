@@ -424,7 +424,9 @@ export class IlinkClient {
           await res.body?.cancel().catch(() => {});
           throw Object.assign(new Error(t("channel.too_large", { size: (declared / 1048576).toFixed(1), max: maxBytes / 1048576 })), { fatal: true });
         }
-        const buf = Buffer.from(await res.arrayBuffer());
+        const { readMediaBytes } = await import('../../core/media-bytes.js');
+        if (!res.body) throw new Error('媒体下载返回空响应');
+        const buf = await readMediaBytes(res.body as unknown as AsyncIterable<Uint8Array>, maxBytes, declared);
         if (buf.length > maxBytes) throw Object.assign(new Error(t("channel.too_large", { size: (buf.length / 1048576).toFixed(1), max: maxBytes / 1048576 })), { fatal: true });
         raw = buf;
       } catch (e) {

@@ -1,6 +1,7 @@
 //! Managed, actor-scoped Boost Bot host. Model calls use ordinary owned gateway keys.
 pub(crate) mod activity;
 pub(crate) mod http;
+pub(crate) mod model_sources;
 
 use crate::RpcActor;
 use rand::RngCore;
@@ -17,6 +18,7 @@ struct Host {
     child: Child,
     port: u16,
     token: String,
+    source_token: String,
 }
 #[derive(Clone)]
 pub(crate) struct Endpoint {
@@ -206,11 +208,12 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
             });
         }
     }
-    hosts.remove(&actor_scope);
+    if let Some(host)=hosts.remove(&actor_scope) { model_sources::revoke(&host.source_token); }
     drop(hosts);
     let root = runtime_root()?;
     let base_url = gateway_base_url()?;
     let key = gateway_key(actor, &actor_scope)?;
+    let mut source_lease = model_sources::Lease::new(actor)?;
     let data_dir = crate::process_env::db_dir().join("bots").join(&actor_scope);
     let scratch = std::env::var_os("TMPDIR")
         .filter(|value| !value.is_empty())
@@ -243,7 +246,8 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         .spawn()
         .map_err(|e| format!("启动 Boost Bot 失败（需要 Node.js 22.13+）：{e}"))?;
     let payload = json!({ "dataDir": data_dir, "token": token, "baseUrl": base_url,
-        "apiKey": key, "allowTools": actor.is_admin(), "parentPid": std::process::id() });
+        "apiKey": key, "allowTools": actor.is_admin(), "parentPid": std::process::id(),
+        "sourceBroker": {"url":format!("{}/_boost/bot/model-sources",base_url.trim_end_matches("/v1")),"token":source_lease.token} });
     if let Err(error) = writeln!(
         child.stdin.as_mut().ok_or("Boost Bot stdin unavailable")?,
         "{payload}"
@@ -288,8 +292,10 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
             child,
             port,
             token: token.clone(),
+            source_token: source_lease.token.clone(),
         },
     );
+    source_lease.retain();
     Ok(Endpoint { port, token })
 }
 
@@ -312,6 +318,7 @@ pub(crate) fn shutdown() {
         let children = hosts.drain().map(|(_, host)| host).collect::<Vec<_>>();
         drop(hosts);
         for mut host in children {
+            model_sources::revoke(&host.source_token);
             if let Some(stdin) = host.child.stdin.as_mut() {
                 let _ = writeln!(stdin, "shutdown");
             }

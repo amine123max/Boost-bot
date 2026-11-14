@@ -12,6 +12,11 @@ export interface BotActivity {
   sources?: string[];
   activeSources: string[];
   tokensPerSecond?: number | null;
+  rateKind?: string;
+  rateUpdatedAt?: number;
+  rateStale?: boolean;
+  fallbackTokensPerSecond?: number | null;
+  fallbackUpdatedAt?: number;
   state: BotActivityState;
   percent: number | null;
   activeTasks: number;
@@ -34,6 +39,11 @@ export function readBotActivity(value: unknown): BotActivity {
   return {
     available: source.available === true && state !== "unavailable",
     stale: source.stale === true,
+    rateKind: typeof source.rateKind === 'string' ? source.rateKind : 'request',
+    rateUpdatedAt: typeof source.rateUpdatedAt === 'number' ? source.rateUpdatedAt : undefined,
+    rateStale: source.rateStale === true,
+    fallbackTokensPerSecond: typeof source.fallbackTokensPerSecond === 'number' && Number.isFinite(source.fallbackTokensPerSecond) && source.fallbackTokensPerSecond >= 0 ? source.fallbackTokensPerSecond : null,
+    fallbackUpdatedAt: typeof source.fallbackUpdatedAt === 'number' ? source.fallbackUpdatedAt : undefined,
     tokensPerSecond:
       typeof source.tokensPerSecond === "number" &&
       Number.isFinite(source.tokensPerSecond) &&
@@ -88,12 +98,14 @@ export function mergeActivities(values: BotActivity[]): BotActivity {
   const rates = (
     active.length
       ? active.filter((v) => v.state === "working")
-      : live.filter((v) => v.state === "done")
+      : live.filter((v) => v.state !== "waiting")
   )
     .map((v) => v.tokensPerSecond)
     .filter(
       (v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0,
     );
+  const fallback = active.some(v=>v.state==='waiting') ? undefined : live.find(v => v.fallbackTokensPerSecond != null && v.fallbackUpdatedAt != null && Date.now()-v.fallbackUpdatedAt>=0 && Date.now()-v.fallbackUpdatedAt<60_000);
+  const rateSource = (active.length ? active : live).find(v => v.tokensPerSecond != null);
   const sources = active.length
     ? activeSources
     : selectedActivity.activeSources.length
@@ -105,12 +117,14 @@ export function mergeActivities(values: BotActivity[]): BotActivity {
     activeSources: sources,
     tokensPerSecond: rates.length
       ? rates.reduce((sum, value) => sum + value, 0)
-      : null,
+      : fallback?.fallbackTokensPerSecond ?? null,
+    rateKind: rates.length ? rateSource?.rateKind : fallback ? 'gateway' : undefined,
+    rateStale: rates.length ? rateSource?.rateStale : !!fallback,
     activeTasks,
     waitingTasks: active.reduce((n, v) => n + v.waitingTasks, 0),
     percent:
       activeTasks > 1
-        ? null
+        ? active.every(v=>v.percent!==null) ? Math.round(active.reduce((sum,v)=>sum+v.percent!*Math.max(1,v.activeTasks),0)/Math.max(1,activeTasks)) : null
         : selectedActivity.state === "done"
           ? 100
           : selectedActivity.percent,

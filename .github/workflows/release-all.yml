@@ -77,6 +77,7 @@ jobs:
         run: |
           cargo test --manifest-path backend/desktop/Cargo.toml --lib app_storage -- --test-threads=1
           cargo test --manifest-path backend/desktop/Cargo.toml --lib commands::updater
+          cargo test --manifest-path backend/desktop/Cargo.toml --locked --lib local_activity -- --test-threads=1
       - name: Prepare packaging config
         run: node -e "require('fs').writeFileSync(process.env.TMPDIR + '/tauri-release.json', JSON.stringify({build:{beforeBuildCommand:''}}))"
       - name: Package desktop

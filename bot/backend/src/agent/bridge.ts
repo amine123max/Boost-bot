@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { logger, redactText, registerSecret } from "../log.js";
 import { peekStream, type CompactionPlan, type ServerCompaction } from "./server-compaction.js";
 import { t } from "../i18n/index.js";
+import { UsageMeter } from './usage-meter.js';
 
 const log = logger("agent.bridge");
 /** 长调用的保活间隔：远小于 fetch 默认的 5 分钟数据间隔超时 */
@@ -13,11 +14,14 @@ const KEEPALIVE_MS = 60_000;
 export interface BridgeHandlers {
   /** 模型上游（magpie 网关或外部端点），密钥只在本进程内使用 */
   upstream(): { baseUrl: string; apiKey: string };
+  upstreamFor?: (botId?:string,model?:string)=>Promise<{baseUrl:string;apiKey:string}>;
   ask(body: any): Promise<{ id: string }>;
   wait(body: any): Promise<Record<string, unknown>>;
   cancel(body: any): Promise<void>;
   /** amb-memory 插件：remember / forget / recall */
   memory?(body: any): Promise<unknown>;
+  collaboration?(body: any): Promise<unknown>;
+  channelFile?(body: any): Promise<unknown>;
   /** amb-memory 插件：上下文管家判定 / 压缩回报 */
   steward?(body: any): Promise<unknown>;
   /** amb-media 插件：生图 / 生视频 */
@@ -61,6 +65,7 @@ export const BOT_HEADER = "x-amb-bot";
  * - /dsh/task-report|task-settled|task-tool|task-config：amb-tasks 插件（后台任务的报告、收尾结束、聊天代理的任务工具、规则会话的配置）
  */
 export class AgentBridge {
+  readonly usage = new UsageMeter();
   readonly token = crypto.randomBytes(24).toString("base64url");
   private server: http.Server | undefined;
   port = 0;
@@ -148,7 +153,11 @@ export class AgentBridge {
   }
 
   private async proxy(req: http.IncomingMessage, res: http.ServerResponse, url: string): Promise<void> {
-    const up = this.h.upstream();
+    const body = req.method === "GET" || req.method === "HEAD" ? undefined : await this.readBody(req);
+    const botId = typeof req.headers[BOT_HEADER]==='string' ? req.headers[BOT_HEADER] as string : undefined;
+    let model: string|undefined;
+    if(body){try{const value=JSON.parse(body.toString('utf8'));if(typeof value.model==='string')model=value.model;}catch{/* Original invalid bytes are handled by the gateway. */}}
+    const up = this.h.upstreamFor ? await this.h.upstreamFor(botId,model) : this.h.upstream();
     if (!up.baseUrl) throw new Error(t("agent.gatewayNotReady"));
     const target = up.baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "") + url;
     const headers: Record<string, string> = {};
@@ -161,10 +170,10 @@ export class AgentBridge {
       headers.authorization = `Bearer ${up.apiKey}`;
       if (req.headers["x-api-key"] !== undefined) headers["x-api-key"] = up.apiKey;
     }
-    const body = req.method === "GET" || req.method === "HEAD" ? undefined : await this.readBody(req);
     const id = ++this.seq;
     const p = url.split("?")[0];
     const t0 = Date.now();
+    this.usage.start(id, String(req.headers[BOT_HEADER] || 'host'), t0);
     if (this.proxyListeners.size) this.emitProxy({ phase: "request", id, path: p, ...requestInfo(body) });
     const ac = new AbortController();
     res.on("close", () => ac.abort());
@@ -178,7 +187,7 @@ export class AgentBridge {
       return fetch(target, { method: req.method, headers, body: b ? new Uint8Array(b) : undefined, signal: ac.signal });
     };
     let plan: CompactionPlan | undefined;
-    if (body && req.method === "POST" && this.h.compaction) {
+    if (body && req.method === "POST" && this.h.compaction && !this.h.upstreamFor) {
       try {
         plan = this.h.compaction.prepare(p, req.headers, body);
       } catch (e) {
@@ -190,6 +199,7 @@ export class AgentBridge {
       r = await send(plan?.body ?? body);
       if (plan?.rewritten) r = await this.checkRewritten(plan, r, () => send(body), p);
     } catch (e) {
+      this.usage.finish(id);
       const error = (e as Error).message;
       this.emitProxy({ phase: "error", id, path: p, ms: Date.now() - t0, error });
       throw e;
@@ -201,6 +211,7 @@ export class AgentBridge {
       if (!["content-encoding", "content-length", "transfer-encoding", "connection", "set-cookie"].includes(k)) out[k] = v;
     });
     if (r.status >= 400) {
+      this.usage.finish(id);
       // 上游报错：读完错误体（不大）记日志，再原样转给子进程
       const text = await r.text().catch(() => "");
       const error = redactText(text.slice(0, 1000));
@@ -221,15 +232,18 @@ export class AgentBridge {
     const headersMs = Date.now() - t0;
     this.emitProxy({ phase: "response", id, path: p, status: r.status, ms: headersMs });
     res.writeHead(r.status, out);
-    if (!r.body) return void res.end();
+    if (!r.body) { this.usage.finish(id); return void res.end(); }
     const stream = Readable.fromWeb(r.body as any);
+    const usage = this.usage.reader(id, r.headers.get('content-type')?.includes('text/event-stream') === true);
     let bytes = 0;
     stream.on("data", (c: Buffer) => {
       bytes += c.length;
       plan?.observe(c);
+      usage.push(c);
     });
-    stream.on("end", () => log.info("model request done", { path: p, status: r.status, headersMs, totalMs: Date.now() - t0, bytes }));
+    stream.on("end", () => { usage.end(); log.info("model request done", { path: p, status: r.status, headersMs, totalMs: Date.now() - t0, bytes }); });
     stream.on("error", (e) => {
+      this.usage.finish(id);
       // 子进程读完 [DONE] 就断开时上游流会被中止（res close → abort），这不是错误
       if (ac.signal.aborted) log.debug("model response closed by the agent", { path: p, ms: Date.now() - t0, bytes });
       else log.warn("model response stream failed", { path: p, ms: Date.now() - t0, bytes, error: e.message });
@@ -274,6 +288,8 @@ export class AgentBridge {
     else if (url === "/dsh/wait") out = await this.h.wait(body);
     else if (url === "/dsh/cancel") out = (await this.h.cancel(body), { ok: true });
     else if (url === "/dsh/memory" && this.h.memory) out = await this.h.memory(body);
+    else if (url === "/dsh/collaboration" && this.h.collaboration) out = await this.h.collaboration(body);
+    else if (url === '/dsh/channel-file' && this.h.channelFile) out = await this.h.channelFile(body);
     else if (url === "/dsh/steward" && this.h.steward) out = await this.h.steward(body);
     else if (url === "/dsh/media" && this.h.media) return this.longCall(res, this.h.media(body));
     else if (url === "/dsh/search" && this.h.search) {

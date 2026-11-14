@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import BoostIcon from "./BoostIcon.vue";
 import TrayMetricWidget from "./TrayMetricWidget.vue";
 import {
   trayItems,
@@ -96,14 +95,6 @@ function drop(event: DragEvent, index = props.preferences.pages.length) {
         />
       </div>
     </div>
-    <button
-      v-if="!editable"
-      class="strip-config"
-      aria-label="配置悬浮窗"
-      @click="emit('configure')"
-    >
-      <BoostIcon name="settings" :size="10" />
-    </button>
   </section>
 </template>
 <style scoped>
@@ -150,26 +141,6 @@ function drop(event: DragEvent, index = props.preferences.pages.length) {
 .editable .strip-component:focus-visible {
   outline: 1px solid var(--blue);
   outline-offset: 2px;
-}
-.strip-config {
-  position: absolute;
-  right: -3px;
-  top: -4px;
-  display: grid;
-  place-items: center;
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  background: var(--sidebar);
-  border: 0;
-  border-radius: 4px;
-  color: var(--muted);
-  opacity: 0;
-  cursor: pointer;
-}
-.tray-dashboard:hover .strip-config,
-.strip-config:focus-visible {
-  opacity: 1;
 }
 .strip-slot.metrics :deep(.widget-value) {
   gap: 2px;

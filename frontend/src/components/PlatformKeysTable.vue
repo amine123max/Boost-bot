@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModelLabel from "./ModelLabel.vue";
 import { computed } from "vue";
 import type { ApiKey, ApiKeyUsageStat } from "@/types";
 import { accountClient } from "@/lib/api/account-client";
@@ -138,7 +139,7 @@ function menu(key: ApiKey, action: string) {
             <span
               class="record-model"
               :title="row.key.modelSlug || row.key.model"
-              >{{ row.key.modelSlug || row.key.model || "跟随请求" }}</span
+              ><ModelLabel v-if="row.key.modelSlug || row.key.model" :model="row.key.modelSlug || row.key.model" /><template v-else>跟随请求</template></span
             >
             <p
               v-if="row.key.reasoningEffort || row.key.serviceTier"

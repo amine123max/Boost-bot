@@ -382,7 +382,7 @@ onBeforeUnmount(() => clearInterval(timer));
     <BoostDialog
       v-if="importing"
       title="导入代理节点"
-      @close="!busy && (importing = false)"
+      :busy="busy" @close="!busy && (importing = false)"
     >
       <form class="form-stack" @submit.prevent="saveImport">
         <label class="form-field"
@@ -402,7 +402,7 @@ onBeforeUnmount(() => clearInterval(timer));
             :disabled="busy"
           />替换现有节点列表<HelpHint label="替换节点" text="默认追加并去重。被移除节点的账号绑定会保留并阻断请求，请重新指定节点。" /></label
         ><DialogActions
-          ><button
+          ><button data-dialog-close
             type="button"
             class="secondary"
             :disabled="busy"
@@ -491,7 +491,7 @@ onBeforeUnmount(() => clearInterval(timer));
     <BoostDialog
       v-if="addingLocal"
       title="添加本地代理"
-      @close="!busy && (addingLocal = false)"
+      :busy="busy" @close="!busy && (addingLocal = false)"
     >
       <form class="form-stack" @submit.prevent="saveLocal">
         <label class="form-field"
@@ -520,7 +520,7 @@ onBeforeUnmount(() => clearInterval(timer));
         </div>
         <span>本地代理<HelpHint label="本地代理" text="本地指 Boost 服务端所在机器。添加后查询真实出口国家，成功后显示国旗；失败时显示待检测。" /></span>
         <DialogActions
-          ><button
+          ><button data-dialog-close
             class="secondary"
             type="button"
             :disabled="busy"

@@ -1,3 +1,4 @@
+@import "../../../frontend/src/styles/surfaces.css";
 /* Vue uses the original design/, shell.css, chat.css and boost.css unchanged.
    These rules only cover added controls; application geometry and theme remain there. */
 @layer app {
@@ -45,8 +46,9 @@
     width: var(--ctl-md);
     height: var(--ctl-md);
     border-radius: 50%;
-    background: var(--pill);
-    color: var(--fg-2);
+    background: var(--user-avatar-color, #4f46e5);
+    color: #fff;
+    flex: none;
   }
   .bot-studio .group-mark {
     width: 38px;
@@ -305,24 +307,58 @@
   .workspace-dialog::backdrop {
     background: #0007;
   }
+  .workspace-dialog.is-wide { width:min(840px,calc(100vw - 24px)); }
+  html[data-theme="dark"] { color-scheme:dark; }
+  html[data-theme="light"] { color-scheme:light; }
+  .editor-form.bot-editor-form { padding:0; gap:0; }
+  .bot-editor-form > .error-banner { margin:16px 24px 0; }
+  .bot-editor-form > .dialog-actions { margin:0; bottom:0; padding:15px 24px; z-index:3; flex-wrap:wrap; }
+  .bot-editor-form > .dialog-actions .error-banner { margin:0; flex-basis:100%; }
+  .permission-confirm-copy { padding:20px 24px; font-size:13px; line-height:1.7; }
+  .permission-confirm-actions { display:flex; gap:8px; justify-content:flex-end; padding:16px 24px; border-top:1px solid var(--line); }
+  .editor-switch-row > input[type="checkbox"] { appearance:none; flex:none; position:relative; width:36px; height:21px; padding:2px; margin:0; border:0; border-radius:20px; background:var(--muted); cursor:pointer; transition:background-color 140ms ease; }
+  .editor-switch-row > input[type="checkbox"]::after { content:""; display:block; width:17px; height:17px; border-radius:50%; background:white; transition:transform 140ms ease; }
+  .editor-switch-row > input[type="checkbox"]:checked { background:var(--accent); }
+  .editor-switch-row > input[type="checkbox"]:checked::after { transform:translateX(15px); }
+  .editor-switch-row > input[type="checkbox"]:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+  .editor-switch-row > input[type="checkbox"]:disabled { opacity:.5; cursor:not-allowed; }
+  @media(prefers-reduced-motion:reduce) { .editor-switch-row > input[type="checkbox"],.editor-switch-row > input[type="checkbox"]::after { transition:none; } }
   .workspace-dialog > header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 24px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 20;
     background: var(--surface);
+  }
+  .workspace-dialog,
+  .workspace-dialog * {
+    scrollbar-width: none;
+  }
+  .workspace-dialog::-webkit-scrollbar,
+  .workspace-dialog *::-webkit-scrollbar {
+    display: none;
   }
   .workspace-dialog h2 {
     font-size: 16px;
   }
+  .workspace-dialog.is-wide > header {
+    padding: 6px 16px;
+    min-height: 42px;
+  }
+  .workspace-dialog.is-wide > header > .icon-button {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
   .editor-form {
-    padding: 22px 24px;
+    padding: 14px 16px;
     display: grid;
-    gap: 18px;
+    gap: 12px;
   }
   .editor-form > label,
   .appearance-picker > label,
@@ -337,15 +373,16 @@
     align-items: center;
     gap: 3px;
   }
+  .editor-form > label > input:not([type="checkbox"]),.editor-form > label > textarea { min-width:0; width:100%; border:1px solid var(--line); border-radius:7px; padding:7px 9px; background:var(--well); color:var(--fg); font:inherit; }
   .dialog-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
     border-top: 1px solid var(--line);
-    margin: 4px -24px -22px;
-    padding: 16px 24px;
+    margin: 2px -16px -14px;
+    padding: 10px 16px;
     position: sticky;
-    bottom: -22px;
+    bottom: -14px;
     background: var(--surface);
     z-index: 1;
   }
@@ -443,23 +480,34 @@
   .member-picker {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 5px;
   }
   .member-picker > label {
     display: flex;
     align-items: center;
     gap: 7px;
     cursor: pointer;
-    padding: 12px 8px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    padding: 5px 7px;
+    border: 0;
+    border-radius: 7px;
     font-size: 12px;
     overflow-wrap: anywhere;
   }
+  .member-picker > label:hover { background:var(--pill); }
+  .member-picker input[type="checkbox"] { appearance:none; width:16px; height:16px; flex:none; border:1px solid var(--muted); border-radius:4px; margin:0; background:transparent; }
+  .member-picker input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
+  .member-picker input[type="checkbox"]:checked::after { content:""; display:block; width:5px; height:9px; border:solid var(--on-primary); border-width:0 1.5px 1.5px 0; transform:translate(5px,1px) rotate(45deg); }
   .member-picker > label.selected {
     background: var(--pill);
     border-color: var(--accent);
   }
+  .member-picker > label { min-height: 38px; }
+  .member-heading > strong {display:inline-flex;align-items:center;font-weight:550;}
+  .member-picker + .error-banner {margin:0;padding:8px 10px;font-size:12px;}
+  .member-picker > label > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bot-studio .chip {display:inline-flex;align-items:center;justify-content:center;gap:5px;line-height:1.2;}
+  .bot-studio button > svg {display:block;flex-shrink:0;}
+  .model-control > .select-control { width:220px; max-width:100%; }
   .workspace-panel {
     display: flex;
     flex-direction: column;
@@ -468,6 +516,7 @@
   }
   .panel-content {
     overflow: auto;
+    min-height: 0;
     padding: 30px;
     flex: 1;
   }
@@ -532,6 +581,9 @@
     border-radius: 50%;
     animation: loading 1s linear infinite;
   }
+  .conversation-view { position: relative; }
+  .chat-refresh-status {position:absolute;top:58px;right:16px;z-index:3;pointer-events:none;}
+  .chat-refresh-status .loading-ring {display:block;width:14px;height:14px;border-width:1.5px;}
   .task-card {
     display: flex;
     align-items: center;
@@ -552,23 +604,27 @@
     padding: 16px 0 32px;
   }
   .panel-intro h2 {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 7px;
     margin-top: 12px;
     font-size: 24px;
   }
   .catalog-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 300px));
     gap: 16px;
   }
   .catalog-card {
-    padding: 24px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    border-radius: 14px;
+    padding: 16px;
+    border: 0;
+    background: var(--well);
+    border-radius: 10px;
     display: flex;
     align-items: flex-start;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
   }
   .catalog-icon {
     color: var(--accent);
@@ -585,26 +641,38 @@
     margin-top: auto;
   }
   .create-card {
-    border-style: dashed;
-    min-height: 220px;
-    justify-content: center;
+    min-height: 48px;
+    align-self: start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px;
   }
+  .create-card > svg {flex:none;}
+  .create-card > h3 {flex:none;font-size:12px;white-space:nowrap;margin:0;}
+  .create-card > span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
   .catalog-app-view {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    height: 100%;
+    overflow: hidden;
   }
   .catalog-app-layout {
     display: flex;
     min-height: 0;
     flex: 1;
+    overflow: hidden;
   }
   .catalog-app-layout > iframe {
     border: 0;
     width: 100%;
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
   }
   .catalog-app-layout.with-chat > .conversation-view {
     width: 440px;
@@ -617,15 +685,36 @@
   .external-url {
     overflow-wrap: anywhere;
   }
+  .catalog-card-title { display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: 100%; }
+  .catalog-card-title h3 { min-width: 0; }
+  .panel-content.settings-host { padding: 0; overflow: hidden; display: flex; }
+  .workspace-main { min-height: 0; min-width: 0; }
+  .app.bot-studio.settings-layout { grid-template-columns: 244px minmax(0, 1fr); transition: none; }
+  .app.bot-studio.settings-layout > .main { grid-area: 1 / 2; margin: 8px 8px 8px 0; }
+  .settings-side { grid-area: 1 / 1; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+  .settings-side-head { display: flex; align-items: center; gap: 10px; padding: 18px 20px 12px; flex: none; color:var(--fg-2); }
+  .settings-side-head h2 { font-size: 20px; font-weight: 600; margin: 0; }
+  .settings-nav-host { min-height: 0; display: flex; flex: 1; }
+  .settings-page-head { display: none; height:44px; flex:none; }
+  .settings-page-head h1 { font-size:14px; color:var(--fg-2); }
+  .settings-nav-close { display:none; margin-left:auto; }
 
   .mobile-menu,
   .mobile-scrim {
     display: none;
   }
   @media (max-width: 800px) {
-    .bot-studio {
+    .settings-page-head { display: flex; }
+    .app.bot-studio {
       --side-col: 0px;
+      --panel-track: 0px;
+      grid-template-columns: 0 minmax(0, 1fr) 0;
     }
+    .app.bot-studio.settings-layout { grid-template-columns:minmax(0,1fr); }
+    .app.bot-studio.settings-layout > .main { grid-area:1 / 1; margin:0; border-radius:0; border:0; }
+    .settings-side { position:fixed; inset:0 auto 0 0; width:min(280px,85vw); z-index:60; background:var(--bg); border-right:1px solid var(--line); transform:translateX(-100%); visibility:hidden; }
+    .settings-side.is-open { transform:translateX(0); visibility:visible; }
+    .settings-nav-close { display:inline-flex; }
     .bot-studio > .side {
       position: fixed;
       inset: 0 auto 0 0;
@@ -647,9 +736,8 @@
       background: var(--scrim);
       z-index: 50;
     }
-    .model-control select {
-      max-width: 160px;
-    }
+    .model-control { min-width:0; max-width:45%; }
+    .model-control > .select-control { max-width:180px; }
     .member-picker {
       grid-template-columns: 1fr;
     }

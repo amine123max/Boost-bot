@@ -3,6 +3,7 @@ import { onBeforeUnmount, ref, watch } from "vue";
 import type { Bot, Approval, Task, LiveTurn, Message } from "../types";
 import { api, enc } from "../api";
 import Icon from "./Icon.vue";
+import SettingsButton from './SettingsButton.vue';
 import HelpTip from "./HelpTip.vue";
 import ConversationLabel from "./ConversationLabel.vue";
 import ConversationHistory from "./ConversationHistory.vue";
@@ -19,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   edit: [];
+  delete: [];
   settings: [];
   approvals: [];
   task: [task: Task];
@@ -122,8 +124,8 @@ const channelName = (channel: string) =>
   <aside class="panel" aria-label="智能体信息">
     <div class="panel-head">
       <span class="title">{{ bot.name }}</span
-      ><button class="icon-btn" aria-label="智能体设置" @click="emit('edit')">
-        <Icon name="settings" /></button
+      ><SettingsButton label="智能体设置" @click="emit('edit')" /><button v-if="configure" class="icon-btn" aria-label="删除智能体" @click="emit('delete')">
+        <Icon name="trash" :size="16" /></button
       ><button
         class="icon-btn panel-close"
         aria-label="关闭信息面板"
@@ -140,7 +142,7 @@ const channelName = (channel: string) =>
           aria-label="查看全部任务"
           @click="emit('tasks')"
         >
-          <Icon name="expand" :size="13" />
+          <Icon name="chevron" :size="13" />
         </button>
       </div>
       <div class="panel-task-cards">
@@ -179,9 +181,7 @@ const channelName = (channel: string) =>
           }}</span>
         </div>
         <div class="row">
-          <button class="who channel-manage" @click="emit('settings')">
-            <span class="name">管理聊天渠道</span></button
-          ><HelpTip text="微信、飞书等账号由所有智能体共用，可在设置中管理。" />
+          <span class="channel-manage-label"><button class="channel-manage" @click="emit('settings')">管理聊天渠道</button><HelpTip text="微信、飞书等账号由所有智能体共用，可在设置中管理。" label="管理聊天渠道说明" /></span>
         </div>
       </div>
       <div class="list-head">待审批</div>
@@ -249,7 +249,9 @@ const channelName = (channel: string) =>
 </template>
 
 <style scoped>
+.channel-manage-label { display:inline-flex; align-items:center; gap:5px; }
 .channel-manage {
+  flex: 0 1 auto;
   text-align: left;
 }
 .conversation-row {

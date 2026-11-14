@@ -8,6 +8,7 @@ import {
   useId,
 } from "vue";
 import BoostIcon from "./BoostIcon.vue";
+import SpringSurface from './SpringSurface.vue';
 export interface MenuItem {
   value: string;
   label: string;
@@ -151,7 +152,7 @@ onDeactivated(() => close(false));
     }}</span
     ><BoostIcon v-if="!iconOnly" name="chevron-down" :size="13" />
   </button>
-  <Teleport to="body"
+  <Teleport to="body"><SpringSurface
     ><div
       v-if="open"
       :id="id"
@@ -183,5 +184,5 @@ onDeactivated(() => close(false));
           ><BoostIcon v-if="selected === item.value" name="check" :size="14" />
         </button>
       </template></div
-  ></Teleport>
+  ></SpringSurface></Teleport>
 </template>

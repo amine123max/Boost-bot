@@ -241,6 +241,7 @@ async fn responses_handler(
 /// 返回函数执行结果
 fn build_front_proxy_app(state: ProxyState) -> Router {
     Router::new()
+        .route("/_boost/bot/model-sources", any(crate::bot::model_sources::handle))
         .route("/boost-bot/", any(crate::bot::http::proxy))
         .route("/boost-bot/{*path}", any(crate::bot::http::proxy))
         .route("/rpc", post(crate::http::rpc_endpoint::handle_rpc_http))

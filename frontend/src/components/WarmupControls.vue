@@ -128,7 +128,7 @@ function choose(value: string) {
     v-if="open"
     title="定时预热"
     wide
-    @close="!saving && (open = false)"
+    :busy="saving" @close="!saving && (open = false)"
   >
     <div v-if="loading" class="warmup-loading" role="status">
       <BoostIcon name="loader-circle" :size="18" class="spinning" />正在读取预热计划…
@@ -169,7 +169,7 @@ function choose(value: string) {
           :disabled="saving || loading"
           @click="saveSchedule(true)"
         >取消定时预热</button>
-        <button class="secondary" type="button" :disabled="saving" @click="open = false">关闭</button>
+        <button data-dialog-close class="secondary" type="button" :disabled="saving" @click="open = false">关闭</button>
         <button class="primary" type="button" :disabled="saving || loading || !ready" @click="saveSchedule()">
           {{ saving ? "保存中…" : "保存计划" }}
         </button>

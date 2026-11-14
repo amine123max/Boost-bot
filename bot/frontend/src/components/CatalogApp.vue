@@ -18,12 +18,13 @@ import {
   pickFiles,
 } from "../../compat/lib/bot-bridge.js";
 import Icon from "./Icon.vue";
+import SettingsButton from './SettingsButton.vue';
 import BotAvatar from "./BotAvatar.vue";
 import ChatView from "./ChatView.vue";
 import Modal from "./Modal.vue";
 
-const props = defineProps<{ bot: Bot; configure: boolean }>();
-const emit = defineEmits<{ chat: []; settings: []; menu: [] }>();
+const props = defineProps<{ bot: Bot; configure: boolean; models?: string[] }>();
+const emit = defineEmits<{ chat: []; settings: []; edit: []; delete: []; menu: []; refresh: [] }>();
 const route = ref<Route>({ kind: "chat", id: props.bot.id }),
   chat = reactive(useConversation(route, () => {}));
 const frame = ref<HTMLIFrameElement>(),
@@ -205,6 +206,8 @@ onBeforeUnmount(() => {
       >
         <Icon name="chat" />{{ showChat ? "关闭对话" : "对话与审批" }}</button
       ><button class="quiet-button" @click="emit('chat')">独立会话</button>
+      <SettingsButton label="智能体设置" @click="emit('edit')" />
+      <button v-if="configure" class="icon-btn" aria-label="删除智能体" @click="emit('delete')"><Icon name="trash" :size="16" /></button>
     </header>
     <div v-if="error || chat.error" class="error-banner" role="alert">
       {{ error || chat.error }}
@@ -221,9 +224,10 @@ onBeforeUnmount(() => {
         :chat="chat"
         :bot="bot"
         :bots="[bot]"
-        :models="[]"
+        :models="models || []"
         :configure="configure"
-        @edit="emit('settings')"
+          @refresh="emit('refresh')"
+        @edit="emit('edit')"
         @collaborate="emit('chat')"
       />
     </div>
@@ -231,7 +235,7 @@ onBeforeUnmount(() => {
       ><div class="editor-form">
         <p class="external-url">{{ externalUrl }}</p>
         <footer class="dialog-actions">
-          <button class="quiet-button" @click="resolveUrl(false)">取消</button
+          <button data-dialog-close class="quiet-button" @click="resolveUrl(false)">取消</button
           ><button class="primary-button" @click="resolveUrl(true)">
             打开链接
           </button>

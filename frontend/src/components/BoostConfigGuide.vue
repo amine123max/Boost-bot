@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
 import BoostIcon from "./BoostIcon.vue";
+import ModelSelect from "./ModelSelect.vue";
 import ConfigViewer from "./ConfigViewer.vue";
 import { boost, copyText, perform } from "@/composables/useBoost";
 import { accountClient } from "@/lib/api/account-client";
@@ -111,12 +112,7 @@ const python = computed(
               aria-label="配置网关地址"
               type="url" /></label
           ><label class="form-field"
-            >模型<select v-model="model" aria-label="配置模型">
-              <option v-if="!models.length" value="">请先并入远端模型</option>
-              <option v-for="m in models" :key="m.slug" :value="m.slug">
-                {{ m.slug }}
-              </option>
-            </select></label
+            >模型<ModelSelect v-model="model" label="配置模型" :options="models.map(m => m.slug)" :allow-custom="false" :placeholder="models.length ? '选择模型' : '请先并入远端模型'" /></label
           >
         </div>
         <template v-if="client === 'codex'"

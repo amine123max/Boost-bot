@@ -158,7 +158,7 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
           /></RouterLink>
         </div>
       </header>
-      <main id="main-content" class="page-content">
+      <main id="main-content" class="page-content" v-spring-page="route.path + ':' + (route.query.tab || '') + ':' + (route.query.section || '')">
         <RouterView v-if="boost.ready" v-slot="{ Component }"
           ><KeepAlive><component :is="Component" /></KeepAlive
         ></RouterView>

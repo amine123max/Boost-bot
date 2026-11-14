@@ -6,6 +6,9 @@ import { Store, type Bot, type ChannelAccount } from "./store/db.js";
 import { OpenAICompatClient, type ModelClient } from "./llm/client.js";
 import { BotRuntime } from "./core/runtime.js";
 import { KeyedQueue } from "./core/queue.js";
+import { CollaborationService } from './core/collaboration.js';
+import { BotManagement } from './core/bot-management.js';
+import { ChannelDelivery } from './core/channel-delivery.js';
 import { deferNotice, interruptedText, takeInterrupted, type Interrupted } from "./core/recovery.js";
 import { Outbox } from "./core/outbox.js";
 import { Delivery, type DeliveryOptions } from "./core/delivery.js";
@@ -24,6 +27,7 @@ import { startWebServer, type WebServer } from "./web/server.js";
 import { initFileLog, logFilePath, logger, mask, registerSecret } from "./log.js";
 import { AgentManager } from "./agent/manager.js";
 import { normalizeSettings } from "./agent/settings.js";
+import { ModelSources, type SourceBroker } from './core/model-sources.js';
 import { locateDshRuntime } from "./agent/host.js";
 import { pwshProbe } from "./agent/pwsh.js";
 import { findAppRoot } from "./magpie/supervisor.js";
@@ -129,6 +133,7 @@ export interface OfficialView {
 export type OfficialConnectResult = { ok: true; models: string[] } | { ok: false; code: OfficialFailure; message: string };
 
 export interface AppOptions {
+  sourceBroker?: SourceBroker;
   /** 测试注入：替换飞书传输层 */
   feishuTransport?: (account: { id: string; feishuAppId: string; feishuAppSecret: string; brand: "feishu" | "lark" }) => FeishuTransport;
   /** 测试用：替换 Telegram、Slack、Discord 的传输层 */
@@ -163,8 +168,12 @@ interface BotChannels {
 
 export class App {
   readonly store: Store;
+  readonly collaboration: CollaborationService;
+  readonly botManagement: BotManagement;
+  readonly channelDelivery: ChannelDelivery;
   readonly magpie: MagpieSupervisor | undefined;
   readonly models: ModelClient;
+  readonly modelSources: ModelSources;
   readonly runtime: BotRuntime;
   readonly agent: AgentManager;
   readonly queue = new KeyedQueue();
@@ -232,23 +241,21 @@ export class App {
       log: logFilePath(),
     });
     this.store = new Store(path.join(config.dataDir, "boost-bot.db"));
+    this.collaboration = new CollaborationService(this.store);
+    this.botManagement = new BotManagement(this.store, id => this.startBot(id));
+    this.channelDelivery = new ChannelDelivery(this.store, config.dataDir, () => this.runtime);
     this.outbox = new Outbox(this.store);
     this.delivery = new Delivery({ store: this.store, outbox: this.outbox, timeZone: opts.timeZone, ...opts.deliveryLimits });
     this.access = new AccessControl(this.store, { notify: (to, text, id) => this.reach(to, text, id) });
     if (config.magpie.mode === "managed") {
       this.magpie = new MagpieSupervisor({ dataDir: config.dataDir, binPath: config.magpie.binPath || undefined });
     }
-    this.models =
-      opts.models ??
-      new OpenAICompatClient(() =>
-        this.magpie
-          ? { baseUrl: this.magpie.baseUrl, apiKey: this.magpie.gatewayKey }
-          : { baseUrl: config.magpie.externalBaseUrl.replace(/\/+$/, ""), apiKey: config.magpie.externalApiKey },
-      );
     const upstream = () =>
       this.magpie
         ? { baseUrl: this.magpie.baseUrl, apiKey: this.magpie.gatewayKey }
         : { baseUrl: config.magpie.externalBaseUrl.replace(/\/+$/, ""), apiKey: config.magpie.externalApiKey };
+    this.modelSources = new ModelSources(this.store, upstream, opts.sourceBroker);
+    this.models = opts.models ?? new OpenAICompatClient((botId,model)=>this.modelSources.endpoint(botId,model));
     this.webSearch = loadWebSearch(this.store);
     // 桌面版搜索走 Chromium 的网络栈（系统代理、PAC、系统证书）；命令行 / Docker 用 Node 的 fetch
     this.search = new SearchService({ settings: () => this.webSearch, fetch: () => this.desktop?.fetch });
@@ -264,10 +271,13 @@ export class App {
       startBot: (id) => this.startBot(id),
     });
     this.agent = new AgentManager({
+      collaborate: (botId, conversationId, op, args) => this.collaboration.tool(botId, conversationId, op, args),
+      deliverFile: (botId, conversationId, op, args) => this.channelDelivery.tool(botId, conversationId, op, args),
       store: this.store,
       dataDir: config.dataDir,
       runtimeDir: config.agent.mode === "dsh" ? locateDshRuntime(findAppRoot()) : undefined,
       upstream,
+      upstreamFor: opts.sourceBroker ? (botId,model) => this.modelSources.endpoint(botId,model) : undefined,
       enabled: config.agent.mode === "dsh" && !opts.models,
       turnTimeoutMs: config.agent.turnTimeoutMs,
       idleTimeoutMs: config.agent.idleTimeoutMs,
@@ -294,7 +304,7 @@ export class App {
       // 后台小任务（管家判定/交接/记忆整理）直接走 magpie，不经代理子进程
       complete: (botId, model, system, user) =>
         this.models.streamChat(
-          { model: this.routeModel(botId, model), messages: [{ role: "system", content: system }, { role: "user", content: user }], signal: AbortSignal.timeout(120_000) },
+          { botId, model: this.routeModel(botId, model), messages: [{ role: "system", content: system }, { role: "user", content: user }], signal: AbortSignal.timeout(120_000) },
           () => {},
         ),
       media: (this.magpie || process.env.BOOST_BOT_HOSTED === "1")
@@ -327,7 +337,7 @@ export class App {
       // 规则：检查用小模型，真要发的那一句用主模型写（决定 5）
       complete: (botId, model, system, user) =>
         this.models.streamChat(
-          { model: this.routeModel(botId, model), messages: [{ role: "system", content: system }, { role: "user", content: user }], signal: AbortSignal.timeout(120_000) },
+          { botId, model: this.routeModel(botId, model), messages: [{ role: "system", content: system }, { role: "user", content: user }], signal: AbortSignal.timeout(120_000) },
           () => {},
         ),
       timeZone: opts.timeZone,
@@ -355,11 +365,13 @@ export class App {
       store: this.store,
       models: this.models,
       defaultModel: () => this.config.llm.defaultModel,
+      botModels: async botId => { const source=this.store.getBot(botId)?.settings.modelSource||'default';return source==='default'?this.runtime.listModels():this.modelSources.models(source); },
       contextMessages: config.llm.contextMessages,
       contextChars: config.llm.contextChars,
       // 纯对话路径的推理强度：用户选了、模型资料也标了推理才带（外部端点没有模型资料，不带）
-      reasoningEffort: async (model) => {
-        const effort = this.config.llm.reasoningEffort;
+      reasoningEffort: async (model, botId) => {
+        const botEffort = botId ? this.store.getBot(botId)?.settings.reasoningEffort : undefined;
+        const effort = botEffort && botEffort !== "auto" ? botEffort : this.config.llm.reasoningEffort;
         return effort !== "auto" && (await this.infoOf(model))?.reasoning === true ? effort : undefined;
       },
       route: (botId, model) => this.routeModel(botId, model),
@@ -643,6 +655,8 @@ export class App {
   /** 删除机器人时一并删掉它的预算 Key */
   async deleteBot(botId: string, opts: { keepData?: boolean } = {}): Promise<void> {
     const bot = this.store.getBot(botId);
+    if (!bot) return;
+    for (const conversation of this.store.listConversations(botId)) this.runtime.stop(conversation.id);
     this.tasks.dropBot(botId);
     // 渠道账号是全局的，不跟着机器人停：之后它们的消息交给别的机器人（core/routes.ts）
     await this.agent.stopBot(botId);

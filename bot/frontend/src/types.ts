@@ -13,6 +13,15 @@ export interface Bot {
     paused: boolean;
     modelProtocol?: "auto" | "chat" | "responses" | "messages";
     modelStreaming?: boolean;
+    modelSource?: string;
+    reasoningEffort?: "auto" | "low" | "medium" | "high";
+    steward: { enabled: boolean };
+    computerUse: { enabled: boolean; backend: "cua" | "codex"; approval: "auto" | "ask-input" };
+    utilityModel: string;
+    taskSlots: number;
+    quietHours: { enabled: boolean; from: string; to: string };
+    nudge: boolean;
+    collaboration: { enabled: boolean };
   };
   app?: { catalogId?: string; removed?: { security?: boolean } };
 }

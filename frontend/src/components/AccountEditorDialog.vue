@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModelTags from "./ModelTags.vue";
 import HelpHint from "@/components/HelpHint.vue";
 import { ref } from "vue";
 import type { Account } from "@/types";
@@ -59,7 +60,7 @@ async function save() {
 }
 </script>
 <template>
-  <BoostDialog title="编辑账号" @close="!busy && emit('close')">
+  <BoostDialog title="编辑账号" :busy="busy" @close="!busy && emit('close')">
     <form class="form-stack" @submit.prevent="save">
       <div class="account-editor-grid">
         <label class="form-field"
@@ -94,6 +95,7 @@ async function save() {
             rows="3"
             placeholder="每行一个模型，留空允许全部"
           />
+          <ModelTags :value="models" />
         </label>
         <div class="account-editor-grid">
           <label class="form-field"
@@ -121,7 +123,7 @@ async function save() {
         /></label>
       </div>
       <DialogActions
-        ><button
+        ><button data-dialog-close
           type="button"
           class="secondary"
           :disabled="busy"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HelpHint from "./HelpHint.vue";
+import ModelSelect from "./ModelSelect.vue";
 import { computed, ref, onMounted, watch } from "vue";
 import type { ApiKey, ApiKeyOwner, AppUser } from "@/types";
 import { accountClient } from "@/lib/api/account-client";
@@ -181,7 +182,7 @@ async function save() {
 <template>
   <BoostDialog
     :title="apiKey ? '编辑密钥' : '新建密钥'"
-    @close="!busy && emit('close')"
+    :busy="busy" @close="!busy && emit('close')"
   >
     <form class="form-stack" @submit.prevent="save">
       <label class="form-field"
@@ -259,15 +260,9 @@ async function save() {
         </select></label
       >
       <label class="form-field"
-        >绑定模型<input
-          v-model="model"
-          list="platform-key-models"
-          placeholder="留空跟随请求" /><datalist id="platform-key-models">
-          <option
-            v-for="value in models"
-            :key="value"
-            :value="value"
-          /></datalist
+        >绑定模型<ModelSelect
+          v-model="model" :options="models" label="绑定模型"
+          placeholder="留空跟随请求" />
       ></label>
       <label class="form-field"
         >总额度限制
@@ -347,7 +342,7 @@ async function save() {
         </label>
       </div>
       <DialogActions
-        ><button
+        ><button data-dialog-close
           class="secondary"
           type="button"
           :disabled="busy"

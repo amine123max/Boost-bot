@@ -1,5 +1,6 @@
 import type { DashboardTokenUsage, UsageHistory } from "@/types";
 import type { UsageMetric } from "./usage-heatmap";
+import { emptyUsage } from "./usage-heatmap";
 
 const valid = (value: number) => Number.isFinite(value) && value >= 0;
 
@@ -16,7 +17,7 @@ function hitRate(usage: DashboardTokenUsage): number | null {
   );
 }
 
-/** Positive absolute growth; cache rate changes are percentage points. */
+/** Signed absolute change; cache rate changes are percentage points. */
 export function usageGrowth(
   history: UsageHistory | null,
   daily: boolean,
@@ -33,14 +34,16 @@ export function usageGrowth(
     const yesterday = history.days.find(
       (day) => day.day === date.toISOString().slice(0, 10),
     );
-    if (!yesterday) return null;
-    previous = yesterday.usage;
+    // Daily rollups are sparse: absent days have no dated activity.
+    if (!yesterday && history.hasUndatedHistory) return null;
+    previous = yesterday?.usage ?? emptyUsage();
   } else {
     // The previous cumulative snapshot is the current total minus today's usage.
     previous = { ...current };
-    for (const key of Object.keys(current) as Array<
-      keyof DashboardTokenUsage
-    >) {
+    const keys: Array<keyof DashboardTokenUsage> = metric === "cache"
+      ? ["inputTokens", "cachedInputTokens"]
+      : [metric === "cost" ? "estimatedCostUsd" : metric === "requests" ? "requestCount" : "totalTokens"];
+    for (const key of keys) {
       if (
         !valid(current[key]) ||
         !valid(history.todayUsage[key]) ||
@@ -67,5 +70,5 @@ export function usageGrowth(
     // Use the original daily amount for cumulative counters to avoid cancellation.
     delta = daily ? current[key] - previous[key] : history.todayUsage[key];
   }
-  return Number.isFinite(delta) && delta > 1e-9 ? delta : null;
+  return Number.isFinite(delta) ? (Math.abs(delta) < 1e-9 ? 0 : delta) : null;
 }

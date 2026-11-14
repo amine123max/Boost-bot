@@ -4,6 +4,8 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { ManagedModelInfo, ManagedModelRouting } from "@/types";
 import BoostIcon from "./BoostIcon.vue";
+import ModelLabel from "./ModelLabel.vue";
+import ModelSelect from "./ModelSelect.vue";
 import BoostDialog from "./BoostDialog.vue";
 import PanelCard from "./PanelCard.vue";
 import EmptyState from "./EmptyState.vue";
@@ -372,7 +374,7 @@ function reasoning(model: ManagedModelInfo) {
             <td>
               <div class="model-name-line">
                 <h3 :title="model.displayName || model.slug">
-                  {{ model.displayName || model.slug }}
+                  <ModelLabel :model="model.slug" :display-name="model.displayName" />
                 </h3>
                 <code>{{ model.slug }}</code>
               </div>
@@ -447,7 +449,7 @@ function reasoning(model: ManagedModelInfo) {
       @close="detail = null"
       ><div class="model-detail-grid">
         <div>
-          <span>模型标识</span><code>{{ detail.slug }}</code>
+          <span>模型标识</span><ModelLabel :model="detail.slug" />
         </div>
         <div>
           <span>上下文窗口</span
@@ -474,8 +476,8 @@ function reasoning(model: ManagedModelInfo) {
         :key="mapping.id"
         class="model-binding-row"
       >
-        <code>{{ mapping.upstreamModel }}</code
-        ><span class="badge">{{
+        <ModelLabel :model="mapping.upstreamModel" />
+        <span class="badge">{{
           mapping.sourceKind === "openai_account" ? "账号池" : "聚合 API"
         }}</span
         ><span class="badge" :class="{ success: mapping.enabled }">{{
@@ -502,7 +504,7 @@ function reasoning(model: ManagedModelInfo) {
           "
         >
           编辑模型</button
-        ><button class="primary" @click="detail = null">关闭</button></template
+        ><button data-dialog-close class="primary" @click="detail = null">关闭</button></template
       ></BoostDialog
     >
     <ModelBindingsDialog
@@ -519,10 +521,10 @@ function reasoning(model: ManagedModelInfo) {
       @close="batchDelete = false"
       ><p>确认删除选中的 {{ selected.length }} 个模型？关联路由将一并清理。</p>
       <div class="delete-model-list">
-        <code v-for="slug in selected" :key="slug">{{ slug }}</code>
+        <ModelLabel v-for="slug in selected" :key="slug" :model="slug" />
       </div>
       <DialogActions
-        ><button class="secondary" @click="batchDelete = false">取消</button
+        ><button data-dialog-close class="secondary" @click="batchDelete = false">取消</button
         ><button class="danger-button" @click="deleteSelected">
           确认删除
         </button></DialogActions
@@ -536,10 +538,10 @@ function reasoning(model: ManagedModelInfo) {
     <BoostDialog
       v-if="dialog"
       :title="editing ? '编辑模型' : '添加模型'"
-      @close="!saving && (dialog = false)"
+      :busy="saving" @close="!saving && (dialog = false)"
       ><form class="form-stack" @submit.prevent="save">
         <label class="form-field"
-          >模型标识<input v-model="slug" required placeholder="gpt-…" /></label
+          >模型标识<ModelSelect v-model="slug" label="模型标识" required placeholder="gpt-…" /></label
         ><label class="form-field"
           >显示名称<input v-model="name" required /></label
         ><label class="form-field">描述<textarea v-model="description" /></label
@@ -570,7 +572,7 @@ function reasoning(model: ManagedModelInfo) {
           </label>
         </details>
         <DialogActions>
-          <button
+          <button data-dialog-close
             type="button"
             class="secondary"
             :disabled="saving"
@@ -583,7 +585,7 @@ function reasoning(model: ManagedModelInfo) {
     ><BoostDialog v-if="deleting" title="删除模型" @close="deleting = null"
       ><p style="margin-bottom: 20px">确认删除 {{ deleting.slug }}？</p>
       <DialogActions>
-        <button class="secondary" @click="deleting = null">取消</button
+        <button data-dialog-close class="secondary" @click="deleting = null">取消</button
         ><button class="danger-button" @click="remove">删除模型</button>
       </DialogActions></BoostDialog
     >

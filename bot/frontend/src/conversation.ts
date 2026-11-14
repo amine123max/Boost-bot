@@ -23,6 +23,8 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     live = ref<LiveTurn | null>(null),
     pending = ref<Approval[]>([]),
     loading = ref(false),
+    refreshing = ref(false),
+    modelChanging = ref(false),
     error = ref("");
   const running = ref(false),
     stopping = ref(false),
@@ -36,9 +38,11 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   );
   const drafts = new Map<string, string>();
   let generation = 0,
-    historyRequest = 0;
+    historyRequest = 0,
+    loadRequest = 0;
   let controller: AbortController | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let indicatorEnd: ReturnType<typeof setTimeout> | undefined;
   const active = () =>
     ["chat", "group"].includes(route.value.kind) && !!route.value.id;
 
@@ -152,7 +156,16 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   async function load(showLoading = true) {
     if (!active() || controller) return;
     const ticket = generation;
-    if (showLoading) loading.value = true;
+    if (showLoading && !messages.value.length && !live.value) loading.value = true;
+    const request = ++loadRequest;
+    clearTimeout(indicatorEnd);
+    let indicatorSince = refreshing.value ? performance.now() : 0;
+    const indicator = setTimeout(() => {
+      if (ticket === generation && request === loadRequest) {
+        indicatorSince = performance.now();
+        refreshing.value = true;
+      }
+    }, 180);
     try {
       const data = await history(ticket);
       if (!data) return;
@@ -172,12 +185,17 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     } catch (e) {
       if (ticket === generation) error.value = (e as Error).message;
     } finally {
-      if (ticket === generation) loading.value = false;
+      clearTimeout(indicator);
+      if (ticket === generation && request === loadRequest) {
+        loading.value = false;
+        const remaining = indicatorSince ? Math.max(0, 160 - (performance.now() - indicatorSince)) : 0;
+        indicatorEnd = setTimeout(() => { if (ticket === generation && request === loadRequest) refreshing.value = false; }, remaining);
+      }
     }
   }
   async function send() {
     const text = draft.value.trim();
-    if (!text || loading.value || running.value || !active()) return;
+    if (!text || loading.value || modelChanging.value || running.value || !active()) return;
     error.value = "";
     clearTimeout(timer);
     const ticket = generation;
@@ -243,14 +261,19 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     }
   }
   async function changeModel(value: string) {
+    if(modelChanging.value || running.value || loading.value)return;
+    const ticket=generation,endpoint=path.value;
+    modelChanging.value=true;
     try {
-      await api(`${path.value}/model`, {
+      await api(`${endpoint}/model`, {
         method: "PUT",
         body: { model: value },
       });
-      model.value = value;
+      if(ticket===generation){historyRequest++;model.value = value;error.value='';}
     } catch (e) {
-      error.value = (e as Error).message;
+      if(ticket===generation)error.value = (e as Error).message;
+    } finally {
+      if(ticket===generation)modelChanging.value=false;
     }
   }
   async function answer(
@@ -278,13 +301,18 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       controller?.abort();
       controller = undefined;
       clearTimeout(timer);
+      clearTimeout(indicatorEnd);
       messages.value = [];
+      model.value = "";
+      conversationId.value = "";
       live.value = null;
       pending.value = [];
       error.value = "";
       running.value = false;
       stopping.value = false;
       loading.value = false;
+      refreshing.value = false;
+      modelChanging.value = false;
       if (active()) void load();
     },
     { immediate: true },
@@ -293,12 +321,15 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     generation++;
     controller?.abort();
     clearTimeout(timer);
+    clearTimeout(indicatorEnd);
   });
   return {
     messages,
     live,
     pending,
     loading,
+    refreshing,
+    modelChanging,
     error,
     running,
     stopping,

@@ -72,7 +72,7 @@ export function useTrayMetrics() {
       tps: {
         value:
           tps == null
-            ? "—"
+            ? ['idle','waiting'].includes(activity.value.state) ? '0' : "—"
             : tps < 10
               ? tps.toFixed(1)
               : tps >= 1000
@@ -81,7 +81,7 @@ export function useTrayMetrics() {
         unit: "TPS",
         percent: tps == null ? null : Math.min(100, (tps / 40) * 100),
         history: tpsHistory.value,
-        note: tps == null ? "等待有效 token 采样" : "最近报告的输出 token / 秒",
+        note: tps == null ? activity.value.state === 'idle' ? '当前没有模型输出' : '本轮尚未收到输出 Token 用量' : activity.value.rateKind === 'gateway' ? '最近网关请求的输出 Token ÷ 请求用时' : activity.value.rateStale ? '最近请求的输出均速，等待新用量上报' : activity.value.rateKind === 'stream' ? '实时输出 Token / 秒' : '输出 Token ÷ 采样区间用时',
       },
       upload: rate(
         telemetry.value?.uploadBytesPerSecond,

@@ -3,8 +3,9 @@ import { onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import type { Bot } from "../types";
 import { api, enc } from "../api";
 import HelpTip from "./HelpTip.vue";
+import SelectControl from "./SelectControl.vue";
 import Modal from "./Modal.vue";
-defineProps<{ bots: Bot[] }>();
+defineProps<{ bots: Bot[]; embedded?: boolean }>();
 interface Account {
   key: string;
   channel: string;
@@ -159,8 +160,8 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <section class="settings-card">
-    <h2>
+  <section :class="embedded ? 'channel-settings-embedded' : 'settings-card'">
+    <h2 v-if="!embedded">
       聊天渠道<HelpTip
         text="所有智能体共用渠道账号，每个账号可设置默认回复 Bot。消息上下文仍按 Bot 和渠道会话隔离，凭据仅存于服务端。"
       />
@@ -174,20 +175,14 @@ onBeforeUnmount(() => {
       <span
         >{{ account.label || names[account.channel]
         }}<small>{{ account.status?.state || "未连接" }}</small></span
-      ><select
-        :value="account.defaultBot"
-        :aria-label="(account.label || names[account.channel]) + '默认智能体'"
+      ><SelectControl
+        :model-value="account.defaultBot"
+        :options="bots.map((bot) => ({ value: bot.id, label: bot.name }))"
+        :label="(account.label || names[account.channel]) + '默认智能体'"
         :disabled="busy"
-        @change="
-          update(account, {
-            defaultBot: ($event.target as HTMLSelectElement).value,
-          })
-        "
-      >
-        <option v-for="bot in bots" :key="bot.id" :value="bot.id">
-          {{ bot.name }}
-        </option></select
-      ><button
+        @update:model-value="(value) => update(account, { defaultBot: value })"
+      />
+      <button
         class="quiet-button"
         :disabled="busy"
         @click="update(account, { enabled: !account.enabled })"
@@ -203,11 +198,12 @@ onBeforeUnmount(() => {
     ><form class="editor-form" @submit.prevent="save">
       <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
       <label
-        >渠道<select v-model="channel">
-          <option v-for="(name, value) in names" :value="value">
-            {{ name }}
-          </option>
-        </select></label
+        >渠道<SelectControl
+          v-model="channel"
+          label="渠道"
+          :options="
+            Object.entries(names).map(([value, label]) => ({ value, label }))
+          " /></label
       ><template v-if="channel === 'feishu'"
         ><label
           >App ID<input
@@ -263,7 +259,7 @@ onBeforeUnmount(() => {
         >
       </div>
       <footer class="dialog-actions">
-        <button type="button" class="quiet-button" @click="close">取消</button
+        <button data-dialog-close type="button" class="quiet-button" @click="close">取消</button
         ><button type="submit" class="primary-button" :disabled="busy">
           {{ busy ? "连接中…" : channel === "weixin" ? "获取二维码" : "连接" }}
         </button>
@@ -272,6 +268,10 @@ onBeforeUnmount(() => {
   >
 </template>
 <style scoped>
+.channel-setting-row > .select-control {
+  width: 280px;
+  max-width: 60%;
+}
 .channel-setting-row {
   display: flex;
   flex-wrap: wrap;

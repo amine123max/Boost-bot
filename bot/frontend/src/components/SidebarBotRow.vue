@@ -10,8 +10,9 @@ const props = defineProps<{
   conversationId?: string;
   preview?: string;
   working?: boolean;
+  manage?: boolean;
 }>();
-defineEmits<{ open: []; conversation: [value: ChannelConversation] }>();
+defineEmits<{ open: []; edit: []; delete: []; conversation: [value: ChannelConversation] }>();
 const expanded = ref(false);
 const channels: Record<string, string> = {
   web: "网页",
@@ -26,6 +27,7 @@ const children = computed(() =>
     .filter(
       (c) =>
         c.botId === props.bot.id &&
+        c.channel !== "web" &&
         !c.peerId?.startsWith("group:") &&
         c.messageCount > 0,
     )
@@ -54,17 +56,25 @@ const date = (value: number) =>
         :aria-current="active ? 'page' : undefined"
         @click="$emit('open')"
       >
-        <BotAvatar :bot="bot" :working="working" :size="38" /><span class="body"
+        <BotAvatar :bot="bot" :working="working" :size="32" /><span class="body"
           ><span class="line"
             ><span class="title">{{ bot.name }}</span
             ><Icon v-if="working" name="clock" :size="14" /></span
           ><span v-if="preview" class="snip">{{ preview }}</span></span
         >
       </button>
+      <details v-if="manage" class="bot-row-actions" @click.stop @keydown.esc.stop.prevent="($event.currentTarget as HTMLDetailsElement).open=false">
+        <summary :aria-label="`管理${bot.name}`"><Icon name="more" :size="16" /></summary>
+        <div class="bot-actions-menu">
+          <button type="button" @click="$emit('edit'); ($event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')"><Icon name="settings" :size="14" />编辑智能体</button>
+          <button type="button" class="delete-action" @click="$emit('delete'); ($event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')"><Icon name="trash" :size="14" />删除智能体</button>
+        </div>
+      </details>
       <button
         v-if="children.length"
         type="button"
         class="icon-btn bot-tree-toggle"
+        :class="{ 'with-actions': manage }"
         :aria-label="(expanded ? '收起' : '展开') + bot.name + '的渠道会话'"
         :aria-expanded="expanded"
         @click="expanded = !expanded"
@@ -105,11 +115,23 @@ const date = (value: number) =>
 <style scoped>
 .thread {
   height: auto;
-  min-height: 60px;
-  padding-top: var(--space-2);
-  padding-bottom: var(--space-2);
-  padding-right: var(--space-8);
+  min-height: 44px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-right: 62px;
 }
+.thread .body { gap: 1px; }
+.thread .line { line-height: 18px; }
+.thread .snip { font-size: 11px; line-height: 14px; }
+.bot-row-actions { position:absolute; right:5px; top:50%; transform:translateY(-50%); z-index:3; }
+.bot-row-actions > summary { display:grid; place-items:center; width:26px; height:26px; border-radius:7px; cursor:pointer; color:var(--muted); list-style:none; }
+.bot-row-actions > summary::-webkit-details-marker { display:none; }
+.bot-row-actions > summary:hover,.bot-row-actions[open] > summary { background:var(--pill); color:var(--fg); }
+.bot-actions-menu { position:absolute; right:0; top:30px; display:grid; min-width:145px; padding:5px; border:1px solid var(--line); border-radius:10px; background:var(--glass-pop); box-shadow:0 8px 24px #0002; }
+.bot-actions-menu button { display:flex; align-items:center; gap:8px; text-align:left; padding:9px; border-radius:6px; font-size:12px; }
+.bot-actions-menu button:hover { background:var(--pill); }
+.bot-actions-menu .delete-action { color:var(--red); }
+.bot-tree-toggle.with-actions { right:32px; }
 .bot-tree-toggle {
   position: absolute;
   right: var(--space-1);

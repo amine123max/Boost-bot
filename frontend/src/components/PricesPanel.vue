@@ -3,6 +3,7 @@ import HelpHint from "@/components/HelpHint.vue";
 import { ref, computed, onMounted } from "vue";
 import type { ModelPriceRule } from "@/types";
 import BoostIcon from "./BoostIcon.vue";
+import ModelLabel from "./ModelLabel.vue";
 import PanelCard from "./PanelCard.vue";
 import EmptyState from "./EmptyState.vue";
 import ModelPriceDialog from "./ModelPriceDialog.vue";
@@ -170,7 +171,7 @@ onMounted(() => perform(load));
             <tr v-for="r in visible" :key="r.id">
               <td>
                 <div class="model-name-line">
-                  <h3 class="price-model-name">{{ r.modelPattern }}</h3>
+                  <h3 class="price-model-name"><ModelLabel :model="r.modelPattern" /></h3>
                 </div>
                 <div class="price-model-meta">
                   <span>{{ label(r.provider) }}</span
@@ -267,7 +268,7 @@ onMounted(() => perform(load));
       @close="deleting = null"
       ><p>确认删除 {{ deleting.modelPattern }} 的自定义价格？</p>
       <DialogActions
-        ><button class="secondary" @click="deleting = null">
+        ><button data-dialog-close class="secondary" @click="deleting = null">
           取消</button
         ><button class="danger-button" @click="remove">
           确认删除

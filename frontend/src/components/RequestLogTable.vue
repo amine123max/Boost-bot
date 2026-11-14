@@ -8,6 +8,9 @@ import {
   formatOutputTokensPerSecond,
 } from "@/lib/utils/request-latency";
 import BoostIcon from "./BoostIcon.vue";
+import ModelProviderIcon from "./ModelProviderIcon.vue";
+import ModelLabel from "./ModelLabel.vue";
+import { modelProviderLabel } from "../../../bot/shared/appearance/modelProvider";
 defineProps<{ logs: RequestLog[] }>();
 const emit = defineEmits<{ detail: [log: RequestLog] }>();
 function source(log: RequestLog) {
@@ -110,12 +113,14 @@ function displayedServiceTier(log: RequestLog) {
               :aria-label="'查看请求日志 ' + log.id"
               @click.stop="emit('detail', log)"
             >
-              {{ log.model || "—"
+              <ModelProviderIcon :model="log.model || log.upstreamModel || undefined" />
+              <span>{{ log.model || "—"
               }}<span v-if="log.reasoningEffort">
                 / {{ log.reasoningEffort }}</span
-              >
+              ></span>
             </button>
             <div class="request-tier">
+              <span v-if="log.model" class="badge">{{ modelProviderLabel(log.model) }}</span>
               <span
                 class="badge"
                 :class="{ 'tier-fast': displayedServiceTier(log) === 'fast' }"
@@ -123,7 +128,7 @@ function displayedServiceTier(log: RequestLog) {
               ><span
                 v-if="log.upstreamModel && log.upstreamModel !== log.model"
                 :title="log.upstreamModel"
-                >{{ log.upstreamModel }}</span
+                ><ModelLabel :model="log.upstreamModel" :show-provider="false" /></span
               >
             </div>
           </td>

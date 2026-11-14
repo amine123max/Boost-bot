@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SpringSurface from "../../../../frontend/src/components/SpringSurface.vue";
 import { nextTick, onBeforeUnmount, onMounted, ref, useId } from "vue";
 import Icon from "./Icon.vue";
 defineProps<{ text: string; label?: string }>();
@@ -8,32 +9,20 @@ const id = useId(),
   tip = ref<HTMLElement>();
 const position = ref<Record<string, string>>({}),
   target = ref<HTMLElement | string>("body");
-let hideTimer: ReturnType<typeof setTimeout> | undefined;
-let pinned = false;
 async function show() {
-  clearTimeout(hideTimer);
+  target.value = anchor.value?.closest("dialog") || "body";
   open.value = true;
   await nextTick();
   const box = anchor.value?.getBoundingClientRect(),
     popup = tip.value?.getBoundingClientRect();
-  if (!box || !popup) return;
+  if (!open.value || !box || !popup) return;
   position.value = {
     left: `${Math.max(12, Math.min(box.left, innerWidth - popup.width - 12))}px`,
     top: `${box.bottom + popup.height + 12 < innerHeight ? box.bottom + 8 : Math.max(12, box.top - popup.height - 8)}px`,
   };
 }
 function hide() {
-  clearTimeout(hideTimer);
-  pinned = false;
   open.value = false;
-}
-function leave() {
-  if (!pinned) hideTimer = setTimeout(hide, 180);
-}
-function toggle() {
-  pinned = !pinned;
-  if (pinned) void show();
-  else hide();
 }
 function outside(e: PointerEvent) {
   if (
@@ -49,14 +38,13 @@ onMounted(() => {
   addEventListener("scroll", hide, true);
 });
 onBeforeUnmount(() => {
-  clearTimeout(hideTimer);
   document.removeEventListener("pointerdown", outside);
   removeEventListener("resize", hide);
   removeEventListener("scroll", hide, true);
 });
 </script>
 <template>
-  <span class="help-wrap" @mouseenter="show" @mouseleave="leave">
+  <span class="help-wrap" @mouseenter="show" @mouseleave="hide">
     <button
       ref="anchor"
       class="icon-button help-trigger"
@@ -66,22 +54,23 @@ onBeforeUnmount(() => {
       :aria-expanded="open"
       @focus="show"
       @blur="hide"
-      @click="toggle"
+      @click="show"
+      @mouseleave="hide"
       @keydown.esc.stop.prevent="hide"
     >
       <Icon name="info" :size="16" />
     </button>
     <Teleport :to="target"
-      ><span
-        v-if="open"
-        ref="tip"
-        :id="id"
-        role="tooltip"
-        class="help-popup"
-        :style="position"
-        @mouseenter="show"
-        @mouseleave="leave"
-        >{{ text }}</span
+      ><SpringSurface kind="tooltip"
+        ><span
+          v-if="open"
+          ref="tip"
+          :id="id"
+          role="tooltip"
+          class="help-popup"
+          :style="position"
+          >{{ text }}</span
+        ></SpringSurface
       ></Teleport
     >
   </span>

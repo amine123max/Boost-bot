@@ -1,0 +1,97 @@
+/* Shared by Boost and hosted Bot. Adjust dialog density here, once. */
+:root {
+  --boost-dialog-heading-height: 42px;
+  --boost-dialog-heading-block: 6px;
+  --boost-dialog-inset: 16px;
+  --boost-dialog-close-size: 28px;
+  --boost-section-gap: 12px;
+  --boost-section-heading-height: 42px;
+  --boost-shell-heading-height: 60px;
+  --boost-shell-heading-surface: #242426;
+}
+:root[data-theme="light"] {
+  --boost-shell-heading-surface: #eaeaed;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --boost-shell-heading-surface: #eaeaed;
+  }
+}
+:is(.modal, .workspace-dialog) > :is(.modal-heading, header) {
+  box-sizing: border-box;
+  min-height: var(--boost-dialog-heading-height);
+  padding: var(--boost-dialog-heading-block) var(--boost-dialog-inset);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border, var(--line));
+}
+:is(.modal, .workspace-dialog) > :is(.modal-heading, header) h2 {
+  margin: 0;
+  line-height: 1.4;
+}
+:is(.modal, .workspace-dialog) > :is(.modal-heading, header) > .icon-button {
+  width: var(--boost-dialog-close-size);
+  height: var(--boost-dialog-close-size);
+  min-width: var(--boost-dialog-close-size);
+  min-height: var(--boost-dialog-close-size);
+  padding: 4px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.modal > .modal-content {
+  padding: 12px var(--boost-dialog-inset) 16px;
+}
+.modal > .modal-footer {
+  padding: 10px var(--boost-dialog-inset);
+}
+.settings-grid .panel-header {
+  min-height: var(--boost-dialog-heading-height);
+  padding: 8px var(--boost-dialog-inset);
+}
+.settings-grid .panel-header h2 {
+  margin: 0;
+}
+.settings-grid .panel-body > h3,
+.modal .dialog-section-title {
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+:is(.modal, .workspace-dialog),
+:is(.modal, .workspace-dialog) * {
+  scrollbar-width: none;
+}
+:is(.modal, .workspace-dialog)::-webkit-scrollbar,
+:is(.modal, .workspace-dialog) *::-webkit-scrollbar {
+  display: none;
+}
+@keyframes boost-menu-spring {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0.3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+details[open] > :is(.bot-actions-menu, .warmup-menu) {
+  animation: boost-menu-spring 380ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  details[open] > :is(.bot-actions-menu, .warmup-menu) {
+    animation: none;
+  }
+}
+html[data-motion="off"] details[open] > .bot-actions-menu,
+html[data-motion="reduce"] details[open] > .bot-actions-menu {
+  animation: none;
+}

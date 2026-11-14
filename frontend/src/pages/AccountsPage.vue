@@ -407,7 +407,7 @@ async function refreshUsage() {
     <BoostDialog
       v-if="importing"
       title="添加账号"
-      @close="!importBusy && (importing = false)"
+      :busy="importBusy" @close="!importBusy && (importing = false)"
       ><div v-spring-switch class="tabs">
         <button
           v-for="(title, key) in {
@@ -583,7 +583,7 @@ async function refreshUsage() {
         确认删除 {{ deleting.name }}？此操作会移除本地保存的账号授权。
       </p>
       <DialogActions>
-        <button class="secondary" @click="deleting = null">
+        <button data-dialog-close class="secondary" @click="deleting = null">
           取消</button
         ><button class="danger-button" @click="remove">
           删除账号

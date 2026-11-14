@@ -10,6 +10,8 @@ import { notify, perform } from "@/composables/useBoost";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
 import BoostIcon from "./BoostIcon.vue";
+import ModelLabel from "./ModelLabel.vue";
+import ModelSelect from "./ModelSelect.vue";
 import { usePendingActions } from "@/composables/usePendingActions";
 const actions = usePendingActions();
 const { isPending } = actions;
@@ -214,8 +216,8 @@ function bound(model: string) {
     </p>
     <form class="aggregate-model-form" @submit.prevent="add">
       <label class="form-field"
-        >上游模型名<input
-          v-model="upstream"
+        >上游模型名<ModelSelect
+          v-model="upstream" label="上游模型名" :options="pool.map(m => m.upstreamModel)"
           required
           placeholder="模型 ID" /></label
       ><label class="form-field"
@@ -253,7 +255,7 @@ function bound(model: string) {
         <tbody v-if="tab === 'pool'">
           <tr v-for="m in filteredPool" :key="m.upstreamModel">
             <td>
-              <code>{{ m.upstreamModel }}</code>
+              <ModelLabel :model="m.upstreamModel" />
               <div v-if="m.displayName" class="card-subtitle">
                 {{ m.displayName }}
               </div>
@@ -289,7 +291,7 @@ function bound(model: string) {
         <tbody v-else>
           <tr v-for="m in filteredTemplates" :key="m.upstreamModel">
             <td>
-              <code>{{ m.upstreamModel }}</code>
+              <ModelLabel :model="m.upstreamModel" />
               <div v-if="m.displayName" class="card-subtitle">
                 {{ m.displayName }}
               </div>

@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, useId } from "vue";
+import { nextTick, ref, useId } from "vue";
 import BoostIcon from "./BoostIcon.vue";
+import SpringSurface from "./SpringSurface.vue";
 const props = defineProps<{ text: string; label?: string }>();
 const id = useId();
 const trigger = ref<HTMLElement>();
 const tooltip = ref<HTMLElement>();
 const open = ref(false);
 const position = ref({ left: "0px", top: "0px" });
-let hideTimer: ReturnType<typeof setTimeout> | undefined;
 async function show() {
-  clearTimeout(hideTimer);
   if (open.value) return;
   open.value = true;
   await nextTick();
@@ -23,25 +22,14 @@ async function show() {
   };
 }
 function hide() {
-  clearTimeout(hideTimer);
-  tooltip.value?.hidePopover();
   open.value = false;
 }
-function keepOpen() {
-  clearTimeout(hideTimer);
-}
-function leave() {
-  hideTimer = setTimeout(hide, 120);
-}
-onBeforeUnmount(() => {
-  clearTimeout(hideTimer);
-});
 </script>
 <template>
   <span
     class="help-hint"
     @mouseenter="show"
-    @mouseleave="leave"
+    @mouseleave="hide"
     @keydown.esc.stop="hide"
   >
     <span
@@ -52,24 +40,25 @@ onBeforeUnmount(() => {
       :aria-label="`${props.label || '帮助'}说明`"
       :aria-describedby="open ? id : undefined"
       @focus="show"
-      @blur="leave"
+      @blur="hide"
+      @mouseleave="hide"
       @click.prevent.stop="open ? hide() : show()"
       @keydown.enter.prevent.stop="open ? hide() : show()"
       @keydown.space.prevent.stop="open ? hide() : show()"
     >
       <BoostIcon name="info" :size="14" />
     </span>
-    <span
-      v-if="open"
-      :id="id"
-      ref="tooltip"
-      role="tooltip"
-      popover="manual"
-      class="help-hint-tooltip"
-      :style="position"
-      @mouseenter="keepOpen"
-      @mouseleave="leave"
-      >{{ text }}</span
+    <SpringSurface kind="tooltip"
+      ><span
+        v-if="open"
+        :id="id"
+        ref="tooltip"
+        role="tooltip"
+        popover="manual"
+        class="help-hint-tooltip"
+        :style="position"
+        >{{ text }}</span
+      ></SpringSurface
     >
   </span>
 </template>

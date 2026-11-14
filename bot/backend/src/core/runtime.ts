@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
+import { documentContext } from './documents.js';
 import fs from "node:fs";
 import path from "node:path";
 import type { ChannelId, InboundEvent, ReplySession } from "./types.js";
 import { findBot, setBotForPeer } from "./routes.js";
 import { KeyedQueue } from "./queue.js";
 import { eventText } from "./types.js";
+import { isPushChannel } from './types.js';
 import { acceptsImages, type ModelClient, type ChatMessage } from "../llm/client.js";
 import { TurnStopped, type TurnImage } from "../agent/host.js";
 import { describeStep, fmtSecs, type ActivityStep } from "../agent/activity.js";
@@ -94,10 +96,11 @@ export interface RuntimeOptions {
   store: Store;
   models: ModelClient;
   defaultModel: () => string;
+  botModels?: (botId:string)=>Promise<string[]>;
   contextMessages: number;
   contextChars: number;
   /** 这个模型该带的推理强度（用户选了、模型也支持时）；纯对话路径用，代理路径由 AgentHost 自己带 */
-  reasoningEffort?: (model: string) => Promise<string | undefined>;
+  reasoningEffort?: (model: string, botId?: string) => Promise<string | undefined>;
   /** DSH 代理宿主；缺省或不可用时走纯对话路径 */
   agent?: AgentManager;
   /**
@@ -208,7 +211,8 @@ export class BotRuntime {
       const elapsed = task.sampledAt - task.step.at;
       const output = task.step.tokens?.output;
       return { id: task.botId, state: task.state, percent: task.state === 'done' ? 100 : null,
-        tokensPerSecond: output != null && elapsed >= 100 && now - task.sampledAt < 5000 && ['working', 'done'].includes(task.state) ? output * 1000 / elapsed : null,
+        tokensPerSecond: output != null && elapsed >= 100 && now - task.sampledAt < 60_000 && ['working', 'done'].includes(task.state) ? output * 1000 / elapsed : null,
+        rateUpdatedAt: task.sampledAt, rateKind: 'request', rateStale: now-task.sampledAt>=15_000,
         updatedAt: task.state === 'working' ? now : task.updatedAt };
     });
   }
@@ -230,6 +234,16 @@ export class BotRuntime {
   registerReplier(account: string, channel: ChannelId, fn: Replier | undefined): void {
     if (fn) this.repliers.set(`${account}:${channel}`, fn);
     else this.repliers.delete(`${account}:${channel}`);
+  }
+  async sendFile(conversationId: string, file: string, name: string, requestId: string): Promise<void> {
+    const conv = this.opts.store.getConversation(conversationId);
+    if (!conv || !isPushChannel(conv.channel)) throw new Error('渠道会话不存在');
+    let handle: Record<string, string> | undefined;
+    try { handle = JSON.parse(this.opts.store.getKV(REPLY_TO + conv.id) || 'null') || undefined; } catch { /* Missing reply handle is reported below. */ }
+    const replier = this.repliers.get(`${conv.account || conv.botId}:${conv.channel}`)?.(conv, handle, requestId);
+    if (!replier) throw new Error('渠道未连接或缺少可用的回复句柄，请先从对应渠道发送一条消息');
+    await replier.out.apply({ type: 'file', path: file, name });
+    replier.done?.();
   }
 
   /** 应用退出前调用（App.stop）：之后失败的回合留下重启标记，由下次启动告诉用户 */
@@ -267,10 +281,10 @@ export class BotRuntime {
     return list;
   }
 
-  private async resolveModel(convModel: string, botModel: string): Promise<string> {
+  private async resolveModel(convModel: string, botModel: string, botId?:string): Promise<string> {
     const m = convModel || botModel || this.opts.defaultModel();
     if (m) return m;
-    const list = await this.listModels();
+    const list = botId&&this.opts.botModels ? await this.opts.botModels(botId) : await this.listModels();
     if (!list.length) throw new Error(t("runtime.noModels"));
     return list[0];
   }
@@ -368,7 +382,7 @@ export class BotRuntime {
     const agent = this.opts.agent;
     // 代理模式：收到的图片/文件先进工作区，消息里写路径
     if (agent?.available) storeInbound(agent.host(bot.id).workspace, ev);
-    const text = eventText(ev);
+    const text = [eventText(ev), await documentContext(ev.parts, signal)].filter(Boolean).join('\n\n');
     if (!text) return;
     const images = inboundImages(ev);
     // 上次重启时没处理完、当时又没能告诉用户的：先说一声
@@ -408,7 +422,7 @@ export class BotRuntime {
       }
     }
 
-    const model = await this.resolveModel(conv.model, bot.defaultModel).catch(async (e: Error) => {
+    const model = await this.resolveModel(conv.model, bot.defaultModel, bot.id).catch(async (e: Error) => {
       await out.apply({ type: "text", text: `⚠️ ${e.message}` });
       return "";
     });
@@ -454,9 +468,9 @@ export class BotRuntime {
     }
     this.directActivity.set(conv.id, monitored);
     await out.apply({ type: 'activity', step: { ...modelStep } });
-    const reasoningEffort = await this.opts.reasoningEffort?.(routed).catch(() => undefined);
+    const reasoningEffort = await this.opts.reasoningEffort?.(routed, bot.id).catch(() => undefined);
     const call = () =>
-      this.opts.models.streamChat({ model: routed, messages, signal, reasoningEffort, protocol: bot.settings.modelProtocol, stream: bot.settings.modelStreaming,
+      this.opts.models.streamChat({ botId: bot.id, model: routed, messages, signal, reasoningEffort, protocol: bot.settings.modelProtocol, stream: bot.settings.modelStreaming,
         onTrace: trace => {
           if (trace.summary !== undefined) modelStep.output = trace.summary;
           modelStep.tokens = { ...modelStep.tokens, ...(trace.inputTokens !== undefined ? { input: trace.inputTokens } : {}), ...(trace.outputTokens !== undefined ? { output: trace.outputTokens } : {}) };
@@ -921,7 +935,7 @@ export class BotRuntime {
         if (!a?.available) return t("runtime.newAgentOnly");
         if (!this.opts.store.getAgentSession(convId)) return t("runtime.alreadyNew");
         try {
-          await a.newSegment(botId, convId, await this.resolveModel(convModel, botModel));
+          await a.newSegment(botId, convId, await this.resolveModel(convModel, botModel, botId));
         } catch (e) {
           return t("runtime.newFailed", { error: (e as Error).message.slice(0, 200) });
         }
@@ -932,7 +946,7 @@ export class BotRuntime {
       case "/model": {
         let list: string[];
         try {
-          list = await this.listModels(true);
+          list = this.opts.botModels ? await this.opts.botModels(botId) : await this.listModels(true);
         } catch (e) {
           return t("runtime.modelListFailed", { error: (e as Error).message });
         }

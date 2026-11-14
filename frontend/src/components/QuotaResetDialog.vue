@@ -6,7 +6,7 @@ defineProps<{ account: Account; busy: boolean; error?: string }>();
 const emit = defineEmits<{ close: []; confirm: [] }>();
 </script>
 <template>
-  <BoostDialog title="重置额度" confirmation @close="!busy && emit('close')">
+  <BoostDialog title="重置额度" confirmation :busy="busy" @close="!busy && emit('close')">
     <template #title-leading
       ><span class="reset-heading-mark"
         ><BoostIcon name="rotate-ccw" :size="20" /></span
@@ -31,7 +31,7 @@ const emit = defineEmits<{ close: []; confirm: [] }>();
     <p v-if="error" class="reset-error" role="alert">{{ error }}</p>
     <template #footer
       ><div class="reset-actions">
-        <button
+        <button data-dialog-close
           type="button"
           class="reset-cancel"
           :disabled="busy"

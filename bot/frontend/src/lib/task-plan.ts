@@ -45,9 +45,11 @@ export function taskPlan(steps: Activity[]): TaskPlan {
           state:
             raw.status === "completed"
               ? "done"
-              : raw.status === "in_progress"
-                ? "working"
-                : "pending",
+              : raw.status === "failed"
+                ? "failed"
+                : raw.status === "in_progress"
+                  ? "working"
+                  : "pending",
         });
       }
       if (items.length) return { kind: "plan", items };

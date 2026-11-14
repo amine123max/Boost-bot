@@ -245,3 +245,79 @@ SOFTWARE.
 
 Cua Driver 自身依赖的第三方组件声明见其随附的 THIRD_PARTY_NOTICES.md。
 
+
+
+## Document extraction dependencies
+
+### fflate 0.8.2
+
+Source: https://github.com/101arrowz/fflate
+
+Used for bounded Office ZIP parsing and PDF text extraction.
+
+```
+MIT License
+
+Copyright (c) 2023 Arjun Barrett
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### unpdf 1.4.0
+
+Source: https://github.com/unjs/unpdf
+
+Used for bounded Office ZIP parsing and PDF text extraction.
+
+```
+MIT License
+
+Copyright (c) 2023-PRESENT Johann Schopplich
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### PDF.js (bundled by unpdf)
+
+Source: https://github.com/mozilla/pdf.js
+
+Copyright Mozilla Foundation and contributors. Licensed under the Apache License, Version 2.0; see [full license](LICENSES/Apache-2.0.txt). PDF.js is redistributed inside unpdf for text extraction.
+
+
+## Lobe Icons (provider SVG marks)
+
+Source: https://github.com/lobehub/lobe-icons
+
+Copyright (c) 2023 LobeHub. MIT License; the full license is included in [LICENSES/lobe-icons-MIT.txt](LICENSES/lobe-icons-MIT.txt). Eight static SVG provider marks are bundled locally for Bot model selection and Boost model labels (DeepSeek, Zhipu, OpenAI, Claude, Gemini, Qwen, Moonshot and Grok). Unknown models use a neutral fallback. Product marks retain their respective owners.

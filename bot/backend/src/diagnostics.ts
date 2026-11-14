@@ -129,7 +129,11 @@ export async function testModel(app: App, opts: { botId?: string; model?: string
   const probeOpts = { timeoutMs: opts.timeoutMs, fetchImpl: opts.fetchImpl };
   let gateway: Promise<ProbeResult>;
   let direct: Promise<ProbeResult>;
-  if (mp) {
+  if(app.store.getBot(botId)?.settings.modelSource!=='default' && app.store.getBot(botId)?.settings.modelSource){
+    const endpoint=await app.modelSources.endpoint(botId,model);
+    gateway=probeChat('gateway',endpoint.baseUrl,endpoint.apiKey,model,probeOpts);
+    direct=Promise.resolve({route:'direct',url:'',ok:false,skipped:'来源请求使用Boost授权网关，无需单独读取供应商凭据'});
+  } else if (mp) {
     gateway = probeChat("gateway", mp.baseUrl, mp.gatewayKey, model, probeOpts).then((r) =>
       mp.state === "running" || r.ok
         ? r

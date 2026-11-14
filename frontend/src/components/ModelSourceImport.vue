@@ -93,7 +93,7 @@ async function sync() {
 }
 </script>
 <template>
-  <BoostDialog title="并入远端模型" @close="!busy && emit('close')">
+  <BoostDialog title="并入远端模型" :busy="busy" @close="!busy && emit('close')">
     <form class="form-stack" @submit.prevent="sync">
       <label class="form-field"
         >模型来源<select v-model="kind" aria-label="模型来源" :disabled="busy">
@@ -129,7 +129,7 @@ async function sync() {
         </p>
       </div>
       <DialogActions
-        ><button
+        ><button data-dialog-close
           type="button"
           class="secondary"
           :disabled="busy"

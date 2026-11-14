@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState.vue";
 import BoostDialog from "@/components/BoostDialog.vue";
 import GatewayLogsPanel from "@/components/GatewayLogsPanel.vue";
 import RequestLogTable from "@/components/RequestLogTable.vue";
+import ModelLabel from "@/components/ModelLabel.vue";
 import {
   boost,
   formatNumber,
@@ -264,12 +265,12 @@ async function clear() {
       <BoostDialog
         v-if="clearing"
         title="清空请求日志"
-        @close="!clearingBusy && (clearing = false)"
+        :busy="clearingBusy" @close="!clearingBusy && (clearing = false)"
         ><p style="line-height: 1.8; margin-bottom: 20px">
           确认清空请求日志？已保存的请求记录将被移除。
         </p>
         <DialogActions>
-          <button class="secondary" :disabled="clearingBusy" @click="clearing = false">
+          <button data-dialog-close class="secondary" :disabled="clearingBusy" @click="clearing = false">
             取消</button
           ><button class="danger-button" :disabled="clearingBusy" @click="clear">
             清空日志
@@ -313,7 +314,7 @@ async function clear() {
             class="form-field"
           >
             <span class="muted">{{ key }}</span
-            ><code>{{ value ?? "—" }}</code>
+            ><ModelLabel v-if="key === '模型' || key === '上游模型'" :model="String(value || '')" /><code v-else>{{ value ?? "—" }}</code>
           </div>
         </div></BoostDialog
       >

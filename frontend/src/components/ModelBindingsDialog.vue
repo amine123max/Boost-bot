@@ -10,6 +10,8 @@ import { accountClient } from "@/lib/api/account-client";
 import BoostDialog from "./BoostDialog.vue";
 import DialogActions from "./DialogActions.vue";
 import BoostIcon from "./BoostIcon.vue";
+import ModelLabel from "./ModelLabel.vue";
+import ModelSelect from "./ModelSelect.vue";
 import { usePendingActions } from "@/composables/usePendingActions";
 const actions = usePendingActions();
 const { isPending } = actions;
@@ -145,7 +147,7 @@ async function add() {
 <template>
   <BoostDialog title="调用绑定" wide @close="emit('close')">
     <div class="binding-model-heading">
-      <h3>{{ model.displayName || model.slug }}</h3>
+      <h3><ModelLabel :model="model.slug" :display-name="model.displayName" /></h3>
       <code>{{ model.slug }}</code
       ><span class="badge"
         >{{ draft.filter((m) => m.enabled).length }} 条启用</span
@@ -164,7 +166,7 @@ async function add() {
             row.enabled ? "已启用" : "已停用"
           }}</span>
         </div>
-        <code>{{ row.upstreamModel }}</code>
+        <ModelLabel :model="row.upstreamModel" />
         <div v-if="writable" class="binding-fields">
           <label class="form-field"
             >优先级<input
@@ -180,8 +182,8 @@ async function add() {
               step="1"
               required /></label
           ><label class="form-field"
-            >计费模型<input
-              v-model="row.billingModelSlug"
+            >计费模型<ModelSelect
+              v-model="row.billingModelSlug" label="计费模型"
               placeholder="使用平台模型"
           /></label>
         </div>
@@ -246,18 +248,10 @@ async function add() {
         >
       </div>
       <label class="form-field"
-        >上游模型<input
-          v-model="upstream"
-          :list="'source-models-' + model.slug"
-          required
-          placeholder="选择已发现模型，或输入模型 ID" /><datalist
-          :id="'source-models-' + model.slug"
-        >
-          <option
-            v-for="m in available"
-            :key="m.upstreamModel"
-            :value="m.upstreamModel"
-          /></datalist
+        >上游模型<ModelSelect
+          v-model="upstream" label="上游模型"
+          :options="available.map(m => m.upstreamModel)"
+          required placeholder="选择已发现模型，或输入模型 ID" />
       ></label>
       <div class="binding-fields">
         <label class="form-field"
@@ -274,7 +268,7 @@ async function add() {
             step="1"
             required /></label
         ><label class="form-field"
-          >绑定计费模型<input v-model="billing" placeholder="使用平台模型"
+          >绑定计费模型<ModelSelect v-model="billing" label="绑定计费模型" placeholder="使用平台模型"
         /></label>
       </div>
       <div class="form-actions">
@@ -287,7 +281,7 @@ async function add() {
       </div>
     </form>
     <DialogActions
-      ><button class="secondary" @click="emit('close')">
+      ><button data-dialog-close class="secondary" @click="emit('close')">
         关闭
       </button></DialogActions
     >

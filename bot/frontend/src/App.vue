@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type {
   Bot,
   Group,
@@ -14,26 +14,29 @@ import type { BotAppearance } from "../../shared/appearance/preferences";
 import { api, enc } from "./api";
 import { back, ready } from "./host";
 import { identityFor } from "./identity";
+import { userAvatarColor } from "./user-avatar";
 import { useConversation } from "./conversation";
 import Icon from "./components/Icon.vue";
+import SettingsButton from './components/SettingsButton.vue';
 import BotAvatar from "./components/BotAvatar.vue";
 import HelpTip from "./components/HelpTip.vue";
 import Modal from "./components/Modal.vue";
-import AppearancePicker from "./components/AppearancePicker.vue";
+import BotEditor from "./components/BotEditor.vue";
+import { editorSettings } from './bot-editor-options';
 import ChatView from "./components/ChatView.vue";
 import CatalogApp from "./components/CatalogApp.vue";
 import SidebarSearch from "./components/SidebarSearch.vue";
 import InfoPanel from "./components/InfoPanel.vue";
 import SidebarBotRow from "./components/SidebarBotRow.vue";
 import ChannelConversationView from "./components/ChannelConversation.vue";
-import ThemePicker from "./components/ThemePicker.vue";
-import ChannelSettings from "./components/ChannelSettings.vue";
+import WorkspaceSettings from "./components/WorkspaceSettings.vue";
 import TaskDetail from "./components/TaskDetail.vue";
 
 function readRoute(): Route {
   try {
     const [kind, id = ""] = location.hash
       .replace(/^#\/?/, "")
+      .split('?')[0]
       .split("/")
       .map(decodeURIComponent);
     return {
@@ -63,7 +66,9 @@ const status = ref<Status>(),
   loading = ref(true),
   error = ref(""),
   modelError = ref("");
-const infoOpen = ref(true);
+const avatarColor = computed(() => userAvatarColor(status.value?.username || "Boost"));
+const infoOpen = ref(false);
+const initialized = ref(false);
 const mobileOpen = ref(false),
   tasks = ref<Task[]>([]),
   catalog = ref<CatalogEntry[]>([]),
@@ -91,6 +96,15 @@ const bot = computed(() =>
   ),
 );
 const group = computed(() => groups.value.find((g) => g.id === route.value.id));
+const sourceModels = ref<string[]>([]);
+const conversationModels = computed(() => !bot.value || (bot.value.settings.modelSource||'default')==='default' ? models.value : sourceModels.value);
+watch(() => [bot.value?.id,bot.value?.settings.modelSource], async (_value,_old,onCleanup) => {
+  sourceModels.value=[];
+  const source=bot.value?.settings.modelSource;
+  if(!source||source==='default')return;
+  const controller=new AbortController();onCleanup(()=>controller.abort());
+  try{const value=await api<{models:string[]}>('/models?source='+enc(source),{signal:controller.signal});if(!controller.signal.aborted)sourceModels.value=value.models;}catch(e){if(!controller.signal.aborted)modelError.value=(e as Error).message;}
+},{immediate:true});
 const chat = reactive(
   useConversation(route, () => {
     void refresh();
@@ -106,39 +120,58 @@ const editId = ref(""),
   members = ref<string[]>([]);
 const appearance = ref<BotAppearance>(identityFor()),
   deleteKind = ref<"bots" | "groups">("bots");
-const botSettings = reactive({
-  permission: "workspace",
-  memory: true,
-  teamWrite: false,
-  paused: false,
-  modelProtocol: "auto",
-  modelStreaming: true,
+const botSettings = reactive(editorSettings());
+const createRequestId = ref("");
+const confirmBotFull = ref(false);
+const botSourceValid = ref(true);
+const settingsBotId = ref(new URLSearchParams(location.hash.split('?')[1] || '').get('bot') || '');
+const settingsReturn = ref<Route>({ kind: 'chat', id: '' });
+const settingsPanel = ref<HTMLElement>();
+watch(mobileOpen, async open => {
+  if (route.value.kind !== 'settings') return;
+  await nextTick();
+  if (open) settingsPanel.value?.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+  else document.querySelector<HTMLButtonElement>('[aria-controls="bot-settings-nav"]')?.focus();
 });
-const templates = [
-  {
-    name: "研究分析",
-    prompt:
-      "你是研究分析师。先明确问题、范围和证据要求，区分事实与推断，核对来源，输出可追溯的结论。需要其他成员协助时，明确交接任务和交付要求。",
-  },
-  {
-    name: "开发工程",
-    prompt:
-      "你是软件工程师。先理解现有实现和约束，提出最小必要改动，完成实现与验证，报告结果与未解决的问题。协作时说明输入、输出与验收标准。",
-  },
-  {
-    name: "内容策划",
-    prompt:
-      "你是内容策划师。根据目标读者与传播目的组织结构，校验事实，使用准确简练的表达。协作时将待核实的信息交给适合的成员。",
-  },
-];
+function settingsKeydown(event: KeyboardEvent) {
+  if (!mobileOpen.value || innerWidth > 800) return;
+  if (event.key === 'Escape') { event.preventDefault(); mobileOpen.value = false; return; }
+  if (event.key !== 'Tab') return;
+  const elements = [...(settingsPanel.value?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled)') || [])].filter(el => el.getClientRects().length);
+  const first = elements[0], last = elements.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+}
+function settingsShortcut(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.key === ',' && !event.altKey && !modal.value) {
+    event.preventDefault();
+    if (route.value.kind === 'settings') exitSettings();
+    else go('settings', 'general');
+  }
+}
 function go(kind: Route["kind"], id = "") {
-  location.hash = `/${kind}${id ? "/" + enc(id) : ""}`;
+  if (kind === 'settings' && route.value.kind !== 'settings') {
+    settingsReturn.value = { ...route.value };
+    settingsBotId.value = bot.value?.id || bots.value[0]?.id || '';
+  }
+  location.hash = `/${kind}${id ? "/" + enc(id) : ""}${kind === 'settings' && settingsBotId.value ? '?bot=' + enc(settingsBotId.value) : ''}`;
   mobileOpen.value = false;
 }
 function changedRoute() {
   route.value = readRoute();
+  if (route.value.kind === 'settings') settingsBotId.value = new URLSearchParams(location.hash.split('?')[1] || '').get('bot') || settingsBotId.value;
   void loadPanel();
 }
+function openSettings(id?: string, section = 'agent') {
+  if (section === 'channels') go('settings', 'channels');
+  else openBot(bots.value.find(item => item.id === id));
+}
+function exitSettings() {
+  const previous = settingsReturn.value;
+  const fallback = bots.value.find(item => item.id === settingsBotId.value)?.id || bots.value[0]?.id || '';
+  go(previous.kind, previous.id || (previous.kind === 'chat' ? fallback : ''));
+}
+function setSettingsPosition(id: string) { const url = new URL(location.href); url.hash = '/settings/' + enc(id); history.replaceState(null, '', url); }
 let refreshing: Promise<void> | undefined;
 function refresh() {
   if (!refreshing) refreshing = refreshState().finally(() => { refreshing = undefined; });
@@ -183,6 +216,7 @@ async function refreshState() {
   }
 }
 async function connect() {
+  const firstLoad = !initialized.value, startedAt = performance.now();
   loading.value = true;
   error.value = "";
   modelError.value = "";
@@ -203,6 +237,9 @@ async function connect() {
     error.value = (e as Error).message;
   } finally {
     loading.value = false;
+    if (firstLoad) await new Promise(resolve => setTimeout(resolve, Math.max(0, 220 - (performance.now() - startedAt))));
+    if (disposed) return;
+    initialized.value = true;
     void ready();
   }
 }
@@ -232,6 +269,8 @@ async function loadPanel() {
   }
 }
 function openBot(value?: Bot) {
+  botSourceValid.value = (value?.settings.modelSource || 'default')==='default';
+  createRequestId.value = value ? "" : crypto.randomUUID();
   editId.value = value?.id || "";
   name.value = value?.name || "";
   prompt.value = value?.systemPrompt || "";
@@ -239,12 +278,7 @@ function openBot(value?: Bot) {
   appearance.value = identityFor(value);
   formError.value = "";
   modal.value = "bot";
-  botSettings.permission = value?.settings.permission || "workspace";
-  botSettings.memory = value?.settings.memory.enabled ?? true;
-  botSettings.teamWrite = value?.settings.memory.teamWrite ?? false;
-  botSettings.paused = value?.settings.paused ?? false;
-  botSettings.modelProtocol = value?.settings.modelProtocol ?? "auto";
-  botSettings.modelStreaming = value?.settings.modelStreaming ?? true;
+  Object.assign(botSettings, editorSettings(value));
 }
 function openGroup(value?: Group) {
   editId.value = value?.id || "";
@@ -253,10 +287,13 @@ function openGroup(value?: Group) {
   formError.value = "";
   modal.value = "group";
 }
-async function saveBot() {
-  if (saving.value || !name.value.trim()) return;
+async function saveBot(confirmed = false) {
+  if (saving.value || !name.value.trim() || !botSourceValid.value) return;
+  if (configure.value && botSettings.permission === 'full' && bots.value.find(bot => bot.id === editId.value)?.settings.permission !== 'full' && !confirmed) { confirmBotFull.value = true; return; }
+  confirmBotFull.value = false;
   saving.value = true;
   formError.value = "";
+  let identitySaved = false;
   try {
     const d = await api<{ bot: Bot }>(
       editId.value ? `/bots/${enc(editId.value)}` : "/bots",
@@ -264,15 +301,18 @@ async function saveBot() {
         method: editId.value ? "PUT" : "POST",
         body: {
           name: name.value.trim(),
+          ...(!editId.value ? { requestId: createRequestId.value } : {}),
           systemPrompt: prompt.value,
           defaultModel: defaultModel.value,
           appearance: appearance.value,
           modelProtocol: botSettings.modelProtocol,
           modelStreaming: botSettings.modelStreaming,
+          modelSource: botSettings.modelSource,
         },
       },
     );
     // Identity changes are available to members. Execution permissions remain admin-only.
+    identitySaved = true;
     editId.value = d.bot.id;
     if (configure.value)
       await api(`/bots/${enc(d.bot.id)}/settings`, {
@@ -282,8 +322,16 @@ async function saveBot() {
           memory: {
             enabled: botSettings.memory,
             teamWrite: botSettings.teamWrite,
+            review: botSettings.review,
           },
           paused: botSettings.paused,
+          utilityModel: botSettings.utilityModel,
+          taskSlots: botSettings.taskSlots,
+          quietHours: {...botSettings.quietHours},
+          nudge: botSettings.nudge,
+          steward: {enabled:botSettings.steward},
+          computerUse: {...botSettings.computerUse},
+          collaboration: {enabled:botSettings.collaboration},
         },
       });
     await refresh();
@@ -291,7 +339,7 @@ async function saveBot() {
     go("chat", d.bot.id);
     notice.value = "智能体已保存";
   } catch (e) {
-    formError.value = (e as Error).message;
+    formError.value = (identitySaved ? '资料已保存，运行选项尚未保存。请重试：' : '') + (e as Error).message;
   } finally {
     saving.value = false;
   }
@@ -322,6 +370,10 @@ function requestDelete(kind: "bots" | "groups") {
   deleteKind.value = kind;
   formError.value = "";
   modal.value = "delete";
+}
+function deleteBot(value: Bot) {
+  openBot(value);
+  requestDelete("bots");
 }
 async function remove() {
   if (saving.value) return;
@@ -368,7 +420,7 @@ async function testModel() {
       verdict: string;
     }>("/diagnostics/test-model", {
       method: "POST",
-      body: { botId: bots.value[0]?.id },
+      body: { botId: settingsBotId.value || bot.value?.id || bots.value[0]?.id },
     });
     if (!(d.gateway.skipped ? d.direct.ok : d.gateway.ok))
       throw new Error(d.verdict || "模型测试未通过，请检查 Boost 配置。");
@@ -383,11 +435,13 @@ function closeModal() {
   if (!saving.value) modal.value = null;
 }
 onMounted(() => {
+  addEventListener('keydown', settingsShortcut);
   addEventListener("hashchange", changedRoute);
   void connect();
   poll();
 });
 onBeforeUnmount(() => {
+  removeEventListener('keydown', settingsShortcut);
   disposed = true;
   clearTimeout(refreshTimer);
   removeEventListener("hashchange", changedRoute);
@@ -395,9 +449,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <Transition name="boot-mask"><div v-if="!initialized" class="bot-loading-screen" role="status" aria-label="正在载入Boost工作台"><span class="loading-ring" /></div></Transition>
   <div
     class="app bot-studio"
-    :class="{ 'with-panel': infoOpen && route.kind === 'chat' && bot }"
+    :inert="!initialized"
+    :class="{ 'with-panel': infoOpen && route.kind === 'chat' && bot, 'settings-layout': route.kind === 'settings' }"
     data-bot-vue-workspace
   >
     <button
@@ -406,7 +462,7 @@ onBeforeUnmount(() => {
       aria-label="关闭导航"
       @click="mobileOpen = false"
     />
-    <aside class="side" :class="{ 'is-open': mobileOpen }">
+    <aside v-if="route.kind !== 'settings'" class="side" :class="{ 'is-open': mobileOpen }">
       <header class="side-top">
         <button
           class="side-brand boost-brand-return"
@@ -446,6 +502,9 @@ onBeforeUnmount(() => {
           "
           :preview="previews[b.id]?.text"
           :working="agent.busy?.includes(b.id)"
+          :manage="configure"
+          @edit="openSettings(b.id)"
+          @delete="deleteBot(b)"
           @open="
             go(
               b.origin === 'catalog' && b.app && configure ? 'app' : 'chat',
@@ -504,16 +563,14 @@ onBeforeUnmount(() => {
       </nav>
       <footer class="side-foot">
         <button class="side-user" @click="go('settings')">
-          <span class="user-avatar">{{
+          <span class="user-avatar" :style="{ '--user-avatar-color': avatarColor }">{{
             (status?.username || "Boost").slice(0, 1).toUpperCase()
           }}</span
           ><span>{{ status?.username || "Boost" }}</span></button
-        ><button class="icon-btn" aria-label="设置" @click="go('settings')">
-          <Icon name="settings" />
-        </button>
+        ><SettingsButton @click="go('settings', 'general')" />
       </footer>
     </aside>
-    <main class="main workspace-main">
+    <main class="main workspace-main" v-spring-page="route.kind + '/' + route.id" :inert="route.kind === 'settings' && mobileOpen">
       <div v-if="error" class="error-banner" role="alert">
         <Icon name="info" /><span>{{ error }}</span
         ><button class="quiet-button" :disabled="loading" @click="connect">
@@ -538,11 +595,12 @@ onBeforeUnmount(() => {
         :bot="bot"
         :group="group"
         :bots="bots"
-        :models="models"
+        :models="conversationModels"
         :configure="configure"
         :info-open="infoOpen"
         @info="infoOpen = !infoOpen"
-        @edit="group ? openGroup(group) : openBot(bot)"
+        @refresh="refresh"
+        @edit="group ? openGroup(group) : openSettings(bot?.id)"
         @collaborate="openGroup()"
         @menu="mobileOpen = true"
       />
@@ -558,23 +616,30 @@ onBeforeUnmount(() => {
         :key="bot.id"
         :bot="bot"
         :configure="configure"
+        :models="conversationModels"
         @chat="go('chat', bot.id)"
-        @settings="go('settings')"
+        @settings="openSettings(bot.id, 'channels')"
+        @refresh="refresh"
+        @edit="openSettings(bot.id)"
+        @delete="deleteBot(bot)"
         @menu="mobileOpen = true"
       />
       <section v-else class="workspace-panel">
-        <header class="workspace-head">
+        <header class="workspace-head" :class="{ 'settings-page-head': route.kind === 'settings' }">
           <button
             class="icon-button mobile-menu"
-            aria-label="打开导航"
+            :aria-label="route.kind === 'settings' ? '打开设置导航' : '打开导航'"
+            :aria-controls="route.kind === 'settings' ? 'bot-settings-nav' : undefined"
+            :aria-expanded="mobileOpen"
             @click="mobileOpen = true"
           >
             <Icon name="menu" />
           </button>
+          <button v-if="route.kind === 'settings'" class="icon-btn" aria-label="返回智能体工作台" @click="exitSettings"><Icon name="back" /></button>
           <h1>
             {{
               route.kind === "settings"
-                ? "工作台设置"
+                ? "设置"
                 : route.kind === "tasks"
                   ? "任务记录"
                   : route.kind === "discover"
@@ -582,7 +647,7 @@ onBeforeUnmount(() => {
                     : "智能体工作台"
             }}
           </h1>
-          <span class="head-spacer" /><button
+          <span class="head-spacer" /><button v-if="route.kind !== 'settings'"
             class="icon-button"
             aria-label="刷新"
             :disabled="panelBusy"
@@ -591,67 +656,11 @@ onBeforeUnmount(() => {
             <Icon name="refresh" />
           </button>
         </header>
-        <div class="panel-content">
+        <div class="panel-content" :class="{ 'settings-host': route.kind === 'settings' }">
           <div v-if="panelError" class="error-banner" role="alert">
             {{ panelError }}
           </div>
-          <div v-if="route.kind === 'settings'" class="settings-grid">
-            <section class="settings-card">
-              <h2>外观</h2>
-              <ThemePicker />
-            </section>
-            <ChannelSettings v-if="configure" :bots="bots" />
-            <section class="settings-card">
-              <h2>
-                模型与运行环境<HelpTip
-                  text="模型、账户和计费由 Boost 管理。连接失败时先确认账户可用、模型已启用，再进行连接测试。"
-                />
-              </h2>
-              <dl>
-                <div>
-                  <dt>运行版本</dt>
-                  <dd>{{ status?.version || "尚未连接" }}</dd>
-                </div>
-                <div>
-                  <dt>可用模型</dt>
-                  <dd>{{ models.length }}</dd>
-                </div>
-                <div>
-                  <dt>当前权限</dt>
-                  <dd>{{ configure ? "管理员" : "成员" }}</dd>
-                </div>
-              </dl>
-              <div class="button-row">
-                <button class="quiet-button" @click="connect">重新连接</button
-                ><button
-                  v-if="configure"
-                  class="primary-button"
-                  :disabled="panelBusy"
-                  @click="testModel"
-                >
-                  {{ panelBusy ? "测试中…" : "测试模型连接" }}</button
-                ><button class="quiet-button" @click="back">
-                  返回 Boost 配置
-                </button>
-              </div>
-            </section>
-            <section class="settings-card">
-              <h2>
-                协作规则<HelpTip
-                  text="群聊中先点名成员或所有人。Bot 可点名其他成员接手；单条用户消息最多自动接力 6 次。工具执行始终遵循成员权限和审批要求。"
-                />
-              </h2>
-              <div class="setting-row">
-                <span>群聊成员</span><span>至少 2 位</span>
-              </div>
-              <div class="setting-row">
-                <span>自动接力上限</span><span>6 次／消息</span>
-              </div>
-              <button class="quiet-button" @click="openGroup()">
-                <Icon name="team" />创建协作群
-              </button>
-            </section>
-          </div>
+          <WorkspaceSettings v-if="route.kind === 'settings'" :bots="bots" :models="models" :status="status" :configure="configure" :busy="panelBusy" :section="route.id" @section="(id) => go('settings', id)" @position="setSettingsPosition" @edit="openBot" @delete="deleteBot" @group="openGroup()" @reconnect="connect" @test="testModel" @saved="refresh" @navigate="mobileOpen = false" @exit="exitSettings" />
           <template v-else-if="route.kind === 'tasks'"
             ><div v-if="panelBusy" class="empty-state" role="status">
               正在加载任务…
@@ -680,10 +689,10 @@ onBeforeUnmount(() => {
           <template v-else-if="route.kind === 'discover'"
             ><div class="panel-intro">
               <span class="eyebrow">CAPABILITIES</span>
-              <h2>为不同工作，找到合适的智能体</h2>
+              <h2>为不同工作，找到合适的智能体
               <HelpTip
                 text="内置应用安装后作为独立 Bot 运行。其工具操作需要管理员授权；成员可使用普通对话与群聊。"
-              />
+              /></h2>
             </div>
             <div class="catalog-grid">
               <article
@@ -691,14 +700,12 @@ onBeforeUnmount(() => {
                 :key="entry.id"
                 class="catalog-card"
               >
-                <span class="catalog-icon"
-                  ><Icon name="grid" :size="26"
-                /></span>
-                <h3>{{ localized(entry.name) }}</h3>
+                <BotAvatar :bot="bots.find((item) => item.id === entry.instanceId) || { id: entry.id, name: localized(entry.name) } as Bot" :size="54" />
+                <div class="catalog-card-title"><h3>{{ localized(entry.name) }}</h3>
                 <HelpTip
                   :text="localized(entry.description || entry.summary)"
                   label="查看能力说明"
-                />
+                /></div>
                 <button
                   class="primary-button"
                   :disabled="!configure || panelBusy"
@@ -708,9 +715,9 @@ onBeforeUnmount(() => {
                 </button>
               </article>
               <button class="catalog-card create-card" @click="openBot()">
-                <Icon name="plus" :size="28" />
+                <Icon name="plus" :size="16" />
                 <h3>自定义智能体</h3>
-                <span>设置角色、外观与模型</span>
+                <span title="设置角色、外观与模型">设置角色、外观与模型</span>
               </button>
             </div></template
           >
@@ -738,12 +745,17 @@ onBeforeUnmount(() => {
       :messages="chat.messages"
       :live="chat.live"
       @close="infoOpen = false"
-      @edit="openBot(bot)"
-      @settings="go('settings')"
+      @edit="openSettings(bot.id)"
+      @delete="deleteBot(bot)"
+      @settings="openSettings(bot.id, 'channels')"
       @approvals="infoOpen = false"
       @task="selectedTask = $event"
       @tasks="go('tasks')"
     />
+    <aside v-if="route.kind === 'settings'" ref="settingsPanel" class="settings-side" :class="{ 'is-open': mobileOpen }" aria-label="设置导航面板" :role="mobileOpen ? 'dialog' : undefined" :aria-modal="mobileOpen || undefined" @keydown="settingsKeydown">
+      <header class="settings-side-head"><Icon name="settings" :size="20" /><h2>设置</h2><button class="icon-btn settings-nav-close" aria-label="关闭设置导航" @click="mobileOpen = false"><Icon name="close" /></button></header>
+      <div id="bot-settings-nav" class="settings-nav-host" />
+    </aside>
     <TaskDetail
       v-if="selectedTask"
       :key="selectedTask.id"
@@ -751,102 +763,15 @@ onBeforeUnmount(() => {
       :configure="configure"
       @close="selectedTask = null"
     />
-    <Modal
+    <Modal :busy="saving"
       v-if="modal === 'bot'"
       :title="editId ? '智能体设置' : '创建智能体'"
+      wide
       @close="closeModal"
-      ><form class="editor-form" @submit.prevent="saveBot">
-        <div v-if="formError" class="error-banner" role="alert">
-          {{ formError }}
-        </div>
-        <AppearancePicker v-model="appearance" /><label
-          >名称<input
-            v-model="name"
-            required
-            maxlength="60"
-            placeholder="为智能体命名" /></label
-        ><label
-          ><span
-            >角色与职责<HelpTip
-              text="描述专长、工作方式与交付要求。人设不会扩大工具权限。" /></span
-          ><textarea
-            v-model="prompt"
-            rows="4"
-            placeholder="你希望这位智能体负责什么？"
-          />
-        </label>
-        <div v-if="!editId" class="template-chips">
-          <button
-            v-for="t in templates"
-            type="button"
-            class="member-chip"
-            @click="
-              name = t.name;
-              prompt = t.prompt;
-            "
-          >
-            {{ t.name }}
-          </button>
-        </div>
-        <label
-          >默认模型<select v-model="defaultModel">
-            <option value="">跟随 Boost 默认模型</option>
-            <option
-              v-if="defaultModel && !models.includes(defaultModel)"
-              :value="defaultModel"
-            >
-              {{ defaultModel }}
-            </option>
-            <option v-for="m in models" :value="m">{{ m }}</option>
-          </select></label
-        >
-        <label
-          ><span
-            >请求格式<HelpTip
-              text="纯对话与代理不可用时的回退请求可选择 Chat Completions、Responses 或 Messages。代理工具模式使用模型原生适配器。" /></span
-          ><select v-model="botSettings.modelProtocol">
-            <option value="auto">自动兼容</option>
-            <option value="chat">Chat Completions</option>
-            <option value="responses">Responses</option>
-            <option value="messages">Messages</option>
-          </select></label
-        >
-        <label class="checkbox-label"
-          ><input
-            v-model="botSettings.modelStreaming"
-            type="checkbox" />流式模型响应<HelpTip
-            text="关闭后使用上游 JSON 响应，工作台仍保留执行状态和错误反馈。"
-        /></label>
-        <details v-if="configure" class="advanced-settings">
-          <summary>执行与记忆设置</summary>
-          <label
-            >执行权限<select v-model="botSettings.permission">
-              <option value="readonly">只读</option>
-              <option value="workspace">工作区内写入</option>
-              <option value="full">完全权限</option>
-            </select></label
-          >
-          <p v-if="botSettings.permission === 'full'" class="error-banner">
-            完全权限允许以当前用户身份读写工作区外文件。仅为可信智能体启用。
-          </p>
-          <label class="checkbox-label"
-            ><input
-              v-model="botSettings.memory"
-              type="checkbox"
-            />启用长期记忆</label
-          ><label class="checkbox-label"
-            ><input
-              v-model="botSettings.teamWrite"
-              type="checkbox" />允许写入团队共享记忆<HelpTip
-              text="共享记忆会被其他成员读取，不要写入凭据或不适合共享的信息。" /></label
-          ><label class="checkbox-label"
-            ><input
-              v-model="botSettings.paused"
-              type="checkbox"
-            />暂停后台任务</label
-          >
-        </details>
+      ><form class="editor-form bot-editor-form" @submit.prevent="saveBot()">
+        <BotEditor v-model:name="name" v-model:prompt="prompt" v-model:model="defaultModel" v-model:appearance="appearance" :settings="botSettings" @update:settings="Object.assign(botSettings, $event)" @valid="botSourceValid = $event" :models="models" :configure="configure" :editing="!!editId" :busy="saving" :target-name="bots.find(item=>item.id===editId)?.name" />
         <footer class="dialog-actions">
+          <p v-if="formError" class="error-banner" role="alert">{{ formError }}</p>
           <button
             v-if="editId"
             type="button"
@@ -855,7 +780,7 @@ onBeforeUnmount(() => {
             @click="requestDelete('bots')"
           >
             删除智能体</button
-          ><span class="head-spacer" /><button
+          ><span class="head-spacer" /><button data-dialog-close
             type="button"
             class="quiet-button"
             :disabled="saving"
@@ -865,14 +790,15 @@ onBeforeUnmount(() => {
           ><button
             type="submit"
             class="primary-button"
-            :disabled="saving || !name.trim()"
+            :disabled="saving || !name.trim() || !botSourceValid"
           >
             {{ saving ? "保存中…" : "保存智能体" }}
           </button>
         </footer>
       </form></Modal
     >
-    <Modal
+    <Modal v-if="confirmBotFull" title="启用完全权限" @close="confirmBotFull = false"><p class="permission-confirm-copy">此智能体将能够以当前用户身份访问工作区外文件并执行命令。请确认你信任它的职责和工具操作。</p><footer class="permission-confirm-actions"><button data-dialog-close class="quiet-button" @click="confirmBotFull = false">取消</button><button class="danger-button" @click="saveBot(true)">确认启用</button></footer></Modal>
+    <Modal :busy="saving"
       v-if="modal === 'group'"
       :title="editId ? '协作群设置' : '创建协作群'"
       @close="closeModal"
@@ -886,11 +812,10 @@ onBeforeUnmount(() => {
             maxlength="80"
             placeholder="例如：产品研究团队"
         /></label>
-        <div class="field-heading">
-          邀请成员 <span>{{ members.length }} 位已选</span
-          ><HelpTip
+        <div class="field-heading member-heading">
+          <strong>邀请成员<HelpTip
             text="至少选择两位智能体。群消息独立保存，不会自动转发成员的私聊历史。"
-          />
+          /></strong><span>{{ members.length }} 位已选</span>
         </div>
         <div class="member-picker">
           <label
@@ -899,7 +824,7 @@ onBeforeUnmount(() => {
             :class="{ selected: members.includes(b.id) }"
             ><input v-model="members" type="checkbox" :value="b.id" /><BotAvatar
               :bot="b"
-              :size="36"
+              :size="28"
             /><span>{{ b.name }}</span></label
           >
         </div>
@@ -915,7 +840,7 @@ onBeforeUnmount(() => {
             @click="requestDelete('groups')"
           >
             删除群聊</button
-          ><span class="head-spacer" /><button
+          ><span class="head-spacer" /><button data-dialog-close
             type="button"
             class="quiet-button"
             :disabled="saving"
@@ -932,14 +857,14 @@ onBeforeUnmount(() => {
         </footer>
       </form></Modal
     >
-    <Modal v-if="modal === 'delete'" title="确认删除" @close="closeModal"
+    <Modal :busy="saving" v-if="modal === 'delete'" title="确认删除" @close="closeModal"
       ><div class="editor-form">
-        <p>确定删除「{{ name }}」？相关会话和数据将被移除，此操作无法撤销。</p>
+        <p>确定删除「{{ name }}」？相关会话、任务和配置将被移除，此操作无法撤销。<template v-if="deleteKind === 'bots' && bots.find(item => item.id === editId)?.origin !== 'catalog'">自建智能体的工作区文件会保留。</template></p>
         <div v-if="formError" class="error-banner" role="alert">
           {{ formError }}
         </div>
         <footer class="dialog-actions">
-          <button class="quiet-button" :disabled="saving" @click="closeModal">
+          <button data-dialog-close class="quiet-button" :disabled="saving" @click="closeModal">
             取消</button
           ><button class="danger-button" :disabled="saving" @click="remove">
             {{ saving ? "删除中…" : "确认删除" }}

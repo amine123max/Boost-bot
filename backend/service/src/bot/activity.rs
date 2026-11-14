@@ -9,6 +9,29 @@ static ACTIVITY_CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = On
 
 /// Observe only an already running actor-owned host; polling never launches a bot or creates keys.
 pub(crate) fn read(actor: &RpcActor) -> Result<Value, String> {
+    let mut value = read_host(actor)?;
+    if let Some((rate, at)) = gateway_rate(actor) {
+        value["fallbackTokensPerSecond"] = json!(rate);
+        value["fallbackUpdatedAt"] = json!(at);
+    }
+    Ok(value)
+}
+
+fn gateway_rate(actor: &RpcActor) -> Option<(f64, i64)> {
+    let storage = crate::storage_helpers::open_storage()?;
+    let key_ids = crate::apikey_list::read_api_keys_for_actor(actor).ok()?.into_iter().map(|key| key.id).collect::<Vec<_>>();
+    if key_ids.is_empty() { return None; }
+    let now = boost_core::storage::now_ts();
+    let rows = storage.list_request_logs_paginated_for_keys(None, None, Some(now-60), None, 0, 16, &key_ids).ok()?;
+    rows.into_iter().find_map(|row| {
+        let tokens = row.output_tokens?;
+        let elapsed = row.duration_ms?;
+        (tokens > 0 && elapsed >= 100 && matches!(row.status_code, Some(200..=299)) && row.created_at <= now)
+            .then_some((tokens as f64 * 1000.0 / elapsed as f64, row.created_at * 1000))
+    })
+}
+
+fn read_host(actor: &RpcActor) -> Result<Value, String> {
     let actor_scope = scope(actor)?;
     let endpoint = if let Some(hosts) = HOSTS.get() {
         let mut hosts = hosts

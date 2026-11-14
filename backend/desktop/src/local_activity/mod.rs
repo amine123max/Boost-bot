@@ -254,7 +254,7 @@ impl Observer {
             .or_else(|| active.iter().max_by_key(|l| l.task.at).copied())
             .or_else(|| tasks.iter().max_by_key(|l| l.task.at));
         let percent = if active.len() > 1 {
-            None
+            active.iter().map(|log| log.task.percent).collect::<Option<Vec<_>>>().map(|values| values.iter().sum::<u64>() / values.len() as u64)
         } else {
             selected.and_then(|l| l.task.percent)
         };
@@ -277,15 +277,19 @@ impl Observer {
         let rates: Vec<_> = rate_tasks
             .iter()
             .filter(|log| log.task.state != "waiting")
-            .filter_map(|log| log.task.rate.value(now))
+            .filter_map(|log| log.task.rate.retained(now))
             .collect();
         let tokens_per_second = if rates.is_empty() {
             None
         } else {
             Some(rates.iter().sum::<f64>())
         };
+        let rate_at = rate_tasks.iter().filter_map(|log| log.task.rate.sampled_at()).max();
+        let rate_stale = rate_tasks.iter().any(|log| log.task.rate.retained(now).is_some() && log.task.rate.value(now).is_none());
+        let rate_kind = if rate_tasks.iter().filter(|log| log.task.rate.retained(now).is_some()).all(|log| log.task.rate.kind == "counter") { "counter" } else { "request" };
         json!({"available":true,"state":selected.map(|l| l.task.state).unwrap_or("idle"),"percent":percent,
             "tokensPerSecond":tokens_per_second,"updatedAt":now,
+            "rateUpdatedAt":rate_at,"rateKind":rate_kind,"rateStale":rate_stale,
             "activeTasks":active.len(),"waitingTasks":waiting,"sources":self.sources,
             "activeSources":active_sources,
             "stale":selected.is_some_and(|l| l.task.state == "working" && l.task.reported_at > 0 && now - l.task.reported_at > 120_000)})

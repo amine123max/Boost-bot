@@ -303,7 +303,7 @@ async function remove() {
       <div class="credential-box">{{ secret }}</div>
       <DialogActions>
         <button class="secondary" @click="openGuide(secret)">配置方法</button>
-        <button class="secondary" @click="secret = ''">关闭</button
+        <button data-dialog-close class="secondary" @click="secret = ''">关闭</button
         ><button class="primary" @click="perform(() => copyText(secret))">
           <BoostIcon name="copy" :size="15" />复制密钥
         </button>
@@ -314,7 +314,7 @@ async function remove() {
         确认删除 {{ deleting.name }}？使用此密钥的客户端将无法继续调用服务。
       </p>
       <DialogActions>
-        <button class="secondary" @click="deleting = null">取消</button
+        <button data-dialog-close class="secondary" @click="deleting = null">取消</button
         ><button class="danger-button" @click="remove">删除密钥</button>
       </DialogActions></BoostDialog
     >

@@ -5,6 +5,7 @@ import "./styles.css";
 import { installButtonEffects } from "./lib/button-effects";
 import { springSwitch } from "./lib/spring-switch";
 import { resizableColumns } from "./directives/resizable-columns";
+import { springPage } from "./lib/surface-motion";
 const removeButtonEffects = installButtonEffects();
 if (import.meta.hot) import.meta.hot.dispose(removeButtonEffects);
 
@@ -65,5 +66,6 @@ const router = createRouter({
 const app = createApp(App)
   .directive("spring-switch", springSwitch)
   .directive("resizable-columns", resizableColumns)
+  .directive("spring-page", springPage)
   .use(router);
 void router.isReady().then(() => app.mount("#app"));

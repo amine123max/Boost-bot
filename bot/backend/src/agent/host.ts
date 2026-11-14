@@ -783,6 +783,9 @@ export class AgentHost {
       `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-permission.mjs"))}`,
       "    - id: amb-memory",
       `      name: ${yamlStr(memory)}`,
+      "    - id: amb-collaboration",
+      `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-collaboration.mjs"))}`,
+      ...(this.allows('network') ? ["    - id: amb-channel-files", `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-channel-files.mjs"))}`] : []),
       // 生图 / 生视频：宿主带着本机器人的 Key 调 OKINTO，文件存进工作区 media/；技能说明在 skills/media
       "    - id: amb-media",
       `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-media.mjs"))}`,

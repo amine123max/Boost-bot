@@ -523,9 +523,13 @@ export class WeixinChannel {
   /** 逐个下载解密；失败的记下原因（消息照常处理，文字里会说明没下载成功） */
   private async download(items: MessageItem[]): Promise<WeixinMediaResults> {
     const out: WeixinMediaResults = new Map();
-    for (const it of items) {
+    let remaining = 20 * 1048576;
+    for (const [index, it] of items.entries()) {
       try {
-        out.set(it, await this.client!.downloadMedia(it));
+        if (index >= 8 || remaining <= 0) throw new Error('单条消息最多8个附件，总计不超过20 MB');
+        const media = await this.client!.downloadMedia(it, remaining);
+        remaining -= media.data.length;
+        out.set(it, media);
       } catch (e) {
         this.log.warn("weixin media download failed", { type: it.type, message: (e as Error).message.slice(0, 200) });
         out.set(it, e as Error);

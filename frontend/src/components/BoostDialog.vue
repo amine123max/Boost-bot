@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, useId, provide } from "vue";
+import { ref, onMounted, useId, provide } from "vue";
 import { dialogContext } from "./dialog-context";
 import BoostIcon from "./BoostIcon.vue";
-defineProps<{
+import SpringSurface from "./SpringSurface.vue";
+const props = defineProps<{
   title: string;
   wide?: boolean;
   editor?: boolean;
   expanded?: boolean;
   confirmation?: boolean;
+  busy?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const titleId = useId();
@@ -15,43 +17,58 @@ const footer = ref<HTMLElement>();
 const actions = ref(0);
 provide(dialogContext, { footer, actions, formId: `${titleId}-form` });
 const dialog = ref<HTMLDialogElement>();
+const visible = ref(true);
+function requestClose() {
+  if (!props.busy) visible.value = false;
+}
+function closed() {
+  previous?.focus({ preventScroll: true });
+  if (!visible.value) emit("close");
+}
+function actionClose(event: MouseEvent) {
+  if ((event.target as Element).closest("button[data-dialog-close]")) {
+    event.preventDefault();
+    event.stopPropagation();
+    requestClose();
+  }
+}
 const previous = document.activeElement as HTMLElement | null;
 onMounted(() => dialog.value?.showModal());
-onBeforeUnmount(() => {
-  dialog.value?.close();
-  previous?.focus();
-});
 </script>
 <template>
   <Teleport to="body"
-    ><dialog
-      ref="dialog"
-      :aria-labelledby="titleId"
-      class="modal"
-      :class="{ wide, editor, expanded, confirmation }"
-      @cancel.prevent="emit('close')"
-      @click="$event.target === dialog && emit('close')"
-    >
-      <div class="modal-heading">
-        <slot name="title-leading" />
-        <h2 :id="titleId">{{ title }}</h2>
-        <slot name="title-extra" />
-        <button
-          class="icon-button"
-          aria-label="关闭对话框"
-          @click="emit('close')"
-        >
-          <BoostIcon name="x" />
-        </button>
-      </div>
-      <div class="modal-content"><slot /></div>
-      <footer
-        ref="footer"
-        v-show="$slots.footer || actions"
-        class="modal-footer"
+    ><SpringSurface kind="dialog" @after-leave="closed"
+      ><dialog
+        v-if="visible"
+        ref="dialog"
+        :aria-labelledby="titleId"
+        class="modal"
+        :class="{ wide, editor, expanded, confirmation }"
+        @cancel.prevent="requestClose"
+        @click="$event.target === dialog && requestClose()"
+        @click.capture="actionClose"
       >
-        <slot name="footer" />
-      </footer></dialog
+        <div class="modal-heading">
+          <slot name="title-leading" />
+          <h2 :id="titleId">{{ title }}</h2>
+          <slot name="title-extra" />
+          <button
+            class="icon-button"
+            aria-label="关闭对话框"
+            :disabled="busy"
+            @click="requestClose"
+          >
+            <BoostIcon name="x" />
+          </button>
+        </div>
+        <div class="modal-content"><slot /></div>
+        <footer
+          ref="footer"
+          v-show="$slots.footer || actions"
+          class="modal-footer"
+        >
+          <slot name="footer" />
+        </footer></dialog></SpringSurface
   ></Teleport>
 </template>
 <style scoped>
@@ -64,7 +81,7 @@ onBeforeUnmount(() => {
 }
 .confirmation .modal-heading {
   gap: 11px;
-  padding: 19px 20px 13px;
+  padding: var(--boost-dialog-heading-block) var(--boost-dialog-inset);
   align-items: center;
 }
 .confirmation .modal-heading h2 {
@@ -73,8 +90,8 @@ onBeforeUnmount(() => {
   letter-spacing: -0.2px;
 }
 .confirmation .modal-heading > .icon-button {
-  width: 26px;
-  height: 26px;
+  width: var(--boost-dialog-close-size);
+  height: var(--boost-dialog-close-size);
   padding: 4px;
   border-radius: 7px;
   color: var(--muted);

@@ -4,6 +4,7 @@ import * as Lark from "@larksuiteoapi/node-sdk";
 import { randomUUID } from "node:crypto";
 import { logger } from "../../log.js";
 import { t } from "../../i18n/index.js";
+import { readMediaBytes } from '../../core/media-bytes.js';
 
 const FEISHU_IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
 const FEISHU_FILE_TYPES: Record<string, string> = {
@@ -97,6 +98,7 @@ export interface FeishuTransport {
   replyText(replyToMessageId: string, text: string, uuid?: string): Promise<void>;
   /** 上传本地文件并作为图片/文件消息回复（present 交付物） */
   replyFile?(replyToMessageId: string, filePath: string, uuid?: string): Promise<void>;
+  downloadResource?(messageId: string, ref: string, type: 'image' | 'file', maxBytes: number): Promise<Buffer>;
   /** 主动发一条文本到会话（不是回复某条消息；用于余额提醒、使用请求通知） */
   sendText?(chatId: string, text: string, uuid?: string): Promise<void>;
   /**
@@ -170,6 +172,12 @@ export class LarkTransport implements FeishuTransport {
       domain: domain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu,
       loggerLevel: Lark.LoggerLevel.warn,
     });
+  }
+  async downloadResource(messageId: string, ref: string, type: 'image' | 'file', maxBytes: number): Promise<Buffer> {
+    const response = await this.client.im.v1.messageResource.get({ path: { message_id: messageId, file_key: ref }, params: { type } });
+    const stream = response.getReadableStream();
+    try { return await readMediaBytes(stream, maxBytes, Number(response.headers?.['content-length']) || 0); }
+    finally { stream.destroy(); }
   }
 
   async start(

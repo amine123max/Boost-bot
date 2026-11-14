@@ -6,8 +6,15 @@ const sources = import.meta.glob("../../../assets/icons/*.svg", {
   import: "default",
   eager: true,
 }) as Record<string, string>;
+const providers = import.meta.glob("../../../bot/frontend/src/assets/providers/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 const svg = computed(() =>
   (
+    (props.name.startsWith("provider-") &&
+      providers[`../../../bot/frontend/src/assets/providers/${props.name.slice(9)}.svg`]) ||
     sources[`../../../assets/icons/${props.name}.svg`] ||
     sources["../../../assets/icons/circle-help.svg"]
   ).replace(/stroke-width="[\d.]+"/g, 'stroke-width="1.8"'),

@@ -3,10 +3,11 @@ export function memberRequestAllowed(method: string, path: string): boolean {
   const p = path.split('?')[0];
   if (method === 'GET') {
     if (p === '/activity') return true;
+    if (p === '/model-sources') return true;
     return /^\/(status|models|model-info|modelflare|official|account|agent|settings|guide|update|notices|catalog|attention|needs)$/.test(p)
       || /^\/(models\/info|media\/models|approvals|tasks)$/.test(p)
       || /^\/(bots|groups)(\/[^/]+)?$/.test(p)
-      || /^\/bots\/[^/]+\/(chat|chat\/live|conversations|previews|settings)$/.test(p)
+      || /^\/bots\/[^/]+\/(chat|chat\/live|chat\/metrics|conversations|previews|settings)$/.test(p)
       || /^\/conversations(\/[^/]+(\/messages|\/file|\/turn)?)?$/.test(p)
       || /^\/conversations\/[^/]+\/messages\/\d+\/activity$/.test(p)
       || /^\/groups\/[^/]+\/(live|messages)$/.test(p);

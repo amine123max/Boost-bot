@@ -18,7 +18,7 @@ withDefaults(
   }>(),
   { caption: "任务概览" },
 );
-const emit = defineEmits<{ open: []; export: []; retry: [] }>();
+const emit = defineEmits<{ open: []; retry: [] }>();
 </script>
 <template>
   <article
@@ -31,17 +31,10 @@ const emit = defineEmits<{ open: []; export: []; retry: [] }>();
         ><span class="overview-mark"><Icon name="tasks" :size="13" /></span
         >{{ caption }}</span
       >
-      <div v-if="inspect" class="overview-tools">
-        <button aria-label="导出任务记录" @click="emit('export')">
-          <Icon name="download" :size="13" /></button
-        ><button aria-label="展开任务详情" @click="emit('open')">
-          <Icon name="expand" :size="13" />
-        </button>
-      </div>
     </header>
     <h3>{{ title }}</h3>
     <p v-if="summary" class="overview-summary">{{ summary }}</p>
-    <TaskPlanChecklist v-if="inspect" :plan="plan" :loading="loading" />
+    <TaskPlanChecklist v-if="inspect && plan.kind==='plan'" :plan="plan" :loading="loading" />
     <p v-if="question" class="overview-question">{{ question }}</p>
     <p v-if="error" class="overview-error" role="alert">
       {{ error }}<button @click="emit('retry')">重试</button>
@@ -56,10 +49,10 @@ const emit = defineEmits<{ open: []; export: []; retry: [] }>();
 </template>
 <style scoped>
 .task-overview {
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--surface);
+  padding: 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   min-width: 0;
 }
 .task-overview.borderless {
@@ -91,26 +84,6 @@ const emit = defineEmits<{ open: []; export: []; retry: [] }>();
   border-radius: 5px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
-}
-.overview-tools {
-  display: flex;
-  gap: 3px;
-}
-.overview-tools button {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.overview-tools button:hover {
-  background: var(--well);
-  color: var(--fg);
 }
 .task-overview h3 {
   font-size: 13px;

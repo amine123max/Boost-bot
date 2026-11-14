@@ -760,6 +760,12 @@ export class Store {
     return this.getBot(id);
   }
   deleteBot(id: string): void {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+    const replacement = this.listBots().find(bot => bot.id !== id)?.id || '';
+    this.db.prepare('UPDATE channel_accounts SET default_bot = ? WHERE default_bot = ?').run(replacement, id);
+    this.db.prepare("DELETE FROM kv WHERE key LIKE 'channel-route:%' AND value = ?").run(id);
+    this.db.prepare('DELETE FROM approvals WHERE bot_id = ?').run(id);
     const convs = this.db.prepare("SELECT id FROM conversations WHERE bot_id = ?").all(id) as Row[];
     for (const c of convs) this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(String(c.id));
     this.db.prepare("DELETE FROM agent_segments WHERE conversation_id IN (SELECT id FROM conversations WHERE bot_id = ?)").run(id);
@@ -774,6 +780,8 @@ export class Store {
     this.db.prepare("DELETE FROM tasks WHERE bot_id = ?").run(id);
     this.db.prepare("DELETE FROM rules WHERE bot_id = ?").run(id);
     this.db.prepare("DELETE FROM bots WHERE id = ?").run(id);
+    this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
   // ---------- conversations ----------

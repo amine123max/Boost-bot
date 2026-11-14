@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModelSelect from "./ModelSelect.vue";
 import type { useAggregateOptions } from "@/composables/useAggregateOptions";
 import { computed } from "vue";
 const props = defineProps<{
@@ -36,7 +37,7 @@ const endpointPreset = computed({
             type="number"
             step="1" /></label
         ><label class="form-field"
-          >强制上游模型<input v-model="draft.modelOverride" placeholder="可选"
+          >强制上游模型<ModelSelect v-model="draft.modelOverride" label="强制上游模型" placeholder="可选"
         /></label>
       </div>
       <label class="form-field"

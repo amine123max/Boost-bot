@@ -3,6 +3,9 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import BotAvatar from "./BotAvatar.vue";
 import HelpTip from "./HelpTip.vue";
 import Icon from "./Icon.vue";
+import SettingsButton from './SettingsButton.vue';
+import ComposerModelMenu from './ComposerModelMenu.vue';
+import BotPermissionControl from './BotPermissionControl.vue';
 import Markdown from "./Markdown.vue";
 import ActivityTrace from "./ActivityTrace.vue";
 import type { Bot, Group, Approval, FileItem } from "../types";
@@ -11,7 +14,7 @@ import { defineComponent, type PropType } from "vue";
 import { downloadFile } from "../api";
 
 export default defineComponent({
-  components: { BotAvatar, HelpTip, Icon, Markdown, ActivityTrace },
+  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ActivityTrace },
   props: {
     chat: { type: Object as PropType<Conversation>, required: true },
     bot: Object as PropType<Bot>,
@@ -21,7 +24,7 @@ export default defineComponent({
     configure: Boolean,
     infoOpen: Boolean,
   },
-  emits: ["edit", "collaborate", "menu", "info"],
+  emits: ["edit", "collaborate", "menu", "info", "refresh"],
   setup(props) {
     const scroller = ref<HTMLElement>(),
       composer = ref<HTMLTextAreaElement>(),
@@ -142,9 +145,7 @@ export default defineComponent({
       >
         <Icon name="team" />
       </button>
-      <button class="icon-btn" aria-label="智能体设置" @click="$emit('edit')">
-        <Icon name="settings" />
-      </button>
+      <SettingsButton label="智能体设置" @click="$emit('edit')" />
       <button
         v-if="!group"
         class="icon-btn"
@@ -183,7 +184,7 @@ export default defineComponent({
           100
       "
     >
-      <div v-if="chat.loading" class="empty-state" role="status">
+      <div v-if="chat.loading && !chat.messages.length && !chat.live" class="empty-state" role="status">
         <span class="loading-ring" />正在加载会话
       </div>
       <div
@@ -215,6 +216,7 @@ export default defineComponent({
           </button>
         </div>
       </div>
+      <div v-if="chat.refreshing && chat.messages.length" class="chat-refresh-status" role="status" aria-label="正在刷新会话"><span class="loading-ring" /></div>
       <div
         class="chat-col ready"
         role="log"
@@ -293,7 +295,6 @@ export default defineComponent({
                 v-if="chat.live.steps?.length"
                 :steps="chat.live.steps"
                 :running="chat.running"
-                :title="chat.live.userText"
               />
               <Markdown
                 v-for="(text, i) in chat.live.interim"
@@ -384,39 +385,10 @@ export default defineComponent({
             @click="$emit('collaborate')"
           >
             <Icon name="plus" /></button
-          ><button
-            v-if="configure && bot"
-            type="button"
-            class="model-chip perm"
-            @click="$emit('edit')"
-          >
-            {{
-              bot.settings.permission === "readonly"
-                ? "只读"
-                : bot.settings.permission === "full"
-                  ? "完全权限"
-                  : "工作区可写"
-            }}</button
-          ><HelpTip
+          ><BotPermissionControl v-if="bot && !group" :bot="bot" :configure="configure" :running="chat.running" @saved="$emit('refresh')" /><HelpTip
             text="Enter 发送，Shift + Enter 换行。模型与账户由 Boost 统一管理。"
-          /><span class="grow" /><label v-if="!group" class="model-control"
-            ><select
-              :value="chat.model"
-              aria-label="对话模型"
-              :disabled="chat.running"
-              @change="
-                chat.changeModel(($event.target as HTMLSelectElement).value)
-              "
-            >
-              <option value="">{{ bot?.defaultModel || "默认模型" }}</option>
-              <option
-                v-if="chat.model && !models.includes(chat.model)"
-                :value="chat.model"
-              >
-                {{ chat.model }}
-              </option>
-              <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
-            </select></label
+          /><span class="grow" /><div v-if="!group" class="model-control"
+            ><ComposerModelMenu v-if="bot" :bot="bot" :chat="chat" :models="models" :configure="configure" @saved="$emit('refresh')" /></div
           ><span v-else class="hint">成员默认模型</span>
           <button
             v-if="chat.running"

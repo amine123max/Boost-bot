@@ -15,12 +15,13 @@ export interface ChatMessage {
  * 能看图的模型。OKINTO 的模型目录不带输入模态，只能按名字判断；不在其中的模型
  * （DeepSeek、GLM 文本版等）收到图片时只拿到它在工作区里的路径。
  */
-const IMAGE_INPUT_MODELS = /claude|gpt-4o|gpt-4\.1|gpt-[5-9]|gemini|grok-4|kimi-k3|muse-spark|qvq|-vl\b|-omni\b|glm-[\d.]+v\b/i;
+const IMAGE_INPUT_MODELS = /claude|gpt-4o|gpt-4\.1|gpt-[5-9]|gemini|grok-4|kimi-k3|muse-spark|qvq|-vl\b|-omni\b|glm-[\d.]+v\b|deepseek-v4\.1-flash-1017\b|glm-5\.3-flashx\b/i;
 export function acceptsImages(model: string): boolean {
   return IMAGE_INPUT_MODELS.test(model);
 }
 
 export interface ChatRequest {
+  botId?: string;
   model: string;
   messages: ChatMessage[];
   signal?: AbortSignal;
@@ -47,15 +48,15 @@ const LIST_MODELS_TIMEOUT_MS = 30_000;
 
 export class OpenAICompatClient implements ModelClient {
   private gate = new WorkGate();
-  constructor(private endpoint: () => Endpoint, private fetchImpl: typeof fetch = fetch) {}
+  constructor(private endpoint: (botId?:string,model?:string) => Endpoint | Promise<Endpoint>, private fetchImpl: typeof fetch = fetch) {}
 
-  private headers(): Record<string, string> {
-    const { apiKey } = this.endpoint();
+  private headers({apiKey}:Endpoint): Record<string, string> {
     return { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) };
   }
 
   async listModels(): Promise<string[]> {
-    const res = await this.fetchImpl(`${this.endpoint().baseUrl}/models`, { headers: this.headers(), signal: AbortSignal.timeout(LIST_MODELS_TIMEOUT_MS) });
+    const endpoint=await this.endpoint();
+    const res = await this.fetchImpl(`${endpoint.baseUrl}/models`, { headers: this.headers(endpoint), signal: AbortSignal.timeout(LIST_MODELS_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`GET /models -> HTTP ${res.status}`);
     const body = (await res.json()) as { data?: Array<{ id: string }> };
     return (body.data ?? []).map((m) => m.id).sort();
@@ -65,6 +66,7 @@ export class OpenAICompatClient implements ModelClient {
     return this.gate.run(() => this.performChat(req, onDelta), req.signal);
   }
   private async performChat(req: ChatRequest, onDelta: (delta: string) => void): Promise<string> {
+    const endpoint=await this.endpoint(req.botId,req.model);
     const protocol = req.protocol === 'responses' || req.protocol === 'messages' ? req.protocol : 'chat';
     const streaming = req.stream !== false;
     const system = req.messages.filter(m => m.role === 'system').map(m => typeof m.content === 'string' ? m.content : m.content.filter(p => p.type === 'text').map(p => p.text).join('\n')).join('\n\n');
@@ -78,10 +80,10 @@ export class OpenAICompatClient implements ModelClient {
       ? { model: req.model, input, stream: streaming, ...(req.reasoningEffort ? { reasoning: { effort: req.reasoningEffort, summary: 'auto' } } : {}) }
       : protocol === 'messages'
         ? { model: req.model, system, messages: anthropic, max_tokens: 8192, stream: streaming }
-        : { model: req.model, messages: req.messages, stream: streaming, ...(req.reasoningEffort ? { reasoning_effort: req.reasoningEffort } : {}) };
-    const res = await this.fetchImpl(`${this.endpoint().baseUrl}/${protocol === 'chat' ? 'chat/completions' : protocol}`, {
+        : { model: req.model, messages: req.messages, stream: streaming, ...(streaming ? { stream_options: { include_usage: true } } : {}), ...(req.reasoningEffort ? { reasoning_effort: req.reasoningEffort } : {}) };
+    const res = await this.fetchImpl(`${endpoint.baseUrl}/${protocol === 'chat' ? 'chat/completions' : protocol}`, {
       method: "POST",
-      headers: { ...this.headers(), Accept: streaming ? 'text/event-stream' : 'application/json', ...(protocol === 'messages' ? { 'x-api-key': this.endpoint().apiKey, 'anthropic-version': '2023-06-01' } : {}) },
+      headers: { ...this.headers(endpoint), Accept: streaming ? 'text/event-stream' : 'application/json', ...(protocol === 'messages' ? { 'x-api-key': endpoint.apiKey, 'anthropic-version': '2023-06-01' } : {}) },
       body: JSON.stringify(body),
       signal: req.signal,
     });

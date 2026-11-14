@@ -126,7 +126,7 @@ async function saveTransport() {
     wide
     :editor="kind === 'config'"
     :expanded="expanded"
-    @close="!busy && (kind = '')"
+    :busy="busy" @close="!busy && (kind = '')"
   >
     <template v-if="kind === 'config'" #title-extra
       ><span class="badge">只读 · config.toml</span></template
@@ -189,7 +189,7 @@ async function saveTransport() {
           required
       /></label>
       <DialogActions>
-        <button
+        <button data-dialog-close
           type="button"
           class="secondary"
           :disabled="busy"
@@ -262,7 +262,7 @@ async function saveTransport() {
         </div>
       </div>
       <DialogActions>
-        <button class="primary" @click="kind = ''">关闭</button>
+        <button data-dialog-close class="primary" @click="kind = ''">关闭</button>
       </DialogActions></template
     >
     <template v-if="kind === 'config'" #footer
@@ -282,7 +282,7 @@ async function saveTransport() {
           @click="perform(() => copyText(codexConfig!.content))"
         >
           复制</button
-        ><button class="primary" :disabled="busy" @click="kind = ''">
+        ><button data-dialog-close class="primary" :disabled="busy" @click="kind = ''">
           关闭
         </button>
       </DialogActions></template

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModelTags from "@/components/ModelTags.vue";
 import DialogActions from "@/components/DialogActions.vue";
 import { computed, ref, watch, onActivated, onDeactivated } from "vue";
 import type { AggregateApi, AggregateApiSecretResult } from "@/types";
@@ -423,7 +424,7 @@ function rowAction(api: AggregateApi, action: string) {
     <BoostDialog
       v-if="dialog"
       :title="editing ? '编辑聚合API' : '添加聚合API'"
-      @close="!busy && (dialog = false)"
+      :busy="busy" @close="!busy && (dialog = false)"
       ><form class="form-stack" @submit.prevent="save">
         <label v-if="!editing" class="form-field"
           >快速配置<select
@@ -466,13 +467,13 @@ function rowAction(api: AggregateApi, action: string) {
           >模型（可选）<input
             v-model="models"
             placeholder="多个模型用英文逗号分隔"
-        /></label>
+          /><ModelTags :value="models" /></label>
         <AggregateConnectionOptions
           :draft="options.draft"
           :editing="!!editing"
         />
         <DialogActions>
-          <button
+          <button data-dialog-close
             type="button"
             class="secondary"
             :disabled="busy"
@@ -498,7 +499,7 @@ function rowAction(api: AggregateApi, action: string) {
       >
       <div v-else class="credential-box">{{ secret.key }}</div>
       <DialogActions
-        ><button class="secondary" @click="secret = null">关闭</button
+        ><button data-dialog-close class="secondary" @click="secret = null">关闭</button
         ><button
           class="primary"
           @click="
@@ -523,7 +524,7 @@ function rowAction(api: AggregateApi, action: string) {
         确认删除 {{ deleting.supplierName || deleting.url }}？
       </p>
       <DialogActions>
-        <button class="secondary" @click="deleting = null">取消</button
+        <button data-dialog-close class="secondary" @click="deleting = null">取消</button
         ><button class="danger-button" @click="remove">删除聚合API</button>
       </DialogActions></BoostDialog
     >

@@ -31,6 +31,7 @@ export function feishuParts(ev: FeishuMessageEvent): Part[] {
   } catch {
     /* ignore */
   }
+  if (!c || typeof c !== 'object') c = {};
   switch (ev.messageType) {
     case "text": {
       let t = String(c.text ?? "");
@@ -38,11 +39,15 @@ export function feishuParts(ev: FeishuMessageEvent): Part[] {
       return [{ type: "text", text: t.trim() }];
     }
     case "post": {
-      const blocks = (c.content ?? c.zh_cn?.content ?? []) as any[][];
+      const raw = c.content ?? c.zh_cn?.content;
+      const blocks: any[][] = Array.isArray(raw) ? raw.filter(Array.isArray).map(line => line.filter(n => n && typeof n === 'object')) : [];
       const text = blocks
         .map((line) => line.map((n) => (n.tag === "text" || n.tag === "a" ? n.text : "")).join(""))
         .join("\n");
-      return [{ type: "text", text: `${c.title ? c.title + "\n" : ""}${text}`.trim() }];
+      const files: Part[] = blocks.flatMap(line => line.flatMap<Part>(n => n.tag === 'img' && n.image_key
+        ? [{ type: 'image' as const, ref: String(n.image_key) }] : n.tag === 'file' && n.file_key
+          ? [{ type: 'file' as const, ref: String(n.file_key), name: String(n.file_name || 'file') }] : []));
+      return [{ type: "text", text: `${c.title ? c.title + "\n" : ""}${text}`.trim() }, ...files];
     }
     case "image":
       return [{ type: "image", ref: c.image_key }];
@@ -151,6 +156,21 @@ export class FeishuChannel {
     const p = this.queue.run(`feishu:${this.account}:${ev.chatId}`, async () => {
       const reply = new FeishuReply(this.transport, ev.messageId, this.throttleMs, { outbox: this.outbox, botId: this.botOf(ev.chatId), account: this.account, chatId: ev.chatId, key: ev.messageId });
       try {
+        let remaining = 20 * 1024 * 1024;
+        const media = inbound.parts.filter(part => part.type === 'image' || part.type === 'file');
+        for (const [index, part] of media.entries()) {
+          if (part.type !== 'image' && part.type !== 'file') continue;
+          try {
+            if (index >= 8 || remaining <= 0) throw new Error('单条消息最多分析8个附件，总计不超过20 MB');
+            if (!part.ref || !this.transport.downloadResource) throw new Error('当前飞书连接不支持读取附件，请检查消息资源权限');
+            part.data = await this.transport.downloadResource(ev.messageId, part.ref, part.type, remaining);
+            remaining -= part.data.length;
+            if (part.type === 'image') {
+              const { sniffImageMime } = await import('../weixin/api.js');
+              part.mime = sniffImageMime(part.data);
+            }
+          } catch (error) { part.error = error instanceof Error ? error.message : '附件下载失败'; }
+        }
         await this.runtime.handle(inbound, reply);
       } catch (e) {
         this.log.error("handle failed", { message: (e as Error).message });

@@ -39,10 +39,13 @@ const log = logger("agent");
 const AUTO_REJECT = "auto-reject:";
 
 export interface AgentManagerOptions {
+  collaborate?: (botId:string, conversationId:string, op:string, args:unknown) => Record<string,unknown>;
+  deliverFile?: (botId:string, conversationId:string, op:string, args:unknown) => Promise<Record<string,unknown>>;
   store: Store;
   dataDir: string;
   runtimeDir: string | undefined;
   upstream: () => { baseUrl: string; apiKey: string };
+  upstreamFor?: (botId?:string,model?:string)=>Promise<{baseUrl:string;apiKey:string}>;
   enabled: boolean;
   turnTimeoutMs?: number;
   /** 代理已经在处理、却这么久没有任何进展（模型不回、工具不动、只在重试）就中止；等用户批准/回答不算 */
@@ -194,10 +197,31 @@ export class AgentManager {
       : undefined;
     this.bridge = new AgentBridge({
       upstream: o.upstream,
+      upstreamFor: o.upstreamFor,
       ask: (b) => this.ask(b),
       wait: (b) => this.wait(b),
       cancel: async (b) => void this.approvals.cancel(String(b?.id ?? ""), "agent"),
       memory: (b) => this.memoryOp(b),
+      channelFile: async (body) => {
+        try {
+          const botId = String(body?.botId || ''), sessionId = String(body?.sessionId || '');
+          const conversationId = this.o.store.conversationForSession(sessionId);
+          if (!conversationId || !this.hosts.has(botId) || !this.activeConvs.get(botId)?.has(conversationId) || !this.o.deliverFile) throw new Error('文件推送仅限当前有效的用户对话');
+          return await this.o.deliverFile(botId, conversationId, String(body?.op || ''), body?.args);
+        } catch (error) { return { error: error instanceof Error ? error.message : '文件推送失败' }; }
+      },
+      collaboration: async (body) => {
+        try {
+          const botId=String(body?.botId || ''), sessionId=String(body?.sessionId || '');
+          if (!this.hosts.has(botId) || !sessionId || this.taskOf(botId,sessionId) || this.ruleOf(botId,sessionId))
+            throw new Error('自动协作仅限当前有效的用户对话');
+          const conversationId=this.o.store.conversationForSession(sessionId);
+          if (!conversationId) throw new Error('自动协作只允许当前用户对话的主会话调用');
+          if (!this.activeConvs.get(botId)?.has(conversationId)) throw new Error('当前会话不在执行中');
+          if (!this.o.collaborate) throw new Error('自动协作未配置');
+          return this.o.collaborate(botId,conversationId,String(body?.op || ''),body?.args);
+        } catch(error) { return {error:error instanceof Error ? error.message : '协作调用失败'}; }
+      },
       steward: (b) => this.stewardCall(b),
       media: (b) => this.mediaOp(b),
       search: (b, signal) => this.searchOp(b, signal),
@@ -258,8 +282,12 @@ export class AgentManager {
         connections: () => this.o.connections?.available() ?? {},
         contextWindow: this.o.contextWindow,
         apiInfo: this.o.apiInfo,
-        effort: this.o.effort,
-        apiFallbacks: this.apiFallbacks,
+        effort: () => {
+          const effort = this.settings(botId).reasoningEffort;
+          return effort === "auto" ? (this.o.effort?.() ?? "auto") : effort;
+        },
+        apiFallbacks: this.o.store.getBot(botId)?.settings.modelSource && this.o.store.getBot(botId)?.settings.modelSource!=='default'
+          ? new ApiFallbacks(path.join(this.o.dataDir,'dsh',botId,`api-fallback.${encodeURIComponent(this.o.store.getBot(botId)!.settings.modelSource)}.json`)) : this.apiFallbacks,
         onWake: (conv) => this.onWake?.(botId, conv),
         onTaskEvent: (root, n) => this.tasks?.onEvent(botId, root, n),
         idle: () => this.idle(botId),

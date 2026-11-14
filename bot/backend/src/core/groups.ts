@@ -131,33 +131,68 @@ export class GroupChats {
   }
 
   /** 收到用户的一条消息：存下来，排好谁回答。正在答的话排在后面，后面的机器人和下一轮都能看到它 */
-  send(groupId: string, text: string, requestId = ''): void {
+  send(groupId: string, text: string, requestId = "", senderBotId = ""): void {
     const { store } = this.o;
     const g = store.getGroup(groupId);
     if (!g) return;
-    const key = requestId ? `${groupId}:${requestId}` : '';
-    const hash = key ? createHash('sha256').update(text).digest('hex') : '';
+    if (senderBotId && !g.members.includes(senderBotId))
+      throw new Error("消息来源不是该群成员");
+    const key = requestId ? `${groupId}:${requestId}` : "";
+    const hash = key ? createHash("sha256").update(text).digest("hex") : "";
     if (key) {
       const previous = this.requests.get(key);
       if (previous && Date.now() - previous.at < 600_000) {
-        if (previous.hash !== hash) throw new Error('同一请求编号不能用于不同内容');
+        if (previous.hash !== hash)
+          throw new Error("同一请求编号不能用于不同内容");
         return;
       }
-      for (const [id, item] of this.requests) if (Date.now() - item.at >= 600_000) this.requests.delete(id);
-      if (this.requests.size >= 8192) throw new Error('协作请求记录已满，请稍后重试');
+      for (const [id, item] of this.requests)
+        if (Date.now() - item.at >= 600_000) this.requests.delete(id);
+      if (this.requests.size >= 8192)
+        throw new Error("协作请求记录已满，请稍后重试");
     }
     const a = this.active.get(groupId);
-    store.addMessage(groupPeer(groupId), "user", text);
+    if (senderBotId && a?.stopped) throw new Error('协作已由用户停止，不能通过工具恢复');
+    if (senderBotId && a && a.relays >= MAX_RELAYS)
+      throw new Error("当前协作接力已达上限，等待用户继续后再发送");
+    if (senderBotId) {
+      const source = store.ensureConversation(
+        senderBotId,
+        "web",
+        groupPeer(groupId),
+        g.name,
+        "group",
+      );
+      store.addMessage(source.id, "assistant", text);
+    } else store.addMessage(groupPeer(groupId), "user", text);
     if (key) this.requests.set(key, { hash, at: Date.now() });
-    const targets = chooseTargets(text, this.members(g), a?.current || g.lastBot);
+    const members = this.members(g);
+    let targets = chooseTargets(text, members, a?.current || g.lastBot);
+    if (senderBotId) {
+      targets = targets.filter((id) => id !== senderBotId);
+      if (!targets.length)
+        targets = members
+          .filter((member) => member.id !== senderBotId)
+          .slice(0, 1)
+          .map((member) => member.id);
+      targets = targets.slice(0, Math.max(0, MAX_RELAYS - (a?.relays || 0)));
+    }
     if (a) {
       a.stopped = false;
-      a.relays = 0;
-      a.limitTold = false;
+      if (!senderBotId) {
+        a.relays = 0;
+        a.limitTold = false;
+      } else a.relays += targets.length;
       for (const id of targets) if (!a.queue.includes(id)) a.queue.push(id);
       return;
     }
-    const next: Active = { queue: targets, relays: 0, current: "", stopped: false, limitTold: false };
+    const next: Active = {
+      queue: targets,
+      relays: senderBotId ? targets.length : 0,
+      current: "",
+      stopped: false,
+      limitTold: false,
+    };
     this.active.set(groupId, next);
     void this.drain(groupId, next);
   }

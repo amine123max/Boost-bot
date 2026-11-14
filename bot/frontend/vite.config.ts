@@ -6,6 +6,7 @@ export default defineConfig({
   root: fileURLToPath(new URL("./", import.meta.url)),
   base: "/boost-bot/amb/static/workspace/",
   plugins: [vue()],
+  resolve: { dedupe: ['vue'] },
   publicDir: false,
   cacheDir:
     process.env.BOOST_VITE_CACHE_DIR ||

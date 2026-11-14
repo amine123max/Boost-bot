@@ -49,7 +49,7 @@ These are the packaging targets defined by the release workflow. Download availa
 | --- | --- |
 | Accounts | Import, authorization, availability checks, usage windows, and routing preferences. |
 | API gateway | OpenAI-style Responses and Chat Completions, streaming, tools, model mapping, and aggregate upstreams. |
-| Keys and models | Key ownership, access policies, quotas, model catalog, source routing, and pricing. |
+| Keys and models | Key ownership, access policies, quotas, model catalog, source routing, pricing, and local provider SVG labels (including a generic fallback for new families). |
 | Operations | Request logs, telemetry, account tests, proxy-node measurements, and managed sing-box integration. |
 | Bot workspace | Conversations, memory, tasks, approvals, messaging channels, and role-controlled tools. |
 | Desktop and appearance | Tray integration, user-controlled updates, light/dark modes, and 17 accent colors. |
@@ -58,7 +58,7 @@ Protocol capabilities depend on the configured upstream and model. See the [docu
 
 Management controls track pending operations independently. Each service process shares one FIFO management RPC queue across all browsers and users: six active requests, up to 256 waiting, and a 60-second queue wait limit. Local packages use the same queue in their local service. Each client also limits outstanding RPCs to six; waiting does not lock unrelated controls. Usage history details start collapsed. These limits are separate from gateway inference limits; Nginx forwards RPCs with a longer timeout and no automatic replay.
 
-Home and Keys display separate usage cards with absolute growth over the previous day. Cache hit rate growth uses percentage points (pp); no growth or missing comparison data displays `--`. Usage details start collapsed, including when returning to the page.
+Home and Keys display separate usage cards with signed changes over the previous day. Cache hit rate changes use percentage points (pp); equal values show unchanged, and unavailable comparisons are explicitly labelled. Sparse days with no dated activity count as zero unless undated legacy records make the baseline unknown. Usage details start collapsed, including when returning to the page.
 
 Settings → Text display offers independent Chinese, English, and numeric fonts, including Times New Roman for English and numbers, with a live preview. Choices are saved locally and applied before the page loads. Fonts use local installations with system fallbacks.
 
@@ -95,6 +95,12 @@ The current interface is shown with isolated demonstration data; no production c
 **Bot workspace**
 
 ![Bot workspace](docs/images/bot-workspace.png)
+
+**Per-Bot model source and compact settings**
+
+![Bot model source](docs/images/bot-model-sources.png)
+
+![Bot settings](docs/images/bot-settings.png)
 
 </details>
 

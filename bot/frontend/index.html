@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>Boost</title>
+    <style>
+      html {background:#171719;}
+      html[data-theme="light"] {background:#f7f7f8;}
+      .bot-loading-screen {position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg,#171719);color:var(--muted,#a1a1aa);font:12px system-ui;}
+      html[data-theme="light"] .bot-loading-screen {background:var(--bg,#f7f7f8);}
+      .bot-loading-screen .loading-ring {display:block;width:22px;height:22px;border:2px solid #8883;border-top-color:var(--accent,#2dd4bf);border-radius:50%;animation:boost-boot-spin 1s linear infinite;}
+      @keyframes boost-boot-spin {to{transform:rotate(360deg);}}
+      .boot-mask-leave-active {transition:opacity 180ms ease-out;pointer-events:none;}
+      .boot-mask-leave-to {opacity:0;}
+      html[data-motion="off"] .boot-mask-leave-active,html[data-motion="reduce"] .boot-mask-leave-active {transition:none;}
+      @media(prefers-reduced-motion:reduce){.bot-loading-screen .loading-ring {animation:none;}}
+      @media(prefers-reduced-motion:reduce){.boot-mask-leave-active {transition:none;}}
+    </style>
     <link rel="stylesheet" href="/boost-bot/amb/static/design/index.css" />
     <link rel="stylesheet" href="/boost-bot/amb/static/css/shell.css" />
     <link rel="stylesheet" href="/boost-bot/amb/static/css/chat.css" />
@@ -39,7 +52,7 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"><div class="bot-loading-screen" role="status" aria-label="正在载入Boost工作台"><span class="loading-ring"></span></div></div>
     <p id="boot-error" role="alert" hidden>
       工作台加载失败，请返回 Boost 后重新打开。
     </p>
