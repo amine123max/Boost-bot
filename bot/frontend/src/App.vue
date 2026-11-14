@@ -769,6 +769,7 @@ onBeforeUnmount(() => {
     <InfoPanel
       v-if="infoOpen && route.kind === 'chat' && bot"
       :bot="bot"
+      :bots="bots"
       :configure="configure"
       :pending="chat.pending"
       :conversation-id="chat.conversationId"

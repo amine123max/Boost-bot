@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { Bot, Approval, Task, LiveTurn, Message } from "../types";
 import { api, enc } from "../api";
 import Icon from "./Icon.vue";
@@ -9,8 +9,11 @@ import ConversationLabel from "./ConversationLabel.vue";
 import ConversationHistory from "./ConversationHistory.vue";
 import TaskOverviewCard from "./TaskOverviewCard.vue";
 import ConversationPlanCard from "./ConversationPlanCard.vue";
+import ChannelSettings from './ChannelSettings.vue';
+import { chatChannels, channelStateNames, type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
 const props = defineProps<{
   bot: Bot;
+  bots: Bot[];
   configure: boolean;
   pending: Approval[];
   conversationId: string;
@@ -34,13 +37,6 @@ interface Conversation {
   lastMessage?: string;
   updatedAt?: number;
 }
-interface Account {
-  key: string;
-  channel: string;
-  name?: string;
-  defaultBot?: string;
-  status?: { state?: string; detail?: string };
-}
 const conversations = ref<Conversation[]>([]),
   accounts = ref<Account[]>([]),
   memory = ref<string[]>([]),
@@ -48,6 +44,24 @@ const conversations = ref<Conversation[]>([]),
 const viewing = ref<Conversation | null>(null);
 const tasks = ref<Task[]>([]),
   tasksError = ref("");
+const channelDialog = ref<InstanceType<typeof ChannelSettings>>();
+const channelError = ref('');
+const channelBusy = ref(false);
+const channelGroups = computed(() => chatChannels.map(channel => ({
+  ...channel, accounts: accounts.value.filter(account => account.channel === channel.id),
+})));
+async function connect(channel: ChatChannel, account?: Account) {
+  if (!props.configure || channelBusy.value) return;
+  channelError.value = '';
+  channelBusy.value = true;
+  try {
+    if (account && !account.enabled) {
+      await api(`/channel-accounts/${enc(account.key)}/${enc(channel)}/settings`, { method: 'PUT', body: { enabled: true } });
+      await load();
+    } else await channelDialog.value?.begin(channel, account, props.bot.id, true);
+  } catch (e) { channelError.value = (e as Error).message; }
+  finally { channelBusy.value = false; }
+}
 let generation = 0,
   timer: ReturnType<typeof setTimeout> | undefined;
 async function load() {
@@ -100,6 +114,7 @@ watch(
     memory.value = [];
     tasks.value = [];
     tasksError.value = "";
+    channelError.value = '';
     void load();
   },
   { immediate: true },
@@ -108,19 +123,6 @@ onBeforeUnmount(() => {
   generation++;
   clearTimeout(timer);
 });
-const channelName = (channel: string) =>
-  (
-    ({
-      weixin: "微信",
-      feishu: "飞书",
-      web: "网页",
-      telegram: "Telegram",
-      slack: "Slack",
-      discord: "Discord",
-      dingtalk: '钉钉',
-      qq: 'QQ',
-    }) as Record<string, string>
-  )[channel] || channel;
 </script>
 <template>
   <aside class="panel" aria-label="智能体信息">
@@ -165,27 +167,34 @@ const channelName = (channel: string) =>
         <p v-if="tasksError" class="notice" role="alert">{{ tasksError }}</p>
         <p v-else-if="!tasks.length" class="task-empty">暂无后台任务</p>
       </div>
+      <template v-if="configure">
       <div class="list-head">渠道</div>
       <div class="list">
-        <div v-for="account in accounts" :key="account.key" class="row">
+        <p v-if="channelError" class="notice" role="alert">{{ channelError }}</p>
+        <template v-for="channel in channelGroups" :key="channel.id">
+        <div v-for="(account, index) in channel.accounts" :key="channel.id + account.key" class="row">
           <div class="who">
             <div class="name">
-              {{ account.name || channelName(account.channel) }}
+              {{ account.label || channel.name }}
             </div>
             <div class="sub">
-              {{ account.status?.detail || "默认由这个机器人回复" }}
+              <template v-if="account.label && account.label !== channel.name">{{ channel.name }} · </template>{{ !account.enabled ? '已停用' : account.status?.detail || (account.status?.state === 'connected' ? '默认由这个机器人回复' : channelStateNames[account.status?.state || ''] || '未连接') }}
             </div>
           </div>
-          <span class="channel-state" :class="{ 'is-connected': account.status?.state === 'connected' }">{{
-            account.status?.state === "connected"
-              ? "已连接"
-              : account.status?.state || "未连接"
-          }}</span>
+          <span v-if="account.enabled && ['connected', 'connecting'].includes(account.status?.state || '')" class="channel-state" :class="{ 'is-connected': account.status?.state === 'connected' }">{{ channelStateNames[account.status?.state || ''] }}</span>
+          <button v-else class="channel-state" :disabled="channelBusy" :aria-label="(account.label || channel.name) + (account.enabled ? '重新连接' : '启用')" @click="connect(channel.id, account)">{{ account.enabled ? '连接' : '启用' }}</button>
+          <button v-if="index === 0" class="icon-btn" :disabled="channelBusy" :aria-label="channel.name + '添加账号'" @click="connect(channel.id)"><Icon name="plus" :size="14" /></button>
         </div>
+        <div v-if="!channel.accounts.length" class="row">
+          <div class="who"><div class="name">{{ channel.name }}</div><div class="sub">{{ channel.connection }}</div></div>
+          <button class="channel-state" :disabled="channelBusy" :aria-label="'连接' + channel.name" @click="connect(channel.id)">连接</button>
+        </div>
+        </template>
         <div class="row">
           <span class="channel-manage-label"><button class="channel-manage" @click="emit('settings')">管理聊天渠道</button><HelpTip text="微信、飞书等账号由所有智能体共用，可在设置中管理。" label="管理聊天渠道说明" /></span>
         </div>
       </div>
+      </template>
       <div class="list-head">待审批</div>
       <div class="list">
         <button
@@ -242,6 +251,7 @@ const channelName = (channel: string) =>
       </div>
     </div>
   </aside>
+  <ChannelSettings v-if="configure" :key="bot.id" ref="channelDialog" :bots="bots" dialog-only @changed="load" @error="channelError = $event" />
   <ConversationHistory
     v-if="viewing"
     :key="viewing.id"

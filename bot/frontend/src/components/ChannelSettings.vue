@@ -5,15 +5,9 @@ import { api, enc } from "../api";
 import HelpTip from "./HelpTip.vue";
 import SelectControl from "./SelectControl.vue";
 import Modal from "./Modal.vue";
-const props = defineProps<{ bots: Bot[]; embedded?: boolean; request?: number }>();
-interface Account {
-  key: string;
-  channel: string;
-  label?: string;
-  defaultBot: string;
-  enabled: boolean;
-  status?: { state: string; detail?: string };
-}
+import { channelNames as names, channelStateNames as stateNames, type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
+const props = defineProps<{ bots: Bot[]; embedded?: boolean; request?: number; dialogOnly?: boolean }>();
+const emit = defineEmits<{ changed: []; error: [message: string] }>();
 const accounts = ref<Account[]>([]),
   error = ref(""),
   busy = ref(false),
@@ -25,6 +19,7 @@ const feishuMode = ref('qr'), sandbox = ref('false'), defaultBot = ref(''), labe
 interface FeishuFlow { id: string; state: string; qr: string; url: string; error: string }
 interface Login { state: string; qrContent?: string; qrDataUrl?: string; message?: string }
 const flow = ref<FeishuFlow>();
+const reconnecting = ref(false);
 let attempt = 0;
 let accountLoad = 0;
 const credentials = reactive({
@@ -37,16 +32,6 @@ const credentials = reactive({
   clientSecret: '',
 });
 const login = ref<Login | null>(null);
-const names: Record<string, string> = {
-  weixin: "微信",
-  feishu: "飞书",
-  telegram: "Telegram",
-  slack: "Slack",
-  discord: "Discord",
-  dingtalk: '钉钉',
-  qq: 'QQ',
-};
-const stateNames: Record<string, string> = { connected: '已连接', connecting: '连接中', disabled: '已停用', error: '连接失败', expired: '已过期', login_required: '待登录', paused: '已暂停' };
 let disposed = false,
   timer: ReturnType<typeof setTimeout> | undefined,
   accountTimer: ReturnType<typeof setTimeout> | undefined;
@@ -59,29 +44,41 @@ async function load() {
     error.value = (e as Error).message;
   }
 }
-async function begin(kind?: string) {
+let opening = false;
+async function begin(kind?: ChatChannel, account?: Account, botId?: string, autoQr = false) {
+  if (opening || busy.value || adding.value || disposed) return;
+  opening = true;
   error.value = "";
   login.value = null;
   flow.value = undefined;
+  reconnecting.value = !!account;
   if (kind) channel.value = kind;
-  defaultBot.value = props.bots[0]?.id || '';
-  label.value = '';
+  feishuMode.value = 'qr';
+  sandbox.value = 'false';
+  defaultBot.value = account?.defaultBot || botId || props.bots[0]?.id || '';
+  label.value = account?.label || '';
   for (const name of Object.keys(credentials) as Array<
     keyof typeof credentials
   >)
     credentials[name] = "";
   try {
-    key.value = (
+    key.value = account?.key || (
       await api<{ key: string }>("/channel-accounts/new-key", {
         method: "POST",
         body: {},
       })
     ).key;
+    if (disposed) return;
     adding.value = true;
+    if (autoQr && (channel.value === 'weixin' || channel.value === 'feishu')) await save();
   } catch (e) {
     error.value = (e as Error).message;
+    if (props.dialogOnly) emit('error', error.value);
+  } finally {
+    opening = false;
   }
 }
+defineExpose({ begin });
 async function save() {
   if (busy.value) return;
   busy.value = true;
@@ -92,7 +89,10 @@ async function save() {
     if (flow.value) { const previous = flow.value.id; flow.value = undefined; await api(`/connections/flows/${enc(previous)}`, { method: 'DELETE' }).catch(() => {}); }
     if (channel.value === 'feishu' && feishuMode.value === 'qr') {
       const response = await api<{ flow: FeishuFlow }>(`/channel-accounts/${enc(key.value)}/feishu/one-click`, { method: 'POST', body: {} });
-      if (ticket !== attempt || disposed) return;
+      if (ticket !== attempt || disposed) {
+        await api(`/connections/flows/${enc(response.flow.id)}`, { method: 'DELETE' }).catch(() => {});
+        return;
+      }
       flow.value = response.flow;
       login.value = { state: response.flow.state, qrDataUrl: response.flow.qr, qrContent: response.flow.url };
       void pollLogin(ticket);
@@ -131,7 +131,8 @@ async function finish() {
   const patch = { ...(defaultBot.value ? { defaultBot: defaultBot.value } : {}), ...(label.value.trim() ? { label: label.value.trim() } : {}) };
   if (Object.keys(patch).length) await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}/settings`, { method: 'PUT', body: patch });
   adding.value = false;
-  await load();
+  emit('changed');
+  if (!props.dialogOnly) await load();
 }
 async function pollLogin(ticket: number) {
   clearTimeout(timer);
@@ -202,23 +203,24 @@ async function close() {
 }
 watch(channel, async (_value, previous) => {
   ++attempt; clearTimeout(timer);
+  const previousKey = key.value;
   const previousFlow = flow.value;
   flow.value = undefined; login.value = null; verifyCode.value = '';
   if (previousFlow) await api(`/connections/flows/${enc(previousFlow.id)}`, { method: 'DELETE' }).catch(() => {});
-  if (previous === 'weixin' && key.value) await api(`/channel-accounts/${enc(key.value)}/weixin/cancel`, { method: 'POST', body: {} }).catch(() => {});
-});
+  if (previous === 'weixin' && previousKey) await api(`/channel-accounts/${enc(previousKey)}/weixin/cancel`, { method: 'POST', body: {} }).catch(() => {});
+}, { flush: 'sync' });
 watch(() => props.request, value => { if (value) void begin(); });
 watch(feishuMode, async () => {
   if (!adding.value || channel.value !== 'feishu') return;
   ++attempt; clearTimeout(timer);
   const previous = flow.value; flow.value = undefined; login.value = null;
   if (previous) await api(`/connections/flows/${enc(previous.id)}`, { method: 'DELETE' }).catch(() => {});
-});
+}, { flush: 'sync' });
 async function refreshAccounts() {
   await load();
   if (!disposed) accountTimer = setTimeout(refreshAccounts, 5000);
 }
-onMounted(refreshAccounts);
+onMounted(() => { if (!props.dialogOnly) void refreshAccounts(); });
 onBeforeUnmount(() => {
   disposed = true;
   clearTimeout(accountTimer);
@@ -226,7 +228,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <section :class="embedded ? 'channel-settings-embedded' : 'settings-card'">
+  <section v-if="!dialogOnly" :class="embedded ? 'channel-settings-embedded' : 'settings-card'">
     <h2 v-if="!embedded">
       聊天渠道<HelpTip
         text="所有智能体共用渠道账号，每个账号可设置默认回复 Bot。消息上下文仍按 Bot 和渠道会话隔离，凭据仅存于服务端。"
@@ -260,13 +262,13 @@ onBeforeUnmount(() => {
       添加渠道
     </button>
   </section>
-  <Modal v-if="adding" :busy="busy" title="添加聊天渠道" @close="close"
+  <Modal v-if="adding" :busy="busy" :title="reconnecting ? '重新连接聊天渠道' : '添加聊天渠道'" @close="close"
     ><form class="editor-form" @submit.prevent="save">
       <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
       <label
         >渠道<SelectControl
           v-model="channel"
-          :disabled="busy"
+          :disabled="busy || reconnecting"
           label="渠道"
           :options="
             Object.entries(names).map(([value, label]) => ({ value, label }))

@@ -8,6 +8,8 @@ The Company Research, PPT Master and US Stock Research entries open their own fu
 
 Chat channels support WeChat, Feishu, Telegram, Slack, Discord, DingTalk and QQ. Add independent devices/accounts through the existing **Add channel** dialog, with separate names, enable switches and default Bots. WeChat and Feishu support QR flows; other platforms use official bot credentials. DingTalk uses Stream; QQ uses signed HTTPS callbacks through the [nginx callback configuration](../nginx/README.md#qq-robot-callbacks--qq-机器人回调). Platform-specific concurrent-login limits still apply. **Connections** manages document/tool authorization and links to the shared channel manager without duplicating chat accounts.
 
+The Bot information panel also exposes all seven platform connection entries and the current Bot's account statuses. Connect opens the same dialog, defaults to the current Bot, and starts the QR flow where supported. Use the platform's plus button to add another independent account; reconnecting preserves the existing account key.
+
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 
 Direct chat, channel views and history share theme-colored reply bubbles. Timestamps and reply-copy controls sit below the bubble; user bubble colors and geometry remain unchanged. Copy preserves the original text, reports clipboard failures and offers a compatible fallback without including processing traces.
