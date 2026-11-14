@@ -152,9 +152,21 @@ export class BotInstaller {
     const persona = fs.readFileSync(path.join(runtimeDir, "persona.md"), "utf8");
     const skills = this.installSkills(botId, runtimeDir, uiDir, ref.skills);
     await this.o.stopAgent(botId);
+    const current = this.o.store.getBot(botId);
+    if (!current) throw new CatalogError("catalog_not_found", 404);
     this.o.store.updateBot(botId, {
       systemPrompt: persona,
-      settings: { ...bot.settings, ...settingsFor(entry), avatar: bot.settings.avatar || entry.avatar },
+      // Installation defaults must not overwrite the user's source, model or grants.
+      // A revised manifest may remove capabilities; it cannot grant new access.
+      settings: {
+        ...current.settings,
+        permission: entry.permissions.includes("workspace-write") ? current.settings.permission : "readonly",
+        computerUse: {
+          ...current.settings.computerUse,
+          enabled: current.settings.computerUse.enabled && entry.permissions.includes("computer-use"),
+        },
+        avatar: current.settings.avatar || entry.avatar,
+      },
       app: { ...ref, version: entry.version, ui: entry.ui.sha256, runtime: entry.runtime.sha256, permissions: entry.permissions, skills },
     });
     return "updated";

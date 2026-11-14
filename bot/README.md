@@ -10,6 +10,8 @@ The Company Research, PPT Master and US Stock Research workspaces include intera
 
 Direct chat, channel views and history share theme-colored reply bubbles. Timestamps and reply-copy controls sit below the bubble; user bubble colors and geometry remain unchanged. Copy preserves the original text, reports clipboard failures and offers a compatible fallback without including processing traces.
 
+Specialist template updates preserve current model sources, transport choices and user preferences, including settings saved while the old agent stops. Updates may revoke removed capabilities but never expand an existing user grant.
+
 ## Components
 
 | Directory | Responsibility |
