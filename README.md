@@ -64,7 +64,7 @@ Settings → Text display offers independent Chinese, English, and numeric fonts
 
 ## Screenshots
 
-The current interface is shown with isolated demonstration data; no production credentials are included.
+Management screenshots use isolated demonstration data. Bot screenshots show the installed runtime with a temporary acceptance conversation; private history and credentials are excluded.
 
 <details>
 <summary>Accounts, models, and platform keys</summary>
@@ -107,6 +107,8 @@ Web replies use a borderless layout; channel replies keep theme-matched bubbles 
 ![Bot settings](docs/images/bot-settings.png)
 
 Bot settings can relocate sandbox files into `Boost/bots/<workspace>/workspaces/<bot>` on another drive or folder. The change takes effect on restart and preserves historical file paths. See the [sandbox directory guide](docs/zh-CN/report/Bot沙箱与目录管理.md).
+
+![Bot sandbox storage](docs/images/bot-storage.png)
 
 </details>
 

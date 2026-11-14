@@ -64,7 +64,7 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 
 ## 界面预览
 
-截图展示当前界面，使用隔离的演示数据，不包含生产凭据。
+管理页截图使用隔离的演示数据；Bot 截图来自已安装版本与临时验收对话，不展示私人聊天记录或凭据。
 
 <details>
 <summary>账号、模型与平台密钥</summary>
@@ -101,6 +101,8 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 ![Bot 全局设置](docs/images/bot-settings.png)
 
 Bot 设置支持将沙箱工作文件迁移到其他磁盘或文件夹内的 `Boost/bots/<工作台>/workspaces/<智能体>`，重启生效并保留历史文件路径。参见[沙箱目录说明](docs/zh-CN/report/Bot沙箱与目录管理.md)。
+
+![Bot 沙箱存储设置](docs/images/bot-storage.png)
 
 </details>
 
