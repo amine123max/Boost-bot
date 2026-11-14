@@ -100,7 +100,7 @@ export function useBotActivity() {
     if (value.state === "working")
       return value.percent == null
         ? `${value.activeTasks || 1} 项任务进行中 · 尚未上报百分比`
-        : `任务进度 ${value.percent}%${value.stale ? " · 等待新估计" : ""}`;
+        : `任务进度 ${value.percent}%`;
     return {
       idle: "智能体待命",
       waiting: "等待你的回复",
