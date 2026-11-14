@@ -12,6 +12,7 @@ import type { Bot } from "../types";
 import type { Conversation } from "../conversation";
 import type { ModelMetrics } from "../model-metrics";
 import { DEFAULT_CONTEXT_TOKENS } from "../../../shared/context-window";
+import { contextOccupancy } from "../context-occupancy";
 import ModelSelect from "./ModelSelect.vue";
 import SelectControl from "./SelectControl.vue";
 import ProviderIcon from "./ProviderIcon.vue";
@@ -67,48 +68,15 @@ const liveContext = computed(() => {
     }
   return used;
 });
-const estimatedContext = computed(() => {
-  const breakdown = metrics.value?.context.breakdown;
-  return breakdown ? breakdown.messages + breakdown.systemPrompt : undefined;
-});
-const usedContext = computed(() => liveContext.value ?? metrics.value?.context.usedTokens ?? estimatedContext.value);
-const contextEstimated = computed(() => liveContext.value == null && metrics.value?.context.usedTokens == null && estimatedContext.value != null);
 const contextCapacity = computed(() => metrics.value?.windowTokens || DEFAULT_CONTEXT_TOKENS);
+const occupancy = computed(() => contextOccupancy(metrics.value?.context.breakdown, liveContext.value ?? metrics.value?.context.usedTokens, contextCapacity.value));
+const usedContext = computed(() => occupancy.value.total);
+const contextEstimated = computed(() => occupancy.value.estimated && usedContext.value !== null);
 const defaultCapacity = computed(() => !metrics.value?.windowTokens || metrics.value.windowBasis === 'default');
 const format = (value: number | null | undefined) =>
   value == null ? "—" : value.toLocaleString("zh-CN");
-const percent = computed(() =>
-  usedContext.value != null
-    ? Math.min(100, (100 * usedContext.value) / contextCapacity.value)
-    : null,
-);
-const breakdown = computed(() => [
-  {
-    label: "消息",
-    value: metrics.value?.context.breakdown.messages,
-    color: "#3b82f6",
-  },
-  {
-    label: "系统工具",
-    value: metrics.value?.context.breakdown.systemTools,
-    color: "#06b6d4",
-  },
-  {
-    label: "系统提示词",
-    value: metrics.value?.context.breakdown.systemPrompt,
-    color: "#8b5cf6",
-  },
-  {
-    label: "技能",
-    value: metrics.value?.context.breakdown.skills,
-    color: "#10b981",
-  },
-  {
-    label: "项目上下文",
-    value: metrics.value?.context.breakdown.projectContext,
-    color: "#f59e0b",
-  },
-]);
+const percent = computed(() => occupancy.value.percent);
+const breakdown = computed(() => occupancy.value.items);
 function place() {
   if (!trigger.value || !open.value) return;
   const r = trigger.value.getBoundingClientRect(),
@@ -325,7 +293,7 @@ onBeforeUnmount(() => {
             :aria-valuemin="0"
             :aria-valuemax="100"
           >
-            <span v-if="percent !== null" :style="{ width: percent + '%' }" />
+            <template v-if="percent !== null"><span v-for="item in breakdown.filter(part => part.value !== null && part.value > 0)" :key="item.key" class="context-meter-segment" :data-category="item.key" :style="{ width: item.width + '%', background: item.color }" :title="`${item.label}：${format(item.value)} Token${item.derived ? '（差额）' : '（估算）'}`" /></template>
             <span v-else class="context-meter-unavailable" />
           </div>
           <p class="model-menu-note">
@@ -337,8 +305,8 @@ onBeforeUnmount(() => {
           </p>
           <div class="context-estimates"
             ><p class="model-menu-caption">
-              文本估算<HelpTip
-                text="消息与提示词按文本粗估；工具、技能、项目上下文未独立计量时显示横线，不编造零值，也不与真实用量相加。"
+              上下文构成<HelpTip
+                text="分段颜色与下方分类一致，分类按文本估算。灰色为实测总量与已识别分类的差额，不能当作已知工具或技能用量。未计量的分类显示横线；分类超过实测时按估算总量展示。"
               />
             </p>
             <div
@@ -350,7 +318,7 @@ onBeforeUnmount(() => {
                 class="context-key"
                 :style="{ background: item.color }"
               /><span>{{ item.label }}</span
-              ><span>{{ format(item.value) }}</span>
+              ><span>{{ item.derived ? '≈ ' : '' }}{{ format(item.value) }}</span>
             </div></div
           ></SpringDisclosure
         >
@@ -492,6 +460,7 @@ onBeforeUnmount(() => {
   margin: 4px 0 8px;
 }
 .context-meter {
+  display: flex;
   height: 5px;
   margin: 10px 2px;
   background: var(--pill);
@@ -504,7 +473,7 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   background: var(--accent);
-  border-radius: inherit;
+  flex: none;
   transition: width 0.2s ease;
 }
 .context-breakdown-row {
@@ -514,6 +483,8 @@ onBeforeUnmount(() => {
   padding: 5px 2px;
   font-size: 11px;
 }
+.context-meter > .context-meter-segment:first-child { border-radius: 4px 0 0 4px; }
+.context-meter > .context-meter-segment:last-child { border-radius: 0 4px 4px 0; }
 .context-breakdown-row > span:last-child {
   margin-left: auto;
   color: var(--muted);

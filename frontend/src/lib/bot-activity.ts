@@ -7,6 +7,8 @@ export type BotActivityState =
   | "stopped"
   | "unavailable";
 export interface BotActivity {
+  /** UI-only provenance; raw service percentages remain unchanged. */
+  progressSource?: 'reported' | 'timer';
   available: boolean;
   stale?: boolean;
   sources?: string[];

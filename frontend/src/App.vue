@@ -22,6 +22,7 @@ import {
 import { useTelemetry } from "./composables/useTelemetry";
 import { uiPreferences } from "./composables/useUiPreferences";
 import SidebarSearch from "./components/SidebarSearch.vue";
+import { useSidebarMotion } from "./composables/useSidebarMotion";
 import { navigation } from "./lib/navigation";
 import SidebarTraffic from "./components/SidebarTraffic.vue";
 import { useLiveUsage } from "./composables/useLiveUsage";
@@ -38,6 +39,8 @@ const startupReady = useStartupReady(() =>
     : boost.ready,
 );
 const about = ref(false);
+const shell = ref<HTMLElement>();
+useSidebarMotion(shell);
 const refreshing = ref(false);
 function openBot(event: MouseEvent) {
   prepareBotLaunch(event, route.fullPath);
@@ -64,6 +67,7 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
   <div
     v-else
     class="app-shell"
+    ref="shell"
     :class="{ 'sidebar-collapsed': uiPreferences.compactSidebar, 'app-booting': !startupReady }"
   >
     <aside class="sidebar">

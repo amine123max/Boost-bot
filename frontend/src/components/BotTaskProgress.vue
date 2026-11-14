@@ -25,17 +25,14 @@ const progressColor = computed(() => {
 });
 const progressSweep = computed(() =>
   progress.value == null
-    ? 86.4
-    : Math.max(5.4, Math.min(100, progress.value)) * 3.6,
-);
-const progressHue = computed(
-  () => 120 * Math.min(1, Math.max(0, progress.value ?? 0) / 100),
+    ? 0
+    : Math.max(0, Math.min(100, progress.value)) * 3.6,
 );
 </script>
 <template>
   <span
     class="bot-task-progress"
-    :class="[activity.state, { compact, stale: activity.stale }]"
+    :class="[activity.state, { compact, stale: activity.stale, unknown: progress == null }]"
     role="progressbar"
     :aria-label="label"
     :aria-valuenow="progress ?? undefined"
@@ -49,20 +46,18 @@ const progressHue = computed(
       class="bot-task-ring"
       aria-hidden="true"
       :style="{
-        '--bot-task-progress-hue': `${activity.state === 'done' ? 120 : progressHue}deg`,
         '--bot-task-progress-sweep': `${progressSweep}deg`,
       }"
       :data-progress="progress ?? 'unknown'"
     >
       <span class="bot-task-track" />
       <span
-        v-if="activity.state !== 'idle' && activity.state !== 'unavailable'"
+        v-if="progress !== null && activity.state !== 'idle' && activity.state !== 'unavailable'"
         class="bot-task-arc"
-        :class="{ 'is-unknown': progress == null }"
       />
     </span>
-    <strong v-if="showValue && progress != null" class="bot-task-number">{{
-      progress
+    <strong v-if="showValue" class="bot-task-number">{{
+      progress ?? '—'
     }}</strong>
     <BoostBotAvatar
       v-else
@@ -74,15 +69,10 @@ const progressHue = computed(
   </span>
 </template>
 <style scoped>
-@property --bot-task-progress-hue {
-  syntax: "<angle>";
-  inherits: true;
-  initial-value: 0deg;
-}
 @property --bot-task-progress-sweep {
   syntax: "<angle>";
   inherits: true;
-  initial-value: 86.4deg;
+  initial-value: 0deg;
 }
 .bot-task-progress.compact {
   width: 32px;
@@ -114,7 +104,6 @@ const progressHue = computed(
   border-radius: 50%;
   pointer-events: none;
   transition:
-    --bot-task-progress-hue 500ms ease,
     --bot-task-progress-sweep 500ms ease;
 }
 .bot-task-track {
@@ -130,10 +119,7 @@ const progressHue = computed(
   border-radius: 50%;
   background: conic-gradient(
     from -90deg,
-    hsl(0 82% 48%) 0deg,
-    hsl(calc(var(--bot-task-progress-hue) / 2) 82% 48%)
-      calc(var(--bot-task-progress-sweep) / 2),
-    hsl(var(--bot-task-progress-hue) 82% 48%) var(--bot-task-progress-sweep),
+    currentColor 0deg var(--bot-task-progress-sweep),
     transparent var(--bot-task-progress-sweep) 1turn
   );
   -webkit-mask: radial-gradient(
@@ -164,24 +150,10 @@ const progressHue = computed(
     transparent var(--bot-task-progress-sweep) 1turn
   );
 }
-.bot-task-arc.is-unknown {
-  background: conic-gradient(
-    from -90deg,
-    var(--tray-muted, #8d929d) 0deg var(--bot-task-progress-sweep),
-    transparent var(--bot-task-progress-sweep) 1turn
-  );
-}
-.working .bot-task-arc.is-unknown {
-  animation: task-search 1.4s linear infinite;
-}
+.unknown .bot-task-track { opacity: 0.3; }
 .bot-task-progress.done {
   background: color-mix(in srgb, #22c55e 9%, transparent);
   border-radius: 50%;
-}
-@keyframes task-search {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .idle .bot-task-track,
 .unavailable .bot-task-track {
@@ -198,9 +170,11 @@ const progressHue = computed(
   color: var(--tray-muted, #8d929d);
 }
 @media (prefers-reduced-motion: reduce) {
-  .bot-task-arc {
+  .bot-task-arc, .bot-task-ring {
     transition: none;
     animation: none !important;
   }
 }
+:global(html[data-motion="off"]) .bot-task-ring,
+:global(html[data-motion="reduce"]) .bot-task-ring { transition: none; }
 </style>

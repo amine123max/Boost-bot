@@ -22,9 +22,9 @@ export interface ModelMetrics {
     breakdown: {
       messages: number;
       systemPrompt: number;
-      systemTools: null;
-      skills: null;
-      projectContext: null;
+      systemTools: number | null;
+      skills: number | null;
+      projectContext: number | null;
     };
   };
 }

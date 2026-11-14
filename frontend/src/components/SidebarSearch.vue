@@ -149,6 +149,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", shortcut));
   background: var(--hover);
 }
 .sidebar-collapsed .sidebar-search {
+  width: 56px;
   justify-content: center;
   padding: 8px 0;
   border-color: transparent;

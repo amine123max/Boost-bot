@@ -1663,6 +1663,7 @@ a.icon-button {
   padding: 20px 8px 12px;
 }
 .sidebar-collapsed .brand {
+  width: 56px;
   padding: 0 7px 25px;
   justify-content: center;
 }
@@ -1671,6 +1672,7 @@ a.icon-button {
   display: none;
 }
 .sidebar-collapsed .nav-item {
+  width: 56px;
   display: flex;
   justify-content: center;
   gap: 0;
@@ -4960,6 +4962,7 @@ html[data-theme-transition="light"]::view-transition-old(root) {
   .nav-item > span:not(.boost-icon) { text-align: center; padding-right: 6px; }
 }
 .nav-item { font-size: 18px; }
+.nav-item > span:not(.boost-icon) { white-space: nowrap; }
 
 .settings-grid .panel-header h2, .panel h3 { font-size: 18px; font-weight: 700; }
 .settings-grid .setting-row .setting-label, .settings-grid .detail-line, .settings-grid .setting-row, .settings-grid .setting-link { font-size: 16px; font-weight: 400; }

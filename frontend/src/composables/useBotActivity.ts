@@ -3,6 +3,7 @@ import { botClient } from "@/lib/api/bot-client";
 import { appClient } from "@/lib/api/app-client";
 import { isTauriRuntime } from "@/lib/api/transport-runtime";
 import { readBotActivity, mergeActivities } from "@/lib/bot-activity";
+import { TaskProgressClock } from "@/lib/task-progress-clock";
 import { boost } from "./useBoost";
 
 // One sampler per webview; mounting a preview does not duplicate disk scans/RPCs.
@@ -16,7 +17,7 @@ let generation = 0;
 const timers: Partial<
   Record<"local" | "hosted", ReturnType<typeof setTimeout>>
 > = {};
-const activity = computed(() =>
+const observed = computed(() =>
   mergeActivities(
     (["local", "hosted"] as const).map((kind) => {
       const value = kind === "local" ? local.value : hosted.value;
@@ -30,6 +31,8 @@ const activity = computed(() =>
     }),
   ),
 );
+const progressClock = new TaskProgressClock();
+const activity = computed(() => progressClock.project(observed.value, now.value));
 async function sample(kind: "local" | "hosted", run: number) {
   if (!subscribers || generation !== run) return;
   timers[kind] = undefined;
@@ -96,7 +99,7 @@ export function useBotActivity() {
     const value = activity.value;
     if (value.state === "working")
       return value.percent == null
-        ? `${value.activeTasks || 1} 项任务进行中`
+        ? `${value.activeTasks || 1} 项任务进行中 · 尚未上报百分比`
         : `任务进度 ${value.percent}%${value.stale ? " · 等待新估计" : ""}`;
     return {
       idle: "智能体待命",
