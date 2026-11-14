@@ -8,6 +8,7 @@ import { botAppearance, setBotAppearance } from '@/composables/useBotAppearance'
 import { consumeBotLaunch } from '@/composables/useBotLaunch';
 import { markStartupContentReady } from '@/composables/useStartupReady';
 import { boost, initialize, saveSettings } from '@/composables/useBoost';
+import { uiPreferences } from '@/composables/useUiPreferences';
 const router = useRouter();
 const source = ref(''), error = ref(''), busy = ref(false), loaded = ref(false);
 const frame = ref<HTMLIFrameElement>();
@@ -35,6 +36,7 @@ async function connect() {
     const url = new URL(launch.url, location.href);
     if (url.origin !== location.origin && !(url.protocol === 'http:' && url.hostname === '127.0.0.1')) throw new Error('Boost Bot 返回了无效地址');
     url.searchParams.set('boostTheme', document.documentElement.dataset.theme || 'system');
+    url.searchParams.set('boostAccent', uiPreferences.themeColor);
     source.value = url.href;
     clearTimeout(readyTimeout);
     readyTimeout = setTimeout(() => {
@@ -49,7 +51,7 @@ async function connect() {
 function sync() {
   if (!source.value) return;
   const themeMode = boost.settings?.theme === 'business' ? 'light' : boost.settings?.theme === 'tech' ? 'system' : 'dark';
-  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: themeMode }, new URL(source.value).origin);
+  frame.value?.contentWindow?.postMessage({ type: 'boost:appearance', preferences: { ...botAppearance }, theme: themeMode, accent: uiPreferences.themeColor }, new URL(source.value).origin);
 }
 function onFrameLoad() {
   loaded.value = true;
@@ -116,6 +118,7 @@ async function reveal() {
 function back() { return router.push('/'); }
 watch(botAppearance, sync, { deep: true });
 watch(() => boost.settings?.theme, sync);
+watch(() => uiPreferences.themeColor, sync);
 watch(() => boost.ready, ready => { if (ready && !source.value) void connect(); }, { immediate: true });
 watch(() => boost.error, value => { if (!boost.connected && value) error.value = value; });
 onMounted(() => { window.addEventListener('message', message); });

@@ -7,6 +7,8 @@
 - [CONTRIBUTING](CONTRIBUTING.md)
 - [自动更新与 GitHub 发布](release/自动更新与GitHub发布.md)
 - [Boost 客户端配置](report/Boost客户端配置.md)
+- [Bot 沙箱与目录管理](report/Bot沙箱与目录管理.md)
+- [悬浮窗与本机任务监测](report/悬浮窗与本机任务监测.md)
 - [FAQ 与账号命中规则](report/FAQ与账号命中规则.md)
 - [Nginx 反向代理导致缓存命中偏低说明](report/Nginx反向代理导致缓存命中偏低说明.md)
 - [service部署出现Cloudflare 403错误修复说明](report/service部署出现Cloudflare 403错误修复说明.md)

@@ -88,13 +88,19 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 
 **Bot 工作台**
 
+网页回复采用无框布局，渠道回复保留主题同色气泡；时间与复制位于正文外。侧栏支持收起为图标，并保留动态 Boost 品牌。
+
 ![Bot 工作台](docs/images/bot-workspace.png)
+
+![紧凑智能体库](docs/images/bot-library.png)
 
 **独立模型来源与紧凑设置**
 
 ![Bot 模型来源](docs/images/bot-model-sources.png)
 
 ![Bot 全局设置](docs/images/bot-settings.png)
+
+Bot 设置支持将沙箱工作文件迁移到其他磁盘或文件夹内的 `Boost/bots/<工作台>/workspaces/<智能体>`，重启生效并保留历史文件路径。参见[沙箱目录说明](docs/zh-CN/report/Bot沙箱与目录管理.md)。
 
 </details>
 

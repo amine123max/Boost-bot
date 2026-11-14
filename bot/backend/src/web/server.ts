@@ -2,6 +2,8 @@ import http from "node:http";
 import { validateBotInput } from '../core/bot-management.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
 import { conversationMetrics } from "../core/conversation-metrics.js";
+import { workspaceRoot } from "../core/workspace-storage.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../../../shared/context-window.js";
 import { progressSnapshot, type TaskProgress } from "../agent/progress.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -276,18 +278,18 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     store: app.store,
     attachments: async (groupId, targetBot, messages) => {
       const shared = new Map<number, string>();
-      const workspace = botWorkspace(cfg.dataDir, targetBot);
+      const workspace = botWorkspace(cfg.dataDir, targetBot, workspaceRoot(cfg));
       if (!workspace) throw new Error('协作工作区不可用');
       for (const message of messages) {
         if (!message.botId || message.botId === targetBot || !message.files?.length) continue;
-        const origin = botWorkspace(cfg.dataDir, message.botId);
+        const origin = botWorkspace(cfg.dataDir, message.botId, workspaceRoot(cfg));
         if (!origin) throw new Error('来源工作区不可用');
         const delivered = app.store.deliveredFiles(message.conversationId);
         const artifacts = [];
         for (const filename of message.files) {
           const file = resolveFile(filename, { workspace: origin, dataDir: cfg.dataDir, delivered });
           if (!file) throw new Error('协作交付文件不存在或无读取权限');
-          artifacts.push(await handoffFile({ groupId, sourceBot: message.botId, source: file.path, workspace, boundary: cfg.dataDir }));
+          artifacts.push(await handoffFile({ groupId, sourceBot: message.botId, source: file.path, workspace, boundary: workspaceRoot(cfg) }));
         }
         shared.set(message.id, JSON.stringify(artifacts));
       }
@@ -582,6 +584,11 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     if (p === "/settings") {
       if (m === "PUT") {
         const b = await readJson(req);
+        if (b.workspaceParent !== undefined) {
+          if (typeof b.workspaceParent !== "string") throw new HttpError(400, "沙箱路径必须为文件夹路径");
+          try { app.workspaceStorage.validate(b.workspaceParent); }
+          catch (error) { throw new HttpError(400, (error as Error).message); }
+        }
         if (b.defaultModel !== undefined) app.setDefaultModel(String(b.defaultModel));
         if (b.reasoningEffort !== undefined) {
           const effort = REASONING_EFFORTS.find((x) => x === b.reasoningEffort);
@@ -627,6 +634,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
             ...(url !== undefined ? { url } : {}),
           });
         }
+        if (typeof b.workspaceParent === "string") app.workspaceStorage.schedule(b.workspaceParent);
       } else if (m !== "GET") throw new HttpError(405, "method not allowed");
       return send(res, 200, {
         defaultModel: cfg.llm.defaultModel,
@@ -640,6 +648,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         desktop: !!app.desktop,
         listen: { host, port: boundPort, tokenRequired: !!token },
         dataDir: cfg.dataDir,
+        workspace: app.workspaceStorage.view(),
         webSearch: app.webSearchView(),
       });
     }
@@ -1281,7 +1290,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const desktop = app.desktop;
         if (m === "POST" && !desktop?.openPath) throw new HttpError(400, t("web.desktopOnly"));
         const input = m === "GET" ? url.searchParams.get("path") : (await readJson(req)).path;
-        const ws = botWorkspace(cfg.dataDir, conv.botId);
+        const ws = botWorkspace(cfg.dataDir, conv.botId, workspaceRoot(cfg));
         const f = ws ? resolveFile(String(input ?? ""), { workspace: ws, dataDir: cfg.dataDir, delivered: app.store.deliveredFiles(conv.id) }) : undefined;
         if (!f) throw new HttpError(404, t("web.fileNotFound"));
         if (m === "GET") return sendFile(req, res, f);
@@ -1414,10 +1423,12 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const model = conv?.model || bot.defaultModel || app.config.llm.defaultModel;
         // Hosted catalogs currently omit capability metadata: unknown stays unknown.
         const info = bot.settings.modelSource === "default" ? (await app.modelInfo())[model] : undefined;
+        const runtimeWindow = app.agent.contextWindow(id, model);
         return send(res, 200, {
           model,
           reasoning: {value: bot.settings.reasoningEffort, supported: info?.effort ?? null},
-          windowTokens: info?.context ?? null,
+          windowTokens: info?.context ?? runtimeWindow ?? DEFAULT_CONTEXT_TOKENS,
+          windowBasis: info?.context ? "catalog" : runtimeWindow ? "runtime" : "default",
           agentAvailable: app.agent.available,
           ...conversationMetrics(app.store, bot, convId, model, live.list(convId)[0]?.afterMessageId),
         });

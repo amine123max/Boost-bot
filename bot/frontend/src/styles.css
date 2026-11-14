@@ -1,4 +1,18 @@
 @import "../../../frontend/src/styles/surfaces.css";
+@import "../../../frontend/src/styles/accent-colors.css";
+:root[data-theme][data-accent] {
+  --accent: var(--accent-light);
+  --primary: var(--accent);
+  --primary-hover: color-mix(in srgb, var(--accent) 88%, #000);
+  --primary-press: color-mix(in srgb, var(--accent) 75%, #000);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --send-bg: var(--primary);
+}
+:root[data-theme="dark"][data-accent] {
+  --accent: var(--accent-dark);
+  --primary-hover: color-mix(in srgb, var(--accent) 85%, #fff);
+  --primary-press: color-mix(in srgb, var(--accent) 90%, #000);
+}
 /* Vue uses the original design/, shell.css, chat.css and boost.css unchanged.
    These rules only cover added controls; application geometry and theme remain there. */
 @layer app {
@@ -611,18 +625,18 @@
   }
   .catalog-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 300px));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(min(184px, 100%), 184px));
+    gap: 12px;
   }
   .catalog-card {
-    padding: 16px;
+    padding: 12px;
     border: 0;
     background: var(--well);
     border-radius: 10px;
     display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    flex-direction: row;
+    gap: 12px;
   }
   .catalog-icon {
     color: var(--accent);
@@ -636,9 +650,17 @@
     color: var(--muted);
   }
   .catalog-card .primary-button {
-    margin-top: auto;
+    margin-top: 6px;
+    padding: 5px 10px;
+    min-height: 28px;
+    font-size: 11px;
   }
+  .catalog-card-body { min-width: 0; flex: 1; }
+  .catalog-card-body h3 { font-size: 13px; line-height: 1.4; margin: 0; }
   .create-card {
+    grid-column: 1 / -1;
+    width: max-content;
+    max-width: 100%;
     min-height: 48px;
     align-self: start;
     flex-direction: row;

@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<{
   role?: string;
   createdAt?: number;
   interim?: string[];
+  framed?: boolean;
 }>(), { role: "assistant" });
 const copied = ref(false), error = ref("");
 let timer: ReturnType<typeof setTimeout> | undefined, disposed = false;
@@ -48,7 +49,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 </script>
 
 <template>
-  <div class="message-content" :class="{ 'user-content': role === 'user', 'system-content': role === 'system' }">
+  <div class="message-content" :class="{ 'user-content': role === 'user', 'system-content': role === 'system', 'framed-content': framed }">
     <div class="message-bubble">
       <Markdown v-for="(value, index) in interim" :key="index" :text="value" />
       <Markdown v-if="text" :text="text" />
@@ -72,7 +73,9 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 
 <style scoped>
 .message-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; }
-.message-bubble { min-width: 0; max-width: 100%; padding: var(--space-2-5) var(--space-4); border-radius: var(--r-bubble); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); }
+.message-bubble { min-width: 0; max-width: 100%; padding: var(--space-1) 0; }
+.framed-content .message-bubble, .user-content .message-bubble { padding: var(--space-2-5) var(--space-4); border-radius: var(--r-bubble); }
+.framed-content .message-bubble { background: var(--accent-soft); box-shadow: none; }
 .user-content { align-items: flex-end; }
 .user-content .message-bubble { background: var(--bubble-user); box-shadow: none; }
 .system-content .message-bubble { box-shadow: none; }

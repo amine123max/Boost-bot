@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { resolveThemeColor } from "../../../frontend/src/lib/theme-colors";
 import {
   applyThemeWithTransition,
   type ThemeOrigin,
@@ -9,6 +10,13 @@ import {
 } from "../../shared/appearance/preferences.js";
 
 export const brandAppearance = ref(loadBotAppearance());
+function applyAccent(value: unknown) {
+  const accent = resolveThemeColor(value);
+  document.documentElement.dataset.accent = accent;
+  try { localStorage.setItem("boost.bot.accent.v1", accent); } catch { /* storage optional */ }
+}
+try { applyAccent(new URLSearchParams(location.search).get("boostAccent") || localStorage.getItem("boost.bot.accent.v1") || JSON.parse(localStorage.getItem("boost.ui.v1") || "{}").themeColor); }
+catch { applyAccent(undefined); }
 function savedTheme() {
   try {
     return (
@@ -71,6 +79,7 @@ window.addEventListener("message", (event) => {
   if (event.source !== parent || event.data?.type !== "boost:appearance")
     return;
   brandAppearance.value = normalizeBotAppearance(event.data.preferences);
+  if (event.data.accent !== undefined) applyAccent(event.data.accent);
   if (["light", "dark", "system"].includes(event.data.theme))
     setTheme(event.data.theme, true);
 });

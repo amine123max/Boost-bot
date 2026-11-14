@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
               :conversation-id="conversation.id"
               :message-id="message.id"
             />
-            <MessageBubble :text="message.content" :role="message.role" :created-at="message.createdAt">
+            <MessageBubble framed :text="message.content" :role="message.role" :created-at="message.createdAt">
             <button
               v-for="f in message.files"
               :key="f.path"
@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
           </div>
         </article>
         <section v-if="turn">
-          <ActivityTrace :steps="turn.steps" running /><MessageBubble
+          <ActivityTrace :steps="turn.steps" running /><MessageBubble framed
             v-if="turn.interim.length" :text="turn.interim.join('\n\n')"
           /><button class="danger-button" :disabled="stopping" @click="stop">
             {{ stopping ? "正在停止" : "停止" }}

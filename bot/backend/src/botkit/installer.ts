@@ -30,6 +30,7 @@ export class CatalogError extends Error {
 
 export interface InstallerOptions {
   dataDir: string;
+  workspaceRoot?: () => string;
   store: Store;
   catalog: BotCatalog;
   stopAgent: (botId: string) => Promise<void>;
@@ -50,7 +51,7 @@ export class BotInstaller {
   constructor(readonly o: InstallerOptions) {}
 
   workspace(botId: string): string {
-    return path.join(this.o.dataDir, "workspaces", botId);
+    return path.join(this.o.workspaceRoot?.() || path.join(this.o.dataDir, "workspaces"), botId);
   }
   private skillsDir(botId: string): string {
     return path.join(this.o.dataDir, "dsh", botId, "skills");

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import ModelLabel from "./ModelLabel.vue";
 import { computed } from "vue";
 import type { AggregateApi } from "@/types";
 import type { QuotaModelPoolItem } from "@/types/quota";
@@ -27,9 +26,6 @@ const records = computed(() => {
     api,
     balance: readAggregateBalance(api),
     quota: quotas[api.id],
-    models: api.modelSlugs.length
-      ? api.modelSlugs
-      : quotas[api.id]?.models || [],
   }));
 });
 </script>
@@ -63,7 +59,7 @@ const records = computed(() => {
       </thead>
       <tbody>
         <tr v-for="row in records" :key="row.api.id">
-          <td data-label="供应商 / URL / 模型">
+          <td data-label="供应商 / URL">
             <h3
               class="record-name"
               :title="row.api.supplierName || row.api.url"
@@ -72,20 +68,6 @@ const records = computed(() => {
             </h3>
             <p class="record-subtext record-url" :title="row.api.url">
               {{ row.api.url }}
-            </p>
-            <p
-              v-if="row.api.modelOverride"
-              class="record-subtext"
-              :title="row.api.modelOverride"
-            >
-              <ModelLabel :model="row.api.modelOverride" />
-            </p>
-            <p
-              class="record-subtext record-all-models"
-              :title="row.models.join(', ')"
-            >
-              <span v-if="!row.models.length">全部 API 模型</span>
-              <span v-else class="record-model-labels"><ModelLabel v-for="model in row.models" :key="model" :model="model" /></span>
             </p>
             <p v-if="importedCounts[row.api.id] != null" class="record-subtext">
               {{ importedCounts[row.api.id] }} 个模型已导入

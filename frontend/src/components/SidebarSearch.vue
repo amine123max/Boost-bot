@@ -151,11 +151,14 @@ onBeforeUnmount(() => document.removeEventListener("keydown", shortcut));
 .sidebar-collapsed .sidebar-search {
   justify-content: center;
   padding: 8px 0;
+  border-color: transparent;
+  background: transparent;
 }
 .sidebar-collapsed .sidebar-search > span:not(.boost-icon),
 .sidebar-collapsed .sidebar-search kbd {
   display: none;
 }
+.sidebar-collapsed .sidebar-search:focus-visible { outline: none; color: var(--blue); background: var(--blue-soft); }
 .navigation-search-field {
   display: flex;
   align-items: center;
@@ -208,9 +211,12 @@ onBeforeUnmount(() => document.removeEventListener("keydown", shortcut));
   color: var(--muted);
 }
 @media (max-width: 760px) {
+  .sidebar-search:focus-visible { outline: none; color: var(--blue); background: var(--blue-soft); }
   .sidebar-search {
     justify-content: center;
     padding: 8px 0;
+    border-color: transparent;
+    background: transparent;
   }
   .sidebar-search > span:not(.boost-icon),
   .sidebar-search kbd {

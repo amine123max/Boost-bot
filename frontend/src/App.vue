@@ -67,6 +67,7 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
     :class="{ 'sidebar-collapsed': uiPreferences.compactSidebar, 'app-booting': !startupReady }"
   >
     <aside class="sidebar">
+      <button class="sidebar-edge-toggle" type="button" :aria-expanded="!uiPreferences.compactSidebar" aria-controls="boost-sidebar-content" :aria-label="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" :title="uiPreferences.compactSidebar ? '展开侧边栏' : '收起侧边栏'" @click="uiPreferences.compactSidebar = !uiPreferences.compactSidebar"><span aria-hidden="true" /></button>
       <RouterLink class="brand" to="/bot/" aria-label="Boost 智能体" title="双击左上角动态智能体进入 Bot" @click.prevent @keydown.enter.prevent="openBotFromKeyboard"
         ><span class="brand-avatar-trigger" aria-hidden="true" @click.stop.prevent @dblclick.stop.prevent="openBot"><BoostBotAvatar ambient /></span><span
           class="brand-word"
@@ -74,7 +75,7 @@ onMounted(() => { if (!closePrompt) void initialize({ startService: !route.path.
         ></RouterLink
       >
       <SidebarSearch />
-      <nav aria-label="主导航">
+      <nav id="boost-sidebar-content" aria-label="主导航">
         <RouterLink
           v-for="item in navigation.filter((n) => !n.admin || isAdmin)"
           :key="item.path"

@@ -9,6 +9,7 @@ import { KeyedQueue } from "./core/queue.js";
 import { CollaborationService } from './core/collaboration.js';
 import { BotManagement } from './core/bot-management.js';
 import { ChannelDelivery } from './core/channel-delivery.js';
+import { WorkspaceStorage, workspaceRoot } from './core/workspace-storage.js';
 import { deferNotice, interruptedText, takeInterrupted, type Interrupted } from "./core/recovery.js";
 import { Outbox } from "./core/outbox.js";
 import { Delivery, type DeliveryOptions } from "./core/delivery.js";
@@ -171,6 +172,7 @@ export class App {
   readonly collaboration: CollaborationService;
   readonly botManagement: BotManagement;
   readonly channelDelivery: ChannelDelivery;
+  readonly workspaceStorage: WorkspaceStorage;
   readonly magpie: MagpieSupervisor | undefined;
   readonly models: ModelClient;
   readonly modelSources: ModelSources;
@@ -243,7 +245,8 @@ export class App {
     this.store = new Store(path.join(config.dataDir, "boost-bot.db"));
     this.collaboration = new CollaborationService(this.store);
     this.botManagement = new BotManagement(this.store, id => this.startBot(id));
-    this.channelDelivery = new ChannelDelivery(this.store, config.dataDir, () => this.runtime);
+    this.workspaceStorage = new WorkspaceStorage(config);
+    this.channelDelivery = new ChannelDelivery(this.store, config.dataDir, () => this.runtime, () => workspaceRoot(config));
     this.outbox = new Outbox(this.store);
     this.delivery = new Delivery({ store: this.store, outbox: this.outbox, timeZone: opts.timeZone, ...opts.deliveryLimits });
     this.access = new AccessControl(this.store, { notify: (to, text, id) => this.reach(to, text, id) });
@@ -264,6 +267,7 @@ export class App {
     this.catalog = new BotCatalog({ dataDir: config.dataDir, appVersion: appVersion(), ...catalogConfig(), fetch: () => this.desktop?.fetch });
     this.botInstaller = new BotInstaller({
       dataDir: config.dataDir,
+      workspaceRoot: () => workspaceRoot(config),
       store: this.store,
       catalog: this.catalog,
       stopAgent: (id) => this.agent.stopBot(id),
@@ -271,6 +275,7 @@ export class App {
       startBot: (id) => this.startBot(id),
     });
     this.agent = new AgentManager({
+      workspaceRoot: () => workspaceRoot(config),
       collaborate: (botId, conversationId, op, args) => this.collaboration.tool(botId, conversationId, op, args),
       deliverFile: (botId, conversationId, op, args) => this.channelDelivery.tool(botId, conversationId, op, args),
       store: this.store,
@@ -313,7 +318,7 @@ export class App {
             geminiBaseUrl: () => (!this.magpie ? config.magpie.externalBaseUrl : this.account instanceof NewApiAccountManager && this.account.active ? this.account.baseUrl : modelflareBaseUrl(this.config.modelflare.line)).replace(/\/v1\/?$/, "/v1beta"),
             keyFor: (botId) => !this.magpie ? config.magpie.externalApiKey : this.account instanceof NewApiAccountManager && this.account.active ? this.account.mediaKey : this.botKey(botId),
             headers: () => this.requestHeaders(),
-            workspace: (botId) => path.join(config.dataDir, "workspaces", botId),
+            workspace: (botId) => path.join(workspaceRoot(config), botId),
             defaults: () => ({ image: this.config.media.imageModel, video: this.config.media.videoModel }),
             pricingUrl: () => !this.magpie ? '' : `${modelflareIssuer()}/api/pricing`,
             available: async (kind) => this.account instanceof NewApiAccountManager && this.account.active ? this.account.mediaModels(kind) : undefined,
@@ -733,6 +738,8 @@ export class App {
   async start(): Promise<void> {
     // 同一个数据目录只能有一个宿主（两个调度器会把规则跑两遍、两个渠道连接抢同一个微信）：桌面版另有单实例锁
     this.lock ??= lockDataDir(this.config.dataDir);
+    this.workspaceStorage.activate();
+    if (this.workspaceStorage.view().error) this.notice("warn", this.workspaceStorage.view().error);
     if (this.magpie) {
       try {
         await this.magpie.start();

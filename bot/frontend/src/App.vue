@@ -701,7 +701,7 @@ onBeforeUnmount(() => {
                 class="catalog-card"
               >
                 <BotAvatar :bot="bots.find((item) => item.id === entry.instanceId) || { id: entry.id, name: localized(entry.name) } as Bot" :size="54" />
-                <div class="catalog-card-title"><h3>{{ localized(entry.name) }}</h3>
+                <div class="catalog-card-body"><div class="catalog-card-title"><h3>{{ localized(entry.name) }}</h3>
                 <HelpTip
                   :text="localized(entry.description || entry.summary)"
                   label="查看能力说明"
@@ -713,6 +713,7 @@ onBeforeUnmount(() => {
                 >
                   {{ entry.instanceId ? "打开应用" : "添加智能体" }}
                 </button>
+                </div>
               </article>
               <button class="catalog-card create-card" @click="openBot()">
                 <Icon name="plus" :size="16" />

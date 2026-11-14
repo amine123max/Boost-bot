@@ -43,6 +43,7 @@ export interface AgentManagerOptions {
   deliverFile?: (botId:string, conversationId:string, op:string, args:unknown) => Promise<Record<string,unknown>>;
   store: Store;
   dataDir: string;
+  workspaceRoot?: () => string;
   runtimeDir: string | undefined;
   upstream: () => { baseUrl: string; apiKey: string };
   upstreamFor?: (botId?:string,model?:string)=>Promise<{baseUrl:string;apiKey:string}>;
@@ -260,6 +261,10 @@ export class AgentManager {
     return this.o.enabled && !!this.o.runtimeDir;
   }
 
+  contextWindow(botId: string, model: string): number | undefined {
+    return this.hosts.get(botId)?.contextWindow(model);
+  }
+
   start(): void {
     this.approvals.start();
     if (this.o.enabled && !this.o.runtimeDir) log.warn("DSH runtime not found; agent mode disabled (plain chat fallback)");
@@ -271,6 +276,7 @@ export class AgentManager {
       h = new AgentHost({
         botId,
         dataDir: this.o.dataDir,
+        workspaceRoot: this.o.workspaceRoot,
         runtimeDir: this.o.runtimeDir!,
         bridge: this.bridge,
         store: this.o.store,

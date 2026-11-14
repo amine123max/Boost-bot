@@ -7,7 +7,7 @@ import path from 'node:path';
 
 export class ChannelDelivery {
   private pending = new Map<string, { fingerprint: string; work: Promise<void> }>();
-  constructor(private store: Store, private dataDir: string, private runtime: () => BotRuntime) {}
+  constructor(private store: Store, private dataDir: string, private runtime: () => BotRuntime, private workspaceRoot?: () => string) {}
   async tool(botId: string, sourceId: string, op: string, raw: unknown): Promise<Record<string, unknown>> {
     const bot = this.store.getBot(botId), source = this.store.getConversation(sourceId);
     if (!bot || source?.botId !== botId) throw new Error('文件推送不属于当前智能体会话');
@@ -18,7 +18,7 @@ export class ChannelDelivery {
     const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
     const conv = conversations.find(conv => conv.id === input.conversation_id);
     if (!conv) throw new Error('只能推送到此智能体已经建立的渠道会话');
-    const workspace = botWorkspace(this.dataDir, botId);
+    const workspace = botWorkspace(this.dataDir, botId, this.workspaceRoot?.());
     const file = workspace && typeof input.path === 'string' ? resolveFile(input.path, { workspace, dataDir: this.dataDir, delivered: [] }) : undefined;
     if (!file || runnable(file) || file.size > 20 * 1048576) throw new Error('文件不存在、不是安全工作区文件，或超过20 MB');
     if (typeof input.request_id !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(input.request_id)) throw new Error('推送请求标识无效');

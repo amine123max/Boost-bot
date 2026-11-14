@@ -1,0 +1,18 @@
+/* Shared by the Boost shell and the hosted Bot workspace. */
+:root[data-accent="green"] { --accent-dark: #4ade80; --accent-light: #15803d; }
+:root[data-accent="emerald"] { --accent-dark: #34d399; --accent-light: #047857; }
+:root[data-accent="teal"] { --accent-dark: #2dd4bf; --accent-light: #0f766e; }
+:root[data-accent="cyan"] { --accent-dark: #22d3ee; --accent-light: #0e7490; }
+:root[data-accent="sky"] { --accent-dark: #38bdf8; --accent-light: #0369a1; }
+:root[data-accent="blue"] { --accent-dark: #60a5fa; --accent-light: #1d4ed8; }
+:root[data-accent="indigo"] { --accent-dark: #818cf8; --accent-light: #4338ca; }
+:root[data-accent="violet"] { --accent-dark: #a78bfa; --accent-light: #6d28d9; }
+:root[data-accent="purple"] { --accent-dark: #c084fc; --accent-light: #7e22ce; }
+:root[data-accent="pink"] { --accent-dark: #f472b6; --accent-light: #be185d; }
+:root[data-accent="fuchsia"] { --accent-dark: #e879f9; --accent-light: #a21caf; }
+:root[data-accent="rose"] { --accent-dark: #fb7185; --accent-light: #be123c; }
+:root[data-accent="red"] { --accent-dark: #f87171; --accent-light: #b91c1c; }
+:root[data-accent="orange"] { --accent-dark: #fb923c; --accent-light: #c2410c; }
+:root[data-accent="amber"] { --accent-dark: #fbbf24; --accent-light: #b45309; }
+:root[data-accent="yellow"] { --accent-dark: #facc15; --accent-light: #a16207; }
+:root[data-accent="lime"] { --accent-dark: #a3e635; --accent-light: #4d7c0f; }

@@ -11,6 +11,7 @@ import { api, enc } from "../api";
 import type { Bot } from "../types";
 import type { Conversation } from "../conversation";
 import type { ModelMetrics } from "../model-metrics";
+import { DEFAULT_CONTEXT_TOKENS } from "../../../shared/context-window";
 import ModelSelect from "./ModelSelect.vue";
 import SelectControl from "./SelectControl.vue";
 import ProviderIcon from "./ProviderIcon.vue";
@@ -66,14 +67,19 @@ const liveContext = computed(() => {
     }
   return used;
 });
-const usedContext = computed(
-  () => liveContext.value ?? metrics.value?.context.usedTokens,
-);
+const estimatedContext = computed(() => {
+  const breakdown = metrics.value?.context.breakdown;
+  return breakdown ? breakdown.messages + breakdown.systemPrompt : undefined;
+});
+const usedContext = computed(() => liveContext.value ?? metrics.value?.context.usedTokens ?? estimatedContext.value);
+const contextEstimated = computed(() => liveContext.value == null && metrics.value?.context.usedTokens == null && estimatedContext.value != null);
+const contextCapacity = computed(() => metrics.value?.windowTokens || DEFAULT_CONTEXT_TOKENS);
+const defaultCapacity = computed(() => !metrics.value?.windowTokens || metrics.value.windowBasis === 'default');
 const format = (value: number | null | undefined) =>
   value == null ? "—" : value.toLocaleString("zh-CN");
 const percent = computed(() =>
-  metrics.value?.windowTokens && usedContext.value != null
-    ? Math.min(100, (100 * usedContext.value) / metrics.value.windowTokens)
+  usedContext.value != null
+    ? Math.min(100, (100 * usedContext.value) / contextCapacity.value)
     : null,
 );
 const breakdown = computed(() => [
@@ -300,9 +306,8 @@ onBeforeUnmount(() => {
             ><span
               v-if="loading"
               class="loading-ring context-refresh-ring"
-              aria-label="刷新上下文" />{{ format(usedContext)
-            }}<template v-if="metrics?.windowTokens">
-              / {{ format(metrics.windowTokens) }}</template
+              aria-label="刷新上下文" /><span>{{ contextEstimated ? '≈ ' : '' }}{{ format(usedContext)
+            }} / {{ format(contextCapacity) }}</span
             ><Icon
               name="chevron"
               :size="12"
@@ -313,20 +318,22 @@ onBeforeUnmount(() => {
         <SpringDisclosure :open="contextExpanded"
           ><div
             class="context-meter"
+            :class="{ 'context-meter-unknown': percent === null }"
             :role="percent === null ? undefined : 'progressbar'"
             aria-label="上下文占用"
             :aria-valuenow="percent === null ? undefined : Math.round(percent)"
             :aria-valuemin="0"
             :aria-valuemax="100"
           >
-            <span :style="{ width: (percent || 0) + '%' }" />
+            <span v-if="percent !== null" :style="{ width: percent + '%' }" />
+            <span v-else class="context-meter-unavailable" />
           </div>
           <p class="model-menu-note">
             {{
-              usedContext == null
+              contextEstimated ? "文本估算，不含未计量的工具、技能等上下文" : usedContext == null
                 ? "尚无有效用量采样"
                 : "上次模型请求的输入与输出用量"
-            }}{{ metrics && !metrics.windowTokens ? "；容量未提供" : "" }}。
+            }}{{ defaultCapacity ? "；默认 128K 窗口" : metrics?.windowBasis === 'runtime' ? "；按当前执行窗口计算" : "" }}。
           </p>
           <div class="context-estimates"
             ><p class="model-menu-caption">
@@ -485,11 +492,14 @@ onBeforeUnmount(() => {
   margin: 4px 0 8px;
 }
 .context-meter {
-  height: 4px;
+  height: 5px;
+  margin: 10px 2px;
   background: var(--pill);
   border-radius: 4px;
   overflow: hidden;
 }
+.context-meter-unknown { background: repeating-linear-gradient(110deg, var(--line) 0 6px, transparent 6px 11px); }
+.context-meter > .context-meter-unavailable { width: 100%; background: transparent; }
 .context-meter > span {
   display: block;
   height: 100%;

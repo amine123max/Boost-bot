@@ -13,6 +13,10 @@ export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export interface AppConfig {
   dataDir: string;
+  /** Active workspace root; only changed by a completed startup migration. */
+  workspaceRoot?: string;
+  /** User-selected parent folder. Applied on the next host restart. */
+  workspaceParent?: string;
   ui: {
     host: string;
     port: number;
@@ -80,6 +84,8 @@ export function loadConfig(overrides: { dataDir?: string; env?: NodeJS.ProcessEn
   if (fs.existsSync(p)) file = JSON.parse(fs.readFileSync(p, "utf8"));
   return {
     dataDir,
+    workspaceRoot: typeof file.workspaceRoot === "string" && path.isAbsolute(file.workspaceRoot) ? file.workspaceRoot : undefined,
+    workspaceParent: typeof file.workspaceParent === "string" ? file.workspaceParent : "",
     ui: {
       host: env.AMB_UI_HOST || file.ui?.host || "127.0.0.1",
       port: num(env.AMB_UI_PORT, file.ui?.port ?? 3600),

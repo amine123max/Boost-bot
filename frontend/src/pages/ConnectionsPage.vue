@@ -399,9 +399,9 @@ function rowAction(api: AggregateApi, action: string) {
         :selected="providerFilter"
         :items="[
           { value: 'all', label: '全部类型', icon: 'network' },
-          { value: 'codex', label: 'OpenAI 兼容', icon: 'openai' },
-          { value: 'claude', label: 'Claude', icon: 'message-circle' },
-          { value: 'gemini', label: 'Gemini', icon: 'zap' },
+          { value: 'codex', label: 'OpenAI 兼容', icon: 'provider-openai' },
+          { value: 'claude', label: 'Claude', icon: 'provider-claude' },
+          { value: 'gemini', label: 'Gemini', icon: 'provider-gemini' },
         ]"
         @select="providerFilter = $event"
       />

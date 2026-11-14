@@ -94,13 +94,19 @@ The current interface is shown with isolated demonstration data; no production c
 
 **Bot workspace**
 
+Web replies use a borderless layout; channel replies keep theme-matched bubbles with timestamps and copy controls. The sidebar can collapse to icons while retaining the animated Boost avatar.
+
 ![Bot workspace](docs/images/bot-workspace.png)
+
+![Bot library](docs/images/bot-library.png)
 
 **Per-Bot model source and compact settings**
 
 ![Bot model source](docs/images/bot-model-sources.png)
 
 ![Bot settings](docs/images/bot-settings.png)
+
+Bot settings can relocate sandbox files into `Boost/bots/<workspace>/workspaces/<bot>` on another drive or folder. The change takes effect on restart and preserves historical file paths. See the [sandbox directory guide](docs/zh-CN/report/Bot沙箱与目录管理.md).
 
 </details>
 

@@ -23,6 +23,7 @@ import ChannelSettings from "./ChannelSettings.vue";
 import ConnectedAccounts from "./ConnectedAccounts.vue";
 import BotAvatar from "./BotAvatar.vue";
 import SettingsBanner from "./SettingsBanner.vue";
+import Icon from "./Icon.vue";
 const props = defineProps<{
   bots: Bot[];
   models: string[];
@@ -47,6 +48,7 @@ interface RuntimeSettings {
   reasoningEffort: string;
   dataDir: string;
   desktop: boolean;
+  workspace?: { parent: string; root: string; pendingRoot: string; restartRequired: boolean; error: string };
   webSearch: { provider: string; url?: string; hasKey?: boolean };
 }
 const settings = ref<RuntimeSettings>(),
@@ -137,11 +139,12 @@ async function save() {
     JSON.stringify(settings.value),
   ) as RuntimeSettings;
   try {
-    await api("/settings", {
+    const result = await api<RuntimeSettings>("/settings", {
       method: "PUT",
       body: {
         defaultModel: snapshot.defaultModel,
         reasoningEffort: snapshot.reasoningEffort,
+        ...(snapshot.workspace ? { workspaceParent: snapshot.workspace.parent } : {}),
         webSearch: {
           provider: snapshot.webSearch.provider,
           ...(snapshot.webSearch.provider === "searxng"
@@ -152,7 +155,8 @@ async function save() {
       },
     });
     searchKey.value = "";
-    saved.value = "设置已保存";
+    settings.value = result;
+    saved.value = result.workspace?.restartRequired ? "设置已保存，重启 Boost 后迁移沙箱" : "设置已保存";
     emit("saved");
   } catch (e) {
     error.value = (e as Error).message;
@@ -392,6 +396,16 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
                 ></SettingRow>
               </div>
               <h3>存储</h3>
+              <div v-if="settings?.workspace" class="workspace-location">
+                <SettingRow label="沙箱位置" help="填写运行 Boost 的电脑上的绝对路径。选择的文件夹内自动整理为 Boost / bots / 工作台标识 / workspaces / 智能体标识。数据库和凭据保留在原数据目录。">
+                  <input v-model="settings.workspace.parent" aria-label="沙箱父文件夹" placeholder="留空保留当前目录" :disabled="!configure" autocomplete="off" spellcheck="false" />
+                </SettingRow>
+                <p class="settings-context">保存后重启生效；迁移工作文件，并保留历史文件路径的兼容入口。</p>
+                <dl class="workspace-paths"><dt>当前目录</dt><dd>{{ settings.workspace.root }}</dd>
+                  <template v-if="settings.workspace.restartRequired"><dt>重启后</dt><dd>{{ settings.workspace.pendingRoot }}</dd></template>
+                </dl>
+                <p v-if="settings.workspace.error" class="error-banner" role="alert">{{ settings.workspace.error }}</p>
+              </div>
               <div class="preferences-group">
                 <SettingRow
                   label="数据位置"
@@ -530,6 +544,10 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
   line-height: 1.5;
   margin: 0 0 8px;
 }
+.workspace-location { margin-bottom: 12px; }
+.workspace-paths { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 8px 0; font-size: 11px; line-height: 1.5; }
+.workspace-paths dt { color: var(--muted); }
+.workspace-paths dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); }
 .preferences-group {
   background: transparent;
   border: 0;

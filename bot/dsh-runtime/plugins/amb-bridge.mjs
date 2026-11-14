@@ -6,6 +6,8 @@
 // bridge (URL + per-launch token in AMB_BRIDGE_URL / AMB_BRIDGE_TOKEN; DSH's shell-env does not pass
 // these to tool processes). Any bridge failure fails closed: approvals become 'unavailable'
 // (treated as rejection by DSH) and questions defer to the next answerer.
+import { realpathSync } from 'node:fs'
+import path from 'node:path'
 export const name = 'amb-bridge'
 
 const POLL_MS = 25_000
@@ -68,12 +70,18 @@ function roots(name) {
 }
 function under(p, root) {
   if (typeof p !== 'string') return false
-  const norm = (x) => x.replace(/\\/g, '/').replace(/\/+$/, '')
+  const norm = (x) => {
+    const value = path.resolve(x).replace(/\\/g, '/').replace(/\/+$/, '')
+    return process.platform === 'win32' ? value.toLowerCase() : value
+  }
   const a = norm(p), b = norm(root)
   return a === b || a.startsWith(b + '/')
 }
-export function readDenied(path, deny = roots('AMB_DENY_READ'), allow = roots('AMB_ALLOW_READ')) {
-  return deny.some((r) => under(path, r)) && !allow.some((r) => under(path, r))
+export function readDenied(target, deny = roots('AMB_DENY_READ'), allow = roots('AMB_ALLOW_READ')) {
+  const canonical = value => { try { return realpathSync(value) } catch { return value } }
+  const real = canonical(target)
+  if (allow.some(r => under(real, canonical(r)))) return false
+  return deny.some(r => under(target, r) || under(real, canonical(r)))
 }
 // Content reads only: metadata probes (stat/lstat of ancestors for .git, AGENTS.md…) must keep working.
 const READ_METHODS = ['readText', 'streamText', 'readBytes', 'readByteRange', 'listDir']

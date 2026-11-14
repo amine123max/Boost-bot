@@ -198,6 +198,7 @@ export const RETRY_NOTE = "[系统提示]\n上一条用户消息因模型接口�
 export interface AgentHostOptions {
   botId: string;
   dataDir: string;
+  workspaceRoot?: () => string;
   runtimeDir: string;
   bridge: AgentBridge;
   store: Store;
@@ -697,7 +698,7 @@ export class AgentHost {
     return path.join(this.o.dataDir, "dsh", this.o.botId);
   }
   get workspace(): string {
-    return path.join(this.o.dataDir, "workspaces", this.o.botId);
+    return path.join(this.o.workspaceRoot?.() || path.join(this.o.dataDir, "workspaces"), this.o.botId);
   }
   private get pidFile(): string {
     return path.join(this.home, "amb-host.pid");
@@ -954,7 +955,9 @@ export class AgentHost {
 # 由 Boost 生成：遮住宿主数据目录后再交给真正的 bwrap。
 REAL=${q(real)}
 DATA=${q(data)}
+ROOT=${q(path.dirname(this.workspace))}
 WS=${q(path.resolve(this.workspace))}
+LEGACY=${q(path.join(data, "workspaces", this.o.botId))}
 DHOME=${q(path.resolve(this.home))}
 rw=0
 prev=
@@ -968,7 +971,11 @@ for a do
   if [ $first = 1 ]; then set --; first=0; fi
   if [ $injected = 0 ] && [ "$a" = "--" ]; then
     set -- "$@" --tmpfs "$DATA"${this.allows("network") ? "" : ' --unshare-net'}
+    if [ "$ROOT" != "$DATA/workspaces" ]; then set -- "$@" --tmpfs "$ROOT"; fi
     if [ $rw = 1 ]; then set -- "$@" --bind "$WS" "$WS"; else set -- "$@" --ro-bind-try "$WS" "$WS"; fi
+    if [ "$WS" != "$LEGACY" ]; then
+      if [ $rw = 1 ]; then set -- "$@" --bind "$WS" "$LEGACY"; else set -- "$@" --ro-bind-try "$WS" "$LEGACY"; fi
+    fi
     set -- "$@" --ro-bind-try "$DHOME" "$DHOME"
     injected=1
   fi
@@ -992,7 +999,7 @@ exec "$REAL" "$@"
     const basePath = process.env.PATH || "/usr/local/bin:/usr/bin:/bin";
     const env: Record<string, string> = {
       PATH: shim ? `${shim}${path.delimiter}${basePath}` : basePath,
-      AMB_DENY_READ: JSON.stringify([path.resolve(this.o.dataDir)]),
+      AMB_DENY_READ: JSON.stringify([path.resolve(this.o.dataDir), path.dirname(this.workspace)]),
       AMB_ALLOW_READ: JSON.stringify([path.resolve(this.workspace), path.resolve(this.home)]),
       HOME: this.home,
       LANG: "C.UTF-8",
@@ -1975,6 +1982,11 @@ exec "$REAL" "$@"
       reason,
       until: new Date(fb.until).toISOString(),
     });
+  }
+
+  /** The configured execution budget, not a claim about an upstream model's advertised capacity. */
+  contextWindow(model: string): number | undefined {
+    return [...this.childRoutes.values()].find(route => route.model === model)?.limits.window;
   }
 
   status(): Record<string, unknown> {

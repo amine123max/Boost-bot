@@ -5,6 +5,7 @@ export interface ModelMetrics {
     supported: boolean | null;
   };
   windowTokens: number | null;
+  windowBasis?: "catalog" | "runtime" | "default" | null;
   agentAvailable: boolean;
   usage: {
     inputTokens: number | null;

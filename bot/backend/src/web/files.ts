@@ -87,8 +87,8 @@ export function describeFile(p: string, name = path.basename(p)): ShownFile {
 }
 
 /** 机器人的工作区 <数据目录>/workspaces/<id>（同 AgentHost.workspace）；id 不是一段普通的名字时不给 */
-export function botWorkspace(dataDir: string, botId: string): string | undefined {
-  return /^[\w-][\w.-]*$/.test(botId) ? path.join(dataDir, "workspaces", botId) : undefined;
+export function botWorkspace(dataDir: string, botId: string, root = path.join(dataDir, "workspaces")): string | undefined {
+  return /^[\w-][\w.-]*$/.test(botId) ? path.join(root, botId) : undefined;
 }
 
 export interface FileScope {
