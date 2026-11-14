@@ -12,6 +12,8 @@ Direct chat, channel views and history share theme-colored reply bubbles. Timest
 
 Specialist template updates preserve current model sources, transport choices and user preferences, including settings saved while the old agent stops. Updates may revoke removed capabilities but never expand an existing user grant.
 
+Aggregate upstream requests explicitly negotiate `Accept-Encoding: identity`: JSON/SSE adapters require readable bodies, and must not turn compressed input into plain SSE with a stale gzip header. This preserves content and avoids misleading HTTP 200 stream-decode failures.
+
 ## Components
 
 | Directory | Responsibility |

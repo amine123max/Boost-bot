@@ -511,6 +511,7 @@ fn should_skip_forward_header(name: &str) -> bool {
             | "x-api-key"
             | "api-key"
             | "content-length"
+            | "accept-encoding"
             | "connection"
             | "proxy-authorization"
             | "proxy-authenticate"
@@ -753,7 +754,12 @@ fn build_aggregate_api_request(
     request_deadline: Option<Instant>,
     is_stream: bool,
 ) -> Result<reqwest::blocking::RequestBuilder, String> {
-    let mut builder = client.request(method.clone(), url);
+    // Adapters parse JSON/SSE bodies. Do not inherit a downstream client's gzip
+    // negotiation when the upstream client has no response decompressor.
+    let mut builder = client.request(method.clone(), url).header(
+        reqwest::header::ACCEPT_ENCODING,
+        HeaderValue::from_static("identity"),
+    );
     if let Some(timeout) =
         super::super::support::deadline::send_timeout(request_deadline, is_stream)
     {
@@ -1499,6 +1505,94 @@ mod bridge_tests {
             &injected_headers,
             false,
         ));
+    }
+
+    #[test]
+    fn aggregate_http_negotiates_readable_bodies_for_json_and_stream_adapters() {
+        use std::io::Write;
+        use std::net::TcpStream;
+        use std::time::Duration;
+
+        let incoming = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let mut caller = TcpStream::connect(incoming.server_addr().to_ip().unwrap()).unwrap();
+        caller.write_all(b"POST /v1/responses HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nAccept: application/json\r\nAcCePt-EnCoDiNg: gzip, deflate\r\nContent-Length: 0\r\n\r\n").unwrap();
+        let request = incoming
+            .recv_timeout(Duration::from_secs(3))
+            .unwrap()
+            .unwrap();
+        let upstream = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let url = reqwest::Url::parse(&format!(
+            "http://{}/v1/chat/completions",
+            upstream.server_addr()
+        ))
+        .unwrap();
+        let worker = std::thread::spawn(move || {
+            let mut observed = Vec::new();
+            for _ in 0..2 {
+                let request = upstream
+                    .recv_timeout(Duration::from_secs(5))
+                    .unwrap()
+                    .unwrap();
+                let encodings = request
+                    .headers()
+                    .iter()
+                    .filter(|h| h.field.equiv("accept-encoding"))
+                    .map(|h| h.value.as_str().to_string())
+                    .collect::<Vec<_>>();
+                let identity = encodings == vec!["identity"];
+                observed.push(encodings);
+                let bytes = if identity {
+                    b"{\"ok\":true}".to_vec()
+                } else {
+                    // A gzip-aware upstream honors the downstream's advertised formats.
+                    vec![
+                        31, 139, 8, 0, 0, 0, 0, 0, 2, 255, 171, 86, 202, 207, 86, 178, 42, 41, 42,
+                        77, 173, 5, 0, 144, 95, 212, 167, 11, 0, 0, 0,
+                    ]
+                };
+                let mut response = tiny_http::Response::from_data(bytes);
+                if !identity {
+                    response.add_header(
+                        tiny_http::Header::from_bytes("Content-Encoding", "gzip").unwrap(),
+                    );
+                }
+                request.respond(response).unwrap();
+            }
+            observed
+        });
+        let client = reqwest::blocking::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(3))
+            .build()
+            .unwrap();
+        for stream in [false, true] {
+            let response = build_aggregate_api_request(
+                &client,
+                &request,
+                &reqwest::Method::POST,
+                url.clone(),
+                &Bytes::from_static(b"{}"),
+                "fixture-key",
+                &AggregateApiAuthConfig::ApiKeyDefaultBearer,
+                &HashSet::new(),
+                None,
+                stream,
+            )
+            .unwrap()
+            .send()
+            .unwrap();
+            assert!(response
+                .headers()
+                .get(reqwest::header::CONTENT_ENCODING)
+                .is_none());
+            let value: serde_json::Value =
+                serde_json::from_slice(&response.bytes().unwrap()).unwrap();
+            assert_eq!(value, serde_json::json!({"ok": true}));
+        }
+        assert_eq!(
+            worker.join().unwrap(),
+            vec![vec!["identity".to_string()]; 2]
+        );
     }
 
     /// 函数 `balanced_route_strategy_preserves_explicit_preferred_aggregate_api`
