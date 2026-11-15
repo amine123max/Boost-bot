@@ -11,7 +11,7 @@ location ^~ /boost-bot/amb/hooks/custom/ {
     proxy_set_header Cookie "";
     proxy_set_header Authorization "";
     proxy_set_header X-Boost-Rpc-Token $boost_custom_rpc_token;
-    proxy_set_header X-Boost-Rpc-Actor-Role admin;
+    proxy_set_header X-Boost-Rpc-Actor-Role system_admin;
     proxy_set_header X-Boost-Rpc-Actor-User-Id "";
     proxy_set_header X-Boost-Hook-Timestamp $http_x_boost_hook_timestamp;
     proxy_set_header X-Boost-Hook-Signature $http_x_boost_hook_signature;

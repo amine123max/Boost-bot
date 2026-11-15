@@ -2,7 +2,9 @@
 
 Custom signed HTTP bridges use [custom-webhook.conf.example](custom-webhook.conf.example).
 Keep RPC credentials server-side and forward both HMAC headers. Configure the actual
-account actor for service deployments; never trust public actor headers. See the
+account actor for service deployments; desktop accounts use `system_admin` with no user ID.
+An `admin` session has its own isolated Bot data and is not the desktop account.
+Never trust public actor headers. See the
 [custom channel protocol](../bot/CUSTOM_CHANNEL.md) for challenge verification and payloads.
 
 [Project](../README.md) · [中文首页](../README.zh-CN.md) · [Build guide](../docs/BUILDING.md)

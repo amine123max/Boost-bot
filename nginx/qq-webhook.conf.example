@@ -11,7 +11,7 @@ location ^~ /boost-bot/amb/hooks/qq/ {
     proxy_set_header Cookie "";
     proxy_set_header Authorization "";
     proxy_set_header X-Boost-Rpc-Token $boost_qq_rpc_token;
-    proxy_set_header X-Boost-Rpc-Actor-Role admin;
+    proxy_set_header X-Boost-Rpc-Actor-Role system_admin;
     proxy_set_header X-Boost-Rpc-Actor-User-Id "";
     proxy_set_header X-Signature-Ed25519 $http_x_signature_ed25519;
     proxy_set_header X-Signature-Timestamp $http_x_signature_timestamp;
