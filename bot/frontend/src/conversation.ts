@@ -193,14 +193,14 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       }
     }
   }
-  async function send() {
-    const text = draft.value.trim();
-    if (!text || loading.value || modelChanging.value || running.value || !active()) return;
+  async function send(editedText?: string): Promise<boolean> {
+    const text = (editedText ?? draft.value).trim();
+    if (!text || loading.value || modelChanging.value || running.value || !active()) return false;
     error.value = "";
     clearTimeout(timer);
     const ticket = generation;
     const submittedAt = Date.now();
-    draft.value = "";
+    if (editedText === undefined) draft.value = "";
     if (route.value.kind === "group") {
       running.value = true;
       try {
@@ -215,7 +215,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       } catch (e) {
         if (ticket === generation) {
           error.value = (e as Error).message;
-          draft.value = text;
+          if (editedText === undefined) draft.value = text;
           running.value = false;
         }
       }
@@ -238,8 +238,9 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
         !messages.value.some((m) => typeof m.id === 'number' && m.role === "user" && m.content === text && (m.createdAt || 0) >= submittedAt) &&
         live.value?.userText !== text
       )
-        draft.value = text;
+        if (editedText === undefined) draft.value = text;
     }
+    return ticket === generation && !error.value;
   }
   async function stop() {
     if (stopping.value) return;

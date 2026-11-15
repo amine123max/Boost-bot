@@ -7,24 +7,35 @@ import HelpTip from './HelpTip.vue';
 import Modal from './Modal.vue';
 import SelectControl from './SelectControl.vue';
 import PanelSection from './PanelSection.vue';
+import BackgroundTaskItem from './BackgroundTaskItem.vue';
+import { backgroundWork, type BackgroundRule } from '../lib/background-work';
+import { useTaskTitles } from '../composables/useTaskTitles';
 const props = defineProps<{ bot: Bot; configure: boolean }>();
 const emit = defineEmits<{ open: [task: Task]; saved: [] }>();
 const tasks = ref<Task[]>([]), error = ref(''), busy = ref(false), loaded = ref(false), expanded = ref(false);
+const rules = ref<BackgroundRule[]>([]);
+const panelOpen = ref(false);
 const creating = ref(false), formError = ref(''), title = ref(''), brief = ref(''), budget = ref(1), requestId = ref('');
 const paused = ref(props.bot.settings.paused), slots = ref(String(props.bot.settings.taskSlots));
-const sorted = computed(() => [...tasks.value].sort((a,b) => {
-  const rank = (task: Task) => task.stage?.group === 'working' ? 0 : task.stage?.group === 'needs' ? 1 : 2;
-  return rank(a)-rank(b) || (b.updatedAt || 0)-(a.updatedAt || 0);
-}));
+const sorted = computed(() => backgroundWork(tasks.value, rules.value));
 const visible = computed(() => expanded.value ? sorted.value : sorted.value.slice(0,4));
+const titles = useTaskTitles(() => visible.value, () => JSON.stringify([props.bot.settings.modelSource, props.bot.settings.utilityModel, props.bot.defaultModel, props.bot.settings.modelProtocol, props.bot.settings.modelStreaming]), () => panelOpen.value && props.configure);
 let generation = 0, timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined, disposed = false;
 async function load() {
   clearTimeout(timer); controller?.abort();
   const ticket = ++generation, abort = new AbortController(); controller = abort;
   try {
     if (document.hidden) return;
-    const result = await api<{ tasks: Task[] }>(`/tasks?bot=${enc(props.bot.id)}&limit=100`, { signal: abort.signal });
-    if (ticket === generation && !disposed) { tasks.value = result.tasks; loaded.value = true; error.value = ''; }
+    const results = await Promise.allSettled([
+      api<{ tasks: Task[] }>(`/tasks?bot=${enc(props.bot.id)}&limit=100`, { signal: abort.signal }),
+      props.configure ? api<{ rules: BackgroundRule[] }>(`/rules?bot=${enc(props.bot.id)}`, { signal: abort.signal }) : Promise.resolve({ rules: [] as BackgroundRule[] }),
+    ]);
+    if (ticket === generation && !disposed) {
+      if (results[0].status === 'fulfilled' && JSON.stringify(tasks.value) !== JSON.stringify(results[0].value.tasks)) tasks.value = results[0].value.tasks;
+      if (results[1].status === 'fulfilled' && JSON.stringify(rules.value) !== JSON.stringify(results[1].value.rules)) rules.value = results[1].value.rules;
+      loaded.value = true;
+      error.value = results.flatMap(result => result.status === 'rejected' ? [(result.reason as Error).message] : []).join('；');
+    }
   } catch (e) { if (!abort.signal.aborted && !disposed) error.value = (e as Error).message; }
   finally { if (ticket === generation && !disposed) timer = setTimeout(load, 2000); }
 }
@@ -48,26 +59,24 @@ async function submit() {
   finally { busy.value=false; }
 }
 watch(() => [props.bot.settings.paused, props.bot.settings.taskSlots], () => { paused.value=props.bot.settings.paused; slots.value=String(props.bot.settings.taskSlots); });
-watch(() => props.bot.id, () => { tasks.value=[]; loaded.value=false; expanded.value=false; creating.value=false; void load(); }, { immediate:true });
+watch(() => props.bot.id, () => { tasks.value=[]; rules.value=[]; loaded.value=false; expanded.value=false; creating.value=false; void load(); }, { immediate:true });
 onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearTimeout(timer); });
 </script>
 <template>
-  <PanelSection class="background-tasks" title="后台任务" help="任务使用独立会话与目录执行，可并发运行。暂停后不启动新任务，正在运行的任务继续完成，直接对话不受影响。">
+  <PanelSection class="background-tasks" title="后台任务" @toggle="panelOpen = $event" help="普通任务与定时任务统一展示，点击箭头查看实际步骤。标题由当前智能体的辅助模型概括为20字以内，悬浮查看原名。绿色为已完成、黄色为进行中（含排队）、红色为失败；定时任务显示最近一次结果。暂停后不启动新任务，正在运行的继续完成。">
     <template #actions><button v-if="configure" class="icon-btn task-create" aria-label="新建后台任务" :disabled="busy" @click="create"><Icon name="plus" :size="14" /></button></template>
     <div v-if="configure" class="background-controls">
       <button role="switch" :aria-checked="!paused" aria-label="启用后台任务" :disabled="busy" class="background-toggle" :class="{ enabled: !paused }" @click="settings({paused:!paused})">{{ paused ? '启用' : '已启用' }}</button>
       <span class="background-concurrency"><SelectControl :model-value="slots" :options="Array.from({length:8},(_,i)=>({value:String(i+1),label:(i+1)+'项并发'}))" label="并行后台任务数" :disabled="busy" @update:model-value="settings({taskSlots:Number($event)})" /><HelpTip text="当前智能体允许1–8项并行任务，所有智能体共享宿主的全局执行名额，超出上限的任务自动排队。" label="后台任务并发说明" /></span>
     </div>
     <p v-if="error" class="notice" role="alert">{{ error }}<button @click="load">重试</button></p>
+    <p v-if="titles.error.value" class="task-empty" role="status">标题概括暂不可用 <button :title="titles.error.value" @click="titles.retry">重试</button></p>
     <div class="background-task-list">
-      <button v-for="task in visible" :key="task.id" class="background-task-row" :aria-label="'查看任务：' + task.title" @click="emit('open',task)">
-        <span class="task-marker" :class="{ running:task.stage?.key==='working'||task.stage?.key==='working/asking', done:task.stage?.key==='ready', failed:task.stage?.key==='failed', waiting:task.stage?.group==='needs', stopped:task.stage?.key==='stopped' }"><Icon v-if="task.stage?.key==='ready'" name="check" :size="13" /><Icon v-else-if="task.stage?.key==='failed'" name="close" :size="12" /><Icon v-else-if="task.stage?.group==='needs'" name="info" :size="12" /></span>
-        <span class="background-task-title">{{ task.title }}</span><span v-if="task.stage?.key==='working/queued'||task.stage?.group==='needs'" class="task-label">{{ task.stage.label }}</span>
-      </button>
-      <p v-if="loaded && !tasks.length && !error" class="task-empty">暂无后台任务</p>
+      <BackgroundTaskItem v-for="work in visible" :key="work.key" :work="work" :title="titles.title(work)" @details="emit('open', $event)" />
+      <p v-if="loaded && !sorted.length && !error" class="task-empty">暂无后台任务</p>
       <p v-else-if="!loaded && !error" class="task-empty" role="status">正在读取任务…</p>
     </div>
-    <button v-if="tasks.length>4" class="more-tasks" :aria-expanded="expanded" @click="expanded=!expanded">{{ expanded ? '收起' : '还有 '+(tasks.length-4)+' 项' }}</button>
+    <button v-if="sorted.length>4" class="more-tasks" :aria-expanded="expanded" @click="expanded=!expanded">{{ expanded ? '收起' : '还有 '+(sorted.length-4)+' 项' }}</button>
   </PanelSection>
   <Modal v-if="creating" compact :busy="busy" title="新建后台任务" @close="creating=false"><form class="editor-form" @submit.prevent="submit">
     <p v-if="formError" class="error-banner" role="alert">{{ formError }}</p>
@@ -86,18 +95,6 @@ onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearT
 .background-concurrency { display:flex; align-items:center; gap:3px; }
 .background-concurrency :deep(.select-trigger) { min-height:25px; padding:2px 6px; font-size:11px; border:0; background:transparent; }
 .background-task-list { display:grid; gap:5px; }
-.background-task-row { display:flex; align-items:center; gap:9px; text-align:left; width:100%; min-height:28px; padding:4px 8px; border-radius:5px; }
-.background-task-row:hover { background:var(--pill); }
-.background-task-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
-.task-marker { flex:none; width:15px; height:15px; display:grid; place-items:center; border:1.5px dashed var(--muted); border-radius:50%; color:var(--muted); }
-.task-marker.running { animation:task-spin 1.6s linear infinite; }
-.task-marker.done { border:0; color:var(--green); }
-.task-marker.failed { border:0; color:var(--red,#e85b62); }
-.task-marker.waiting { border:0; color:var(--amber,#d5a94b); }
-.task-marker.stopped { border-style:solid; opacity:.5; }
-.task-label { flex:none; font-size:10px; color:var(--muted); }
 .task-empty { margin:0; padding:8px; color:var(--muted); font-size:12px; }
 .more-tasks { margin:6px 8px 0; color:var(--muted); font-size:11px; }
-@keyframes task-spin { to { transform:rotate(360deg); } }
-@media(prefers-reduced-motion:reduce) { .task-marker.running { animation:none; } }
 </style>

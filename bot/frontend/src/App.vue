@@ -32,6 +32,9 @@ import SidebarBotRow from "./components/SidebarBotRow.vue";
 import ChannelConversationView from "./components/ChannelConversation.vue";
 import WorkspaceSettings from "./components/WorkspaceSettings.vue";
 import TaskDetail from "./components/TaskDetail.vue";
+import BackgroundTaskItem from './components/BackgroundTaskItem.vue';
+import { backgroundWork, type BackgroundRule } from './lib/background-work';
+import { useTaskTitles } from './composables/useTaskTitles';
 
 function readRoute(): Route {
   try {
@@ -81,6 +84,8 @@ const selectedConversation = computed(() =>
   conversations.value.find((c) => c.id === route.value.id),
 );
 const selectedTask = ref<Task | null>(null);
+const rules = ref<BackgroundRule[]>([]);
+const workItems = computed(() => backgroundWork(tasks.value, rules.value));
 const previews = ref<Record<string, { text: string; at: number }>>({});
 const panelError = ref(""),
   notice = ref("");
@@ -89,6 +94,7 @@ let disposed = false,
 const configure = computed(
   () => status.value?.capabilities?.configure === true,
 );
+const taskTitles = useTaskTitles(() => workItems.value, () => JSON.stringify(bots.value.map(bot => [bot.id, bot.settings.modelSource, bot.settings.utilityModel, bot.defaultModel, bot.settings.modelProtocol, bot.settings.modelStreaming])), () => route.value.kind === 'tasks' && configure.value);
 const bot = computed(() =>
   bots.value.find(
     (b) =>
@@ -261,8 +267,12 @@ async function loadPanel() {
   panelError.value = "";
   try {
     if (kind === "tasks") {
-      const d = await api<{ tasks: Task[] }>("/tasks");
-      if (route.value.kind === kind) tasks.value = d.tasks;
+      const results = await Promise.allSettled([api<{ tasks: Task[] }>("/tasks"), configure.value ? api<{ rules: BackgroundRule[] }>("/rules") : Promise.resolve({ rules: [] as BackgroundRule[] })]);
+      if (route.value.kind === kind) {
+        if (results[0].status === 'fulfilled') tasks.value = results[0].value.tasks;
+        if (results[1].status === 'fulfilled') rules.value = results[1].value.rules;
+        panelError.value = results.flatMap(result => result.status === 'rejected' ? [(result.reason as Error).message] : []).join('；');
+      }
     } else {
       const d = await api<{ bots: CatalogEntry[] }>("/catalog");
       if (route.value.kind === kind) catalog.value = d.bots;
@@ -693,26 +703,15 @@ onBeforeUnmount(() => {
             ><div v-if="panelBusy" class="empty-state" role="status">
               正在加载任务…
             </div>
-            <div v-else-if="!tasks.length" class="empty-state">
+            <div v-else-if="!workItems.length" class="empty-state">
               <Icon name="tasks" :size="36" />
               <h2>暂无后台任务</h2>
               <button class="quiet-button" @click="go('chat', bots[0]?.id)">
                 与智能体开始工作
               </button>
             </div>
-            <article v-for="task in tasks" :key="task.id" class="task-card">
-              <BotAvatar :bot="bots.find((b) => b.id === task.botId)" />
-              <div>
-                <h3>{{ task.title }}</h3>
-                <p>{{ task.summary }}</p>
-              </div>
-              <span class="state-chip">{{
-                task.stage?.label || task.status
-              }}</span
-              ><button class="quiet-button" @click="selectedTask = task">
-                查看记录
-              </button>
-            </article></template
+            <p v-if="taskTitles.error.value" class="notice" role="status">标题概括暂不可用 <button :title="taskTitles.error.value" @click="taskTitles.retry">重试</button></p>
+            <BackgroundTaskItem v-for="work in workItems" :key="work.key" :work="work" :title="taskTitles.title(work)" @details="selectedTask = $event" /></template
           >
           <template v-else-if="route.kind === 'discover'"
             ><div class="panel-intro">

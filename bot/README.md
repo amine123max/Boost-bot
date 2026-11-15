@@ -12,6 +12,10 @@ The Bot information panel keeps WeChat, Feishu and Telegram visible, alongside o
 
 Create, enable/pause and monitor background tasks directly in the information panel. Tasks use the existing persisted queue, isolated sessions/folders, per-Bot concurrency limits and budgets; excess work queues without blocking chat. The memory section reads stored entries and topics, supports scoped search, manual additions and explicit deletion, and retains the existing sensitive-data checks. Turning memory off preserves saved entries while excluding them from model context.
 
+Background work and task history include scheduled rules alongside ordinary tasks. Each banner encloses its title and recorded steps, with an independent animated SVG chevron; completed steps use circled checks. Status badges are green for completed, yellow for in progress (including queued work), and red for failed; scheduled rules show their latest run result. Opening the panel generates task titles of at most 20 characters using the Bot's utility model, falling back to its primary model through the selected source. Content caching, batching and failure cooldown avoid repeated inference on polling; full task names remain in title tooltips.
+
+Web user messages have copy and pencil controls. Editing expands inside the original bubble with Cancel and Send; sending submits the edited text as a new request while preserving history and the composer draft. The stop control is a solid square inside a circle. Native disclosures share spring transitions across Boost and Bot; task polling never restarts their animation, and reduced-motion preferences still apply.
+
 ![Boost Bot workspace](../docs/images/bot-workspace.png)
 
 Direct chat, channel views and history share theme-colored reply bubbles. Timestamps and reply-copy controls sit below the bubble; user bubble colors and geometry remain unchanged. Copy preserves the original text, reports clipboard failures and offers a compatible fallback without including processing traces.

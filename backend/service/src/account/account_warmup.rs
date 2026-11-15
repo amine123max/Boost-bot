@@ -62,14 +62,19 @@ pub(crate) fn warmup_accounts(
 
     let client = build_warmup_client()?;
     let warmup_message = normalize_warmup_message(message);
-    let warmup_model = resolve_warmup_model_slug(&storage);
+    crate::apikey_models::bootstrap_account_pool_model_routes(&storage, false)?;
     let mut results = Vec::with_capacity(accounts.len());
     let mut succeeded = 0usize;
 
     for account in accounts.drain(..) {
+        let warmup_model = resolve_warmup_model_slug(&storage, &account.id);
         let bound_client = if crate::upstream_proxy::endpoint_for_account(&account.id).is_some() {
-            Some(crate::gateway::fresh_upstream_client_for_account(&account.id))
-        } else { None };
+            Some(crate::gateway::fresh_upstream_client_for_account(
+                &account.id,
+            ))
+        } else {
+            None
+        };
         let item = warmup_single_account(
             &storage,
             bound_client.as_ref().unwrap_or(&client),
@@ -311,15 +316,25 @@ fn load_account_token(storage: &Storage, account: &Account) -> Result<Token, Str
         .ok_or_else(|| "missing token".to_string())
 }
 
-fn resolve_warmup_model_slug(storage: &Storage) -> String {
+fn resolve_warmup_model_slug(storage: &Storage, account_id: &str) -> String {
     read_managed_model_catalog_from_storage(storage)
         .ok()
         .and_then(|catalog| {
             catalog
                 .items
                 .into_iter()
-                .find(|item| item.model.supported_in_api)
-                .map(|item| item.model.slug)
+                .filter(|item| item.model.supported_in_api)
+                .find_map(|item| {
+                    storage
+                        .find_enabled_model_source_mapping(
+                            &item.model.slug,
+                            "openai_account",
+                            account_id,
+                        )
+                        .ok()
+                        .flatten()
+                        .map(|mapping| mapping.upstream_model)
+                })
         })
         .filter(|slug| !slug.trim().is_empty())
         .unwrap_or_else(|| DEFAULT_WARMUP_MODEL.to_string())
@@ -553,13 +568,14 @@ mod tests {
     }
 
     #[test]
-    fn resolve_warmup_model_slug_uses_first_supported_model_from_catalog_order() {
+    fn resolve_warmup_model_slug_uses_account_mapping_in_catalog_order() {
         let storage = Storage::open_in_memory().expect("open in-memory storage");
         storage.init().expect("init in-memory storage");
         save_managed_model_catalog_with_storage(
             &storage,
             &ManagedModelCatalogResult {
                 items: vec![
+                    make_model("aggregate-only", -1, true),
                     make_model("gpt-hidden", 0, false),
                     make_model("gpt-latest", 1, true),
                     make_model("gpt-older", 2, true),
@@ -569,14 +585,39 @@ mod tests {
         )
         .expect("save model catalog");
 
-        assert_eq!(resolve_warmup_model_slug(&storage), "gpt-latest");
+        storage
+            .upsert_model_source_mapping(&boost_core::storage::ModelSourceMapping {
+                id: "warmup-account".into(),
+                platform_model_slug: "gpt-latest".into(),
+                source_kind: "openai_account".into(),
+                source_id: "account".into(),
+                upstream_model: "gpt-upstream".into(),
+                enabled: true,
+                priority: 0,
+                weight: 1,
+                billing_model_slug: None,
+                created_at: 1,
+                updated_at: 1,
+            })
+            .unwrap();
+        assert_eq!(
+            resolve_warmup_model_slug(&storage, "account"),
+            "gpt-upstream"
+        );
+        assert_eq!(
+            resolve_warmup_model_slug(&storage, "other-account"),
+            DEFAULT_WARMUP_MODEL
+        );
     }
 
     #[test]
     fn resolve_warmup_model_slug_falls_back_when_catalog_missing() {
         let storage = Storage::open_in_memory().expect("open in-memory storage");
         storage.init().expect("init in-memory storage");
-        assert_eq!(resolve_warmup_model_slug(&storage), DEFAULT_WARMUP_MODEL);
+        assert_eq!(
+            resolve_warmup_model_slug(&storage, "account"),
+            DEFAULT_WARMUP_MODEL
+        );
     }
 
     #[test]

@@ -3,6 +3,9 @@ import App from "./App.vue";
 import "./styles.css";
 import { applyPreferences } from './preferences';
 import { springPage } from '../../../frontend/src/lib/surface-motion';
+import { installDisclosureMotion } from '../../../frontend/src/lib/disclosure-motion';
+const removeDisclosureMotion = installDisclosureMotion();
+if (import.meta.hot) import.meta.hot.dispose(removeDisclosureMotion);
 
 document.documentElement.lang = "zh-CN";
 applyPreferences();

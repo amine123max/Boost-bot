@@ -4,7 +4,9 @@ import { motionAllowed } from '../../../../frontend/src/lib/surface-motion';
 import HelpTip from './HelpTip.vue';
 import Icon from './Icon.vue';
 const props = defineProps<{ title: string; help?: string; badge?: number; initiallyOpen?: boolean }>();
+const emit = defineEmits<{ toggle: [open: boolean] }>();
 const open = ref(!!props.initiallyOpen), content = ref<HTMLElement>(), toggle = ref<HTMLButtonElement>(), id = useId();
+watch(open, value => emit('toggle', value));
 let animation: Animation | undefined;
 function animate(element: Element, done: () => void, leaving: boolean) {
   const node = element as HTMLElement;
@@ -59,7 +61,6 @@ onBeforeUnmount(() => animation?.cancel());
 .panel-section-content { overflow:hidden; overflow-anchor:none; }
 .panel-section-inner { padding:4px 8px 6px 33px; min-width:0; }
 .panel-section-inner :deep(.background-controls),
-.panel-section-inner :deep(.background-task-row),
 .panel-section-inner :deep(.memory-controls),
 .panel-section-inner :deep(.memory-preview-entry),
 .panel-section-inner :deep(.panel-approval),

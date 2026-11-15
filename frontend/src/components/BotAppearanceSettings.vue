@@ -24,8 +24,8 @@ import { botAppearance, flowAnimations, flowContours, flowPalettes, resetBotAppe
 <style scoped>
 .bot-appearance-settings { display: grid; gap: 18px; }
 .bot-style-presets { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.bot-style-presets > button { display: grid; justify-items: center; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--input); font-size: 12px; }
-.bot-style-presets > button[aria-pressed="true"] { border-color: var(--accent); background: var(--blue-soft); }
+.bot-style-presets > button { display: grid; justify-items: center; gap: 6px; padding: 10px; border: 0; border-radius: 10px; background: transparent; font-size: 12px; }
+.bot-style-presets > button[aria-pressed="true"] > span { color: var(--blue); font-weight: 600; }
 .bot-avatar-preview { display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 12px; background: var(--card); }
 .bot-avatar-preview strong { font-size: 20px; }
 .bot-appearance-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }

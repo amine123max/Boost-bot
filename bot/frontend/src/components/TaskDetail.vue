@@ -7,6 +7,7 @@ import Markdown from "./Markdown.vue";
 import ActivityTrace from "./ActivityTrace.vue";
 import TaskPlanChecklist from "./TaskPlanChecklist.vue";
 import { taskPlan } from "../lib/task-plan";
+import Icon from './Icon.vue';
 const props = defineProps<{ task: Task; configure: boolean }>();
 defineEmits<{ close: [] }>();
 interface Run {
@@ -132,7 +133,7 @@ onBeforeUnmount(() => {
         :key="run.id"
         @toggle="steps(run, $event)"
       >
-        <summary>
+        <summary class="run-toggle"><Icon name="chevron" :size="12" />
           {{
             run.startedAt
               ? new Date(run.startedAt).toLocaleString("zh-CN")
@@ -163,4 +164,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .task-followup { padding: 0; gap: 8px; }
 .task-followup > button { justify-self: end; }
+.run-toggle { display:flex; align-items:center; gap:6px; cursor:pointer; list-style:none; }
+.run-toggle::-webkit-details-marker { display:none; }
+.run-toggle :deep(svg) { flex:none; transition:transform 220ms ease; }
+details[open]:not([data-spring-open="false"]) > .run-toggle :deep(svg) { transform:rotate(90deg); }
+@media(prefers-reduced-motion:reduce) { .run-toggle :deep(svg) { transition:none; } }
+:global(html[data-motion="off"]) .run-toggle :deep(svg), :global(html[data-motion="reduce"]) .run-toggle :deep(svg) { transition:none; }
 </style>

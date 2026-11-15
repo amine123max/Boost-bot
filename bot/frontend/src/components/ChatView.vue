@@ -246,7 +246,7 @@ export default defineComponent({
               :conversation-id="m.conversationId || chat.conversationId"
               :message-id="m.id"
             />
-            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt">
+            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="m.role === 'user'" :edit-disabled="chat.running || chat.loading" :send-edit="chat.send">
             <button
               v-for="f in m.files"
               :key="f.path"
@@ -263,7 +263,7 @@ export default defineComponent({
         <template v-if="chat.live">
           <article v-if="chat.live.userText && !group" class="message is-user">
             <div class="message-body">
-              <MessageBubble :text="chat.live.userText" role="user" />
+              <MessageBubble :text="chat.live.userText" role="user" editable :edit-disabled="chat.running || chat.loading" :send-edit="chat.send" />
             </div>
           </article>
           <article class="message is-live">
@@ -383,7 +383,7 @@ export default defineComponent({
             aria-label="停止生成"
             @click="chat.stop()"
           >
-            <Icon name="stop" :size="16" />停止</button
+            <span class="stop-square" aria-hidden="true" /><span class="sr-only">停止</span></button
           ><button
             v-else
             type="submit"
@@ -398,3 +398,8 @@ export default defineComponent({
     </form>
   </section>
 </template>
+<style scoped>
+.stop-button { display:inline-grid; place-items:center; width:30px; height:30px; min-width:30px; padding:0; border:0; border-radius:50%; background:var(--fg); color:var(--bg); }
+.stop-square { width:10px; height:10px; border-radius:2px; background:currentColor; }
+.stop-button:disabled { opacity:.5; }
+</style>

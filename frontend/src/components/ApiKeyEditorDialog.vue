@@ -259,11 +259,15 @@ async function save() {
           </option>
         </select></label
       >
-      <label class="form-field"
-        >绑定模型<ModelSelect
-          v-model="model" :options="models" label="绑定模型"
-          placeholder="留空跟随请求" />
-      ></label>
+      <label class="form-field">
+        绑定模型
+        <ModelSelect
+          v-model="model"
+          :options="models"
+          label="绑定模型"
+          placeholder="留空跟随请求"
+        />
+      </label>
       <label class="form-field"
         >总额度限制
         <div class="quota-input">

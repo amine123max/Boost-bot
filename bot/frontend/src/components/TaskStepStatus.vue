@@ -36,6 +36,15 @@ defineProps<{ state: "pending" | "working" | "done" | "failed" }>();
 .is-done {
   color: var(--green);
 }
+.is-done :deep(svg),
+.is-failed :deep(svg) {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  padding: 1px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
 .is-failed {
   color: var(--red);
 }

@@ -528,11 +528,28 @@ fn sync_openai_account_source_models_with_options(
         .filter(|m| m.discovery_kind == "account_remote")
         .map(|m| m.upstream_model)
         .collect::<HashSet<_>>();
+    // The shared catalog also contains supplier models. Their presence is not
+    // evidence that an OAuth account supports them; only account discovery or a
+    // manual account source model can establish that capability.
+    let aggregate_slugs = storage
+        .list_model_source_models(Some(ROUTING_SOURCE_KIND_AGGREGATE_API), None)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|m| m.upstream_model)
+        .collect::<HashSet<_>>();
     let platform_models = read_account_pool_platform_catalog(storage, allow_remote_catalog_fetch)?
         .items
         .into_iter()
         .filter(|item| item.model.supported_in_api)
         .filter(|item| item.source_kind == MODEL_SOURCE_KIND_REMOTE)
+        .filter(|item| {
+            item.model
+                .extra
+                .get("boost_source_kind")
+                .and_then(Value::as_str)
+                != Some(ROUTING_SOURCE_KIND_AGGREGATE_API)
+        })
+        .filter(|item| !aggregate_slugs.contains(&item.model.slug))
         .filter(|item| !account_specific_slugs.contains(&item.model.slug))
         .map(|item| item.model.slug)
         .collect::<Vec<_>>();
@@ -543,6 +560,14 @@ fn sync_openai_account_source_models_with_options(
             .iter()
             .any(|m| m.discovery_kind == "account_remote");
         if has_account_snapshot {
+            storage
+                .upsert_discovered_model_source_models(
+                    ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
+                    &account.id,
+                    &[],
+                    "synced",
+                )
+                .map_err(|err| format!("remove inferred account models failed: {err}"))?;
             auto_associate_source_models(
                 storage,
                 ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
@@ -552,16 +577,14 @@ fn sync_openai_account_source_models_with_options(
             )?;
             continue;
         }
-        if !platform_models.is_empty() {
-            storage
-                .upsert_discovered_model_source_models(
-                    ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
-                    account.id.as_str(),
-                    platform_models.as_slice(),
-                    "synced",
-                )
-                .map_err(|err| format!("sync account source models failed: {err}"))?;
-        }
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
+                account.id.as_str(),
+                platform_models.as_slice(),
+                "synced",
+            )
+            .map_err(|err| format!("sync account source models failed: {err}"))?;
         auto_associate_source_models(
             storage,
             ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
@@ -970,6 +993,10 @@ fn auto_platform_model_from_source_model(source_model: &ModelSourceModel) -> Opt
         supported_in_api: true,
         visibility: Some("list".to_string()),
         input_modalities: default_input_modalities(),
+        extra: BTreeMap::from([(
+            "boost_source_kind".to_string(),
+            Value::String(source_model.source_kind.clone()),
+        )]),
         ..Default::default()
     })
 }
@@ -2407,6 +2434,134 @@ mod tests {
         );
         assert_eq!(merged.items[0].source_kind, MODEL_SOURCE_KIND_REMOTE);
         assert!(merged.items[0].user_edited);
+    }
+
+    #[test]
+    fn account_pool_bootstrap_removes_legacy_aggregate_models_and_mappings() {
+        let storage = Storage::open_in_memory().unwrap();
+        storage.init().unwrap();
+        insert_test_account(&storage, "account");
+        seed_platform_catalog(&storage, &["gpt-account", "vendor-only"]);
+        // Reproduce the old version copying the shared catalog into the pool.
+        bootstrap_account_pool_model_routes(&storage, false).unwrap();
+        assert_eq!(
+            storage
+                .list_enabled_model_source_mappings_for_platform("vendor-only")
+                .unwrap()
+                .len(),
+            1
+        );
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_AGGREGATE_API,
+                "supplier",
+                &["vendor-only".into()],
+                "synced",
+            )
+            .unwrap();
+
+        bootstrap_account_pool_model_routes(&storage, false).unwrap();
+        let models = storage
+            .list_model_source_models(Some(ROUTING_SOURCE_KIND_OPENAI_ACCOUNT), Some("account"))
+            .unwrap();
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].upstream_model, "gpt-account");
+        assert!(storage
+            .list_enabled_model_source_mappings_for_platform("vendor-only")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn aggregate_catalog_provenance_prevents_pool_inference_after_source_removal() {
+        let storage = Storage::open_in_memory().unwrap();
+        storage.init().unwrap();
+        insert_test_account(&storage, "account");
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_AGGREGATE_API,
+                "supplier",
+                &["vendor-only".into()],
+                "synced",
+            )
+            .unwrap();
+        auto_associate_aggregate_api_source_models(&storage, "supplier").unwrap();
+        storage
+            .delete_model_source_routes_for_source(ROUTING_SOURCE_KIND_AGGREGATE_API, "supplier")
+            .unwrap();
+
+        bootstrap_account_pool_model_routes(&storage, false).unwrap();
+        assert!(storage
+            .list_model_source_models(Some(ROUTING_SOURCE_KIND_OPENAI_ACCOUNT), None)
+            .unwrap()
+            .is_empty());
+        assert!(storage
+            .list_enabled_model_source_mappings_for_platform("vendor-only")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn account_discovery_and_manual_models_survive_aggregate_isolation() {
+        let storage = Storage::open_in_memory().unwrap();
+        storage.init().unwrap();
+        insert_test_account(&storage, "account");
+        seed_platform_catalog(&storage, &["shared", "manual-only", "legacy-only"]);
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
+                "account",
+                &["legacy-only".into()],
+                "synced",
+            )
+            .unwrap();
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
+                "account",
+                &["shared".into()],
+                "account_remote",
+            )
+            .unwrap();
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_OPENAI_ACCOUNT,
+                "account",
+                &["manual-only".into()],
+                "manual",
+            )
+            .unwrap();
+        storage
+            .upsert_discovered_model_source_models(
+                ROUTING_SOURCE_KIND_AGGREGATE_API,
+                "supplier",
+                &["shared".into(), "manual-only".into()],
+                "synced",
+            )
+            .unwrap();
+
+        bootstrap_account_pool_model_routes(&storage, false).unwrap();
+        let models = storage
+            .list_model_source_models(Some(ROUTING_SOURCE_KIND_OPENAI_ACCOUNT), None)
+            .unwrap();
+        assert_eq!(models.len(), 2);
+        assert!(models
+            .iter()
+            .any(|m| m.upstream_model == "shared" && m.discovery_kind == "account_remote"));
+        assert!(models
+            .iter()
+            .any(|m| m.upstream_model == "manual-only" && m.discovery_kind == "manual"));
+        assert_eq!(
+            storage
+                .list_enabled_model_source_mappings_for_platform("shared")
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(storage
+            .list_enabled_model_source_mappings_for_platform("legacy-only")
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

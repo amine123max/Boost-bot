@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import Icon from "./Icon.vue";
 import TaskStepStatus from "./TaskStepStatus.vue";
+import SpringDisclosure from './SpringDisclosure.vue';
 import type { TaskPlan } from "../lib/task-plan";
 const props = withDefaults(
   defineProps<{
@@ -13,9 +14,8 @@ const props = withDefaults(
   { limit: 5, heading: true },
 );
 const expanded = ref(false);
-const shown = computed(() =>
-  expanded.value ? props.plan.items : props.plan.items.slice(0, props.limit),
-);
+const shown = computed(() => props.plan.items.slice(0, props.limit));
+const remaining = computed(() => props.plan.items.slice(props.limit));
 </script>
 <template>
   <div class="task-checklist">
@@ -45,6 +45,14 @@ const shown = computed(() =>
     <p v-else class="checklist-empty" role="status">
       {{ loading ? "正在加载执行记录…" : "尚未记录执行步骤" }}
     </p>
+    <SpringDisclosure :open="expanded">
+      <ol v-if="remaining.length" class="checklist-items checklist-remaining">
+        <li v-for="item in remaining" :key="item.id" :class="`step-${item.state}`">
+          <TaskStepStatus :state="item.state" /><span class="step-text" :title="item.text">{{ item.text }}</span>
+          <span class="sr-only">{{ { pending: '待处理', working: '进行中', done: '已完成', failed: '失败' }[item.state] }}</span>
+        </li>
+      </ol>
+    </SpringDisclosure>
     <button
       v-if="plan.items.length > limit"
       class="checklist-expand"
@@ -52,7 +60,7 @@ const shown = computed(() =>
       @click="expanded = !expanded"
     >
       <Icon name="chevron" :size="11" :class="{ expanded }" />{{
-        expanded ? "收起步骤" : `展开其余 ${plan.items.length - limit} 项`
+        expanded ? "收起步骤" : `还有 ${remaining.length} 项`
       }}
     </button>
   </div>
@@ -123,6 +131,10 @@ const shown = computed(() =>
 .checklist-expand .expanded {
   transform: rotate(90deg);
 }
+.checklist-expand :deep(svg) { transition: transform 220ms ease; }
+.checklist-remaining { margin-top:5px; }
+@media(prefers-reduced-motion:reduce) { .checklist-expand :deep(svg) { transition:none; } }
+:global(html[data-motion="off"]) .checklist-expand :deep(svg), :global(html[data-motion="reduce"]) .checklist-expand :deep(svg) { transition:none; }
 .sr-only {
   position: absolute;
   width: 1px;

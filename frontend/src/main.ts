@@ -6,8 +6,11 @@ import { installButtonEffects } from "./lib/button-effects";
 import { springSwitch } from "./lib/spring-switch";
 import { resizableColumns } from "./directives/resizable-columns";
 import { springPage } from "./lib/surface-motion";
+import { installDisclosureMotion } from './lib/disclosure-motion';
 const removeButtonEffects = installButtonEffects();
+const removeDisclosureMotion = installDisclosureMotion();
 if (import.meta.hot) import.meta.hot.dispose(removeButtonEffects);
+if (import.meta.hot) import.meta.hot.dispose(removeDisclosureMotion);
 
 const router = createRouter({
   history: createWebHistory(),

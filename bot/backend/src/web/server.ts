@@ -2,6 +2,7 @@ import http from "node:http";
 import { validateBotInput } from '../core/bot-management.js';
 import { CustomTransport } from '../channels/messenger/custom.js';
 import { cachedMemoryTitle, generateMemoryTitles } from './memory-titles.js';
+import { generateTaskTitles } from './task-titles.js';
 import { createPanelTask, rememberPanelEntry, PanelActionError } from './panel-actions.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
 import { conversationMetrics } from "../core/conversation-metrics.js";
@@ -1424,6 +1425,11 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
       if (sub === 'memory/titles' && m === 'POST') {
         try { return send(res, 200, await generateMemoryTitles(app, id)); }
+        catch (error) { throw new HttpError(502, (error as Error).message); }
+      }
+      if (sub === 'task-titles' && m === 'POST') {
+        const body = await readJson(req);
+        try { return send(res, 200, await generateTaskTitles(app, id, body.items)); }
         catch (error) { throw new HttpError(502, (error as Error).message); }
       }
       if (sub === "memory" && m === "GET") {
