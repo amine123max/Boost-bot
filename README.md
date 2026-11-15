@@ -102,6 +102,10 @@ Web replies use a borderless layout; channel replies keep theme-matched bubbles 
 
 ![Bot library](docs/images/bot-library.png)
 
+The information panel provides compact channel connections, device naming, background task controls and persistent memory management. WeChat and Feishu open direct QR authorization; the plus button opens the shared setup dialog for all supported platforms.
+
+<img src="docs/images/bot-channels.png" width="320" alt="Connected WeChat channel and compact background task controls" />
+
 **Per-Bot model source and compact settings**
 
 ![Bot model source](docs/images/bot-model-sources.png)

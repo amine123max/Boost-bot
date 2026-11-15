@@ -96,6 +96,10 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 
 ![紧凑智能体库](docs/images/bot-library.png)
 
+右侧信息面板直接提供渠道连接、设备命名、后台任务与长期记忆管理。微信／飞书点击连接进入扫码授权，加号打开统一添加弹窗；保留原有紧凑布局。
+
+<img src="docs/images/bot-channels.png" width="320" alt="微信已连接与紧凑后台任务控制" />
+
 **独立模型来源与紧凑设置**
 
 ![Bot 模型来源](docs/images/bot-model-sources.png)
