@@ -23,6 +23,7 @@ const channels: Record<string, string> = {
   slack: "Slack",
   dingtalk: '钉钉',
   qq: 'QQ',
+  custom: '自定义',
 };
 const children = computed(() =>
   props.conversations

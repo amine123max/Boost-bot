@@ -1,5 +1,7 @@
 import http from "node:http";
 import { validateBotInput } from '../core/bot-management.js';
+import { CustomTransport } from '../channels/messenger/custom.js';
+import { cachedMemoryTitle, generateMemoryTitles } from './memory-titles.js';
 import { createPanelTask, rememberPanelEntry, PanelActionError } from './panel-actions.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
 import { conversationMetrics } from "../core/conversation-metrics.js";
@@ -13,7 +15,7 @@ import { createRequire } from "node:module";
 import { appVersion, type App } from "../app.js";
 import type { InboundEvent, OutboundOp, ReplySession } from "../core/types.js";
 import { eventText, isMessenger, isPushChannel } from "../core/types.js";
-import type { PlatformError } from "../channels/messenger/transport.js";
+import { PlatformError } from "../channels/messenger/transport.js";
 import { findAppRoot } from "../magpie/supervisor.js";
 import { botAppApi, serveBotAppStatic } from "./botapp.js";
 import { logFilePath, logger, readLogTail, registerSecret } from "../log.js";
@@ -726,6 +728,14 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       const id = decodeURIComponent(seg[1] ?? "");
       if (!/^[\w-]{1,80}$/.test(id)) throw new HttpError(404, "not found");
       const sub = seg.slice(2).join("/");
+      if (sub === 'custom/test' && m === 'POST') {
+        const body = await readJson(req);
+        const credentials = { endpoint:String(body.endpoint || '').trim(), secret:String(body.secret || '').trim(), token:String(body.token || '').trim() };
+        registerSecret(credentials.secret); registerSecret(credentials.token);
+        try { await new CustomTransport(credentials).verify(); }
+        catch(error) { throw new HttpError(400, error instanceof PlatformError ? error.message : '接收端连接失败，请检查地址、签名与响应格式'); }
+        return send(res,200,{ok:true});
+      }
       if (sub === "channels" && m === "GET") return send(res, 200, app.channelStatus(id));
       if (seg.length === 4 && seg[3] === "settings" && m === "PUT") {
         const b = await readJson(req);
@@ -1412,6 +1422,10 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         try { return send(res, 200, { ok: true, message: rememberPanelEntry(app, id, await readJson(req)) }); }
         catch (error) { if (error instanceof PanelActionError) throw new HttpError(error.status, error.message); throw error; }
       }
+      if (sub === 'memory/titles' && m === 'POST') {
+        try { return send(res, 200, await generateMemoryTitles(app, id)); }
+        catch (error) { throw new HttpError(502, (error as Error).message); }
+      }
       if (sub === "memory" && m === "GET") {
         const scopes = [
           { kind: "team" as const, id: "" },
@@ -1426,8 +1440,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
             kind: s.kind,
             id: s.id,
             label: scopeLabel(s),
-            entries: app.agent.memory.entries(s).map((e) => ({ text: e.text, meta: e.meta })),
-            topics: app.agent.memory.topics(s).map((t) => ({ name: t, entries: app.agent.memory.entries(s, t).map((e) => ({ text: e.text, meta: e.meta })) })),
+            entries: app.agent.memory.entries(s).map((e) => ({ text: e.text, meta: e.meta, ...(s.kind === 'bot' ? {title: cachedMemoryTitle(app, id, e.text)} : {}) })),
+            topics: app.agent.memory.topics(s).map((t) => ({ name: t, entries: app.agent.memory.entries(s, t).map((e) => ({ text: e.text, meta: e.meta, ...(s.kind === 'bot' ? {title: cachedMemoryTitle(app, id, e.text, t)} : {}) })) })),
           })),
           journal: app.agent.memory.journalTail(30).filter((j) => j.scope === "team" || j.scope.includes(id)),
           steward: app.agent.stewardLog.filter((l) => l.conversationId.startsWith(id + ":")).slice(-20),
@@ -1571,7 +1585,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     const url = new URL(req.url || "/", "http://localhost");
     // QQ authenticates callbacks with Ed25519, independently of browser sessions.
     // The Boost service proxy still requires its existing server-side RPC token.
-    const qqHook = /^\/boost-bot\/amb\/hooks\/qq\/([\w-]{1,80})$/.exec(url.pathname);
+    const qqHook = /^\/boost-bot\/amb\/hooks\/(qq|custom)\/([\w-]{1,80})$/.exec(url.pathname);
     if (qqHook) {
       if (req.method !== 'POST') { res.writeHead(405).end(); return; }
       void (async () => {
@@ -1581,7 +1595,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           if (size > 1024 * 1024) { res.writeHead(413).end(); return; }
           chunks.push(Buffer.from(chunk));
         }
-        const reply = app.qqWebhook(qqHook[1]!, req.headers, Buffer.concat(chunks));
+        const reply = qqHook[1] === 'custom' ? app.customWebhook(qqHook[2]!, req.headers, Buffer.concat(chunks)) : app.qqWebhook(qqHook[2]!, req.headers, Buffer.concat(chunks));
         send(res, reply.status, reply.body);
       })().catch(() => { if (!res.headersSent) send(res, 400, { error: 'invalid_callback' }); });
       return;

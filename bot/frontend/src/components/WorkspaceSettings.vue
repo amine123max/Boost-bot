@@ -577,6 +577,7 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
 }
 .preferences-theme {
   max-width: 480px;
+  margin-inline: auto;
 }
 .preferences-actions {
   display: flex;

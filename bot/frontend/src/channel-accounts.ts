@@ -6,6 +6,7 @@ export const chatChannels = [
   { id: 'discord', name: 'Discord', connection: 'Bot Token' },
   { id: 'dingtalk', name: '钉钉', connection: '应用凭据 · Stream' },
   { id: 'qq', name: 'QQ', connection: '应用凭据 · HTTPS 回调' },
+  { id: 'custom', name: '自定义', connection: '签名 Webhook · HTTP API' },
 ] as const;
 export type ChatChannel = typeof chatChannels[number]['id'];
 export interface ChannelAccount {

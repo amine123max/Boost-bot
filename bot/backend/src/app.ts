@@ -1167,6 +1167,9 @@ export class App {
   qqWebhook(key: string, headers: Record<string, string | string[] | undefined>, body: Buffer) {
     return this.channels.get(key)?.messengers?.qq?.webhook(headers, body) ?? { status: 404, body: { error: 'channel_unavailable' } };
   }
+  customWebhook(key: string, headers: Record<string, string | string[] | undefined>, body: Buffer) {
+    return this.channels.get(key)?.messengers?.custom?.webhook(headers, body) ?? { status:404,body:{error:'channel_unavailable'} };
+  }
 
   /**
    * 连接（或改凭据）：留空的凭据沿用已保存的。凭据被平台拒绝就报错、不保存；一时连不上平台照样保存，渠道自己会重试。
@@ -1180,11 +1183,14 @@ export class App {
       if (!credentials[field]) throw new PlatformError(t("channel.messengerMissing", { channel: MESSENGER_LABEL[id] }), true);
     }
     if (id === 'qq') credentials.sandbox = input.sandbox === undefined ? old?.credentials.sandbox || 'false' : input.sandbox === true ? 'true' : 'false';
+    if (id === 'custom') credentials.token = String(input.token ?? '').trim() || old?.credentials.token || '';
+    if (id === 'custom') for (const value of Object.values(credentials)) registerSecret(value);
     const transport = this.opts.messengerTransport?.(id, key, credentials) ?? createTransport(id, key, credentials, this.store);
     let name = old?.name ?? "";
     try {
       name = (await transport.verify?.())?.name ?? name;
     } catch (e) {
+      if (id === 'custom') throw new PlatformError(e instanceof PlatformError ? e.message : '自定义渠道验证失败，请检查接收地址与签名密钥', true);
       if ((e as PlatformError).rejected) throw e;
       log.warn("couldn't verify the credentials now, saving anyway", { channel: id, message: (e as Error).message.slice(0, 200) });
     }
@@ -1380,6 +1386,7 @@ export class App {
       discord: this.messengerStatus(key, "discord"),
       dingtalk: this.messengerStatus(key, 'dingtalk'),
       qq: this.messengerStatus(key, 'qq'),
+      custom: this.messengerStatus(key, 'custom'),
     };
   }
 }

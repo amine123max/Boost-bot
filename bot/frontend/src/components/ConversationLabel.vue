@@ -10,6 +10,7 @@ const channels: Record<string, string> = {
   discord: "Discord",
   dingtalk: '钉钉',
   qq: 'QQ',
+  custom: '自定义',
 };
 const date = computed(() => {
   const value = new Date(props.createdAt);

@@ -113,6 +113,16 @@ node scripts/stage-boost-bot.mjs <package-directory>
 
 ## 验证
 
+管理聊天渠道可通过机器人 SVG 的“自定义”选项接入签名 Webhook／HTTP API。
+连接前验证 challenge，支持可选出站 Bearer Token、多账号独立命名／启停／绑定。
+协议与公网 Nginx 配置见[自定义渠道](CUSTOM_CHANNEL.md)；第三方服务需实现或适配此协议。
+
+信息面板的任务、渠道、账号管理、待审批及记忆统一折叠；记忆预览使用当前Bot的
+辅助模型（未设置时使用主模型），沿所选模型来源生成20字以内AI概括。
+相同内容持久缓存，重复请求合并且并发有界；失败保留本地短标题并允许重试。
+“主题：概括”同行展示，管理保留原文。记忆弹窗采用单行搜索框、紧凑间距和固定头尾，
+正文独立滚动。搜索下方的加号打开统一新增弹窗，删除在垃圾桶原位确认，“完成”使用主题底色。
+
 ```bash
 npm --prefix bot run build
 node scripts/check-repository.mjs

@@ -24,6 +24,16 @@ const flow = ref<FeishuFlow>();
 const reconnecting = ref(false);
 const settingsOnly = ref(false);
 const directEntry = ref(false), qrOnly = ref(false);
+const testResult = ref('');
+async function testCustom() {
+  if (busy.value || !credentials.endpoint || credentials.secret.length < 16) return;
+  busy.value = true; error.value = ''; testResult.value = '';
+  try {
+    await api(`/channel-accounts/${enc(key.value)}/custom/test`, { method:'POST', body:{ endpoint:credentials.endpoint, secret:credentials.secret, token:credentials.token } });
+    testResult.value = '连接验证通过';
+  } catch(e) { error.value = (e as Error).message; }
+  finally { busy.value = false; }
+}
 let attempt = 0;
 let accountLoad = 0;
 const credentials = reactive({
@@ -34,7 +44,10 @@ const credentials = reactive({
   appToken: "",
   clientId: '',
   clientSecret: '',
+  endpoint: '',
+  secret: '',
 });
+watch(() => [credentials.endpoint, credentials.secret, credentials.token], () => { testResult.value = ''; });
 const login = ref<Login | null>(null);
 let disposed = false,
   timer: ReturnType<typeof setTimeout> | undefined,
@@ -54,6 +67,7 @@ async function begin(kind?: ChatChannel, account?: Account, botId?: string, auto
   opening = true;
   error.value = "";
   login.value = null;
+  testResult.value = '';
   flow.value = undefined;
   reconnecting.value = !!account;
   settingsOnly.value = editOnly;
@@ -127,6 +141,7 @@ async function save() {
           ? { botToken: credentials.botToken, appToken: credentials.appToken }
           : channel.value === 'dingtalk' ? { clientId: credentials.clientId, clientSecret: credentials.clientSecret }
           : channel.value === 'qq' ? { appId: credentials.appId, clientSecret: credentials.clientSecret, sandbox: sandbox.value === 'true' }
+          : channel.value === 'custom' ? { endpoint: credentials.endpoint, secret: credentials.secret, token: credentials.token }
           : { token: credentials.token };
     await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}`, {
       method: "PUT",
@@ -314,13 +329,19 @@ onBeforeUnmount(() => {
             required
             type="password"
             autocomplete="new-password" /></label></template
-      ><template v-else-if="channel === 'dingtalk' || channel === 'qq'">
+      ><template v-else-if="channel === 'custom'">
+        <label><span>接收地址<HelpTip text="填写自定义服务接收 Boost 消息的 HTTP／HTTPS URL。连接时会发送签名 challenge，接收端需返回同一个 challenge。" /></span><input v-model="credentials.endpoint" type="url" required autocomplete="off" placeholder="https://example.com/boost/messages" /></label>
+        <label><span>签名密钥<HelpTip text="16–256字符，双向 HMAC-SHA256 签名；只保存在服务端，不放入回调 URL。" /></span><input v-model="credentials.secret" type="password" minlength="16" maxlength="256" required autocomplete="new-password" /></label>
+        <label>API Token（可选）<input v-model="credentials.token" type="password" autocomplete="new-password" /></label>
+        <label><span>入站回调路径<HelpTip text="由接入方将消息POST至此路径；公网部署通过Nginx服务器端注入RPC凭据，接入方只使用签名密钥。协议见项目自定义渠道文档。" /></span><input :value="'/boost-bot/amb/hooks/custom/' + key" readonly /></label>
+        <div class="custom-test"><button type="button" class="quiet-button" :disabled="busy || !credentials.endpoint || credentials.secret.length < 16" @click="testCustom">{{ busy ? '验证中…' : '测试连接' }}</button><span v-if="testResult" role="status">{{ testResult }}</span></div>
+      </template><template v-else-if="channel === 'dingtalk' || channel === 'qq'">
         <p>{{ channel === 'dingtalk' ? '使用钉钉企业内部应用，开启机器人 Stream 模式。' : '使用 QQ 开放平台的机器人应用凭据。' }}<HelpTip text="微信与飞书支持扫码连接；钉钉和 QQ 官方机器人使用应用凭据，不使用个人账号扫码令牌。" /></p>
         <label>{{ channel === 'dingtalk' ? 'Client ID' : 'App ID' }}<input v-if="channel === 'dingtalk'" v-model="credentials.clientId" required autocomplete="off" /><input v-else v-model="credentials.appId" required autocomplete="off" /></label>
         <label>Client Secret<input v-model="credentials.clientSecret" required type="password" autocomplete="new-password" /></label>
         <label v-if="channel === 'qq'">运行环境<SelectControl v-model="sandbox" label="QQ 运行环境" :options="[{ value: 'false', label: '正式环境' }, { value: 'true', label: '沙箱环境' }]" /></label>
         <label v-if="channel === 'qq'">回调路径<HelpTip text="在 QQ 开放平台填写经 Nginx 映射后的公网 HTTPS 地址。此入口校验平台 Ed25519 签名，服务代理仍需要服务器端 RPC 鉴权。" /><input :value="'/boost-bot/amb/hooks/qq/' + key" readonly /></label>
-      </template><label v-else-if="channel !== 'weixin' && channel !== 'feishu'"
+      </template><label v-else-if="channel !== 'weixin' && channel !== 'feishu' && channel !== 'custom'"
         >Token<input
           v-model="credentials.token"
           required
@@ -365,6 +386,7 @@ onBeforeUnmount(() => {
 </template>
 <style scoped>
 .channel-auth-heading { display:inline-flex; align-items:center; gap:7px; }
+.custom-test { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--green); }
 .channel-qr-stage { display: grid; justify-items: center; gap: 10px; padding: 16px 0; text-align: center; }
 .channel-qr-stage p { margin: 0; color: var(--muted); font-size: 12px; }
 .channel-qr-stage img { width: 200px; height: 200px; border-radius: 8px; padding: 6px; }

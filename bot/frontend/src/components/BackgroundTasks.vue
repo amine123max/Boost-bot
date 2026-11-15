@@ -6,6 +6,7 @@ import Icon from './Icon.vue';
 import HelpTip from './HelpTip.vue';
 import Modal from './Modal.vue';
 import SelectControl from './SelectControl.vue';
+import PanelSection from './PanelSection.vue';
 const props = defineProps<{ bot: Bot; configure: boolean }>();
 const emit = defineEmits<{ open: [task: Task]; saved: [] }>();
 const tasks = ref<Task[]>([]), error = ref(''), busy = ref(false), loaded = ref(false), expanded = ref(false);
@@ -51,8 +52,8 @@ watch(() => props.bot.id, () => { tasks.value=[]; loaded.value=false; expanded.v
 onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearTimeout(timer); });
 </script>
 <template>
-  <section class="background-tasks" aria-label="后台任务">
-    <div class="list-head">后台任务<HelpTip text="任务使用独立会话与目录执行，可并发运行。暂停后不启动新任务，正在运行的任务继续完成，直接对话不受影响。" label="后台任务说明" /><button v-if="configure" class="icon-btn task-create" aria-label="新建后台任务" :disabled="busy" @click="create"><Icon name="plus" :size="14" /></button></div>
+  <PanelSection class="background-tasks" title="后台任务" help="任务使用独立会话与目录执行，可并发运行。暂停后不启动新任务，正在运行的任务继续完成，直接对话不受影响。">
+    <template #actions><button v-if="configure" class="icon-btn task-create" aria-label="新建后台任务" :disabled="busy" @click="create"><Icon name="plus" :size="14" /></button></template>
     <div v-if="configure" class="background-controls">
       <button role="switch" :aria-checked="!paused" aria-label="启用后台任务" :disabled="busy" class="background-toggle" :class="{ enabled: !paused }" @click="settings({paused:!paused})">{{ paused ? '启用' : '已启用' }}</button>
       <span class="background-concurrency"><SelectControl :model-value="slots" :options="Array.from({length:8},(_,i)=>({value:String(i+1),label:(i+1)+'项并发'}))" label="并行后台任务数" :disabled="busy" @update:model-value="settings({taskSlots:Number($event)})" /><HelpTip text="当前智能体允许1–8项并行任务，所有智能体共享宿主的全局执行名额，超出上限的任务自动排队。" label="后台任务并发说明" /></span>
@@ -67,7 +68,7 @@ onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearT
       <p v-else-if="!loaded && !error" class="task-empty" role="status">正在读取任务…</p>
     </div>
     <button v-if="tasks.length>4" class="more-tasks" :aria-expanded="expanded" @click="expanded=!expanded">{{ expanded ? '收起' : '还有 '+(tasks.length-4)+' 项' }}</button>
-  </section>
+  </PanelSection>
   <Modal v-if="creating" compact :busy="busy" title="新建后台任务" @close="creating=false"><form class="editor-form" @submit.prevent="submit">
     <p v-if="formError" class="error-banner" role="alert">{{ formError }}</p>
     <p v-if="paused" class="hint">后台任务已暂停，新任务会排队等待启用。</p>

@@ -1,5 +1,10 @@
 # Nginx reverse proxy / 反向代理
 
+Custom signed HTTP bridges use [custom-webhook.conf.example](custom-webhook.conf.example).
+Keep RPC credentials server-side and forward both HMAC headers. Configure the actual
+account actor for service deployments; never trust public actor headers. See the
+[custom channel protocol](../bot/CUSTOM_CHANNEL.md) for challenge verification and payloads.
+
 [Project](../README.md) · [中文首页](../README.zh-CN.md) · [Build guide](../docs/BUILDING.md)
 
 ## QQ robot callbacks / QQ 机器人回调

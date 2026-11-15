@@ -4,7 +4,7 @@ import Icon from "./Icon.vue";
 import SpringSurface from "../../../../frontend/src/components/SpringSurface.vue";
 export default defineComponent({
   components: { Icon, SpringSurface },
-  props: { title: String, wide: Boolean, busy: Boolean, compact: Boolean, qr: Boolean },
+  props: { title: String, wide: Boolean, busy: Boolean, compact: Boolean, qr: Boolean, stable: Boolean },
   emits: ["close"],
   setup(props, { emit }) {
     const dialog = ref<HTMLDialogElement>(),
@@ -60,7 +60,7 @@ export default defineComponent({
         v-if="visible"
         ref="dialog"
         class="workspace-dialog"
-        :class="{ 'is-wide': wide, 'is-compact': compact, 'is-qr': qr }"
+        :class="{ 'is-wide': wide, 'is-compact': compact, 'is-qr': qr, 'is-stable': stable }"
         :aria-labelledby="titleId"
         @cancel.prevent="requestClose"
         @click="close"
@@ -86,6 +86,9 @@ export default defineComponent({
 <style scoped>
 .workspace-dialog.is-compact { width: min(384px, calc(100vw - 24px)); }
 .workspace-dialog.is-qr { width: min(304px, calc(100vw - 24px)); }
+.workspace-dialog.is-stable[open] { display:flex; flex-direction:column; height:min(520px,90dvh); overflow:hidden; }
+.workspace-dialog.is-stable>header { position:static; flex:none; }
+.workspace-dialog { overscroll-behavior:contain; overflow-anchor:none; }
 .workspace-dialog.is-compact :deep(.editor-form), .workspace-dialog.is-qr :deep(.editor-form) { gap: 12px; }
 .workspace-dialog.is-qr :deep(.dialog-actions) { gap: 6px; flex-wrap: wrap; }
 .workspace-dialog.is-qr :deep(.dialog-actions button) { padding-inline: 9px; font-size: 12px; }

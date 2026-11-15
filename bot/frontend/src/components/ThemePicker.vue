@@ -35,6 +35,7 @@ function select(value: string, event: MouseEvent) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+  margin-inline: auto;
 }
 .theme-options > button {
   display: grid;

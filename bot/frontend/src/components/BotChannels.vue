@@ -5,6 +5,7 @@ import HelpTip from './HelpTip.vue';
 import Icon from './Icon.vue';
 import SpringSurface from '../../../../frontend/src/components/SpringSurface.vue';
 import ChannelIcon from './ChannelIcon.vue';
+import PanelSection from './PanelSection.vue';
 const props = defineProps<{ accounts: ChannelAccount[]; busy: boolean }>();
 const emit = defineEmits<{ connect: [channel: ChatChannel, account?: ChannelAccount]; edit: [account: ChannelAccount]; more: [] }>();
 const expanded = ref<ChatChannel | null>(null);
@@ -12,7 +13,8 @@ const groups = computed(() => chatChannels.map(channel => ({ ...channel, account
 const isConnected = (account: ChannelAccount) => account.enabled && account.status?.state === 'connected';
 </script>
 <template>
-  <div class="list-head">渠道<HelpTip text="微信、飞书支持扫码；Telegram 使用机器人 Token。展开平台查看设备并自定义名称，更多平台通过右侧入口添加。" label="渠道说明" /><button class="icon-btn channel-more" aria-label="更多聊天渠道" :disabled="busy" @click="emit('more')"><Icon name="plus" :size="14" /></button></div>
+  <PanelSection title="渠道" help="微信、飞书支持扫码；Telegram 使用机器人 Token。展开平台查看设备并自定义名称，更多平台通过右侧入口添加。">
+    <template #actions><button class="icon-btn channel-more" aria-label="更多聊天渠道" :disabled="busy" @click="emit('more')"><Icon name="plus" :size="14" /></button></template>
   <div class="list bot-channels">
     <div v-for="channel in groups" :key="channel.id">
       <div class="row">
@@ -30,6 +32,7 @@ const isConnected = (account: ChannelAccount) => account.enabled && account.stat
       </div></SpringSurface>
     </div>
   </div>
+  </PanelSection>
 </template>
 <style scoped>
 .channel-label, .channel-name { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }

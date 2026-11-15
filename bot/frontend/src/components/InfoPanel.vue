@@ -13,6 +13,8 @@ import ConversationPlanCard from "./ConversationPlanCard.vue";
 import ChannelSettings from './ChannelSettings.vue';
 import { type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
 import BotChannels from './BotChannels.vue';
+import PanelSection from './PanelSection.vue';
+import BotApprovals from './BotApprovals.vue';
 const props = defineProps<{
   bot: Bot;
   bots: Bot[];
@@ -125,23 +127,11 @@ onBeforeUnmount(() => {
       <template v-if="configure">
       <BotChannels :key="bot.id" :accounts="accounts" :busy="channelBusy" @connect="connect" @edit="channelDialog?.editAccount($event)" @more="channelDialog?.begin(undefined, undefined, bot.id)" />
       <p v-if="channelError" class="notice" role="alert">{{ channelError }}</p>
-      <div class="list">
-        <div class="row">
-          <span class="channel-manage-label"><button class="channel-manage" @click="emit('settings')">管理聊天渠道</button><HelpTip text="微信、飞书等账号由所有智能体共用，可在设置中管理。" label="管理聊天渠道说明" /></span>
-        </div>
-      </div>
+      <PanelSection title="管理聊天渠道" help="管理工作台共用的渠道账号，可调整默认智能体、启停账号或添加新的连接。">
+        <ChannelSettings :bots="bots" embedded @changed="load" />
+      </PanelSection>
       </template>
-      <div class="list-head">待审批</div>
-      <div class="list">
-        <button
-          v-if="pending.length"
-          class="row clickable"
-          @click="emit('approvals')"
-        >
-          <span>{{ pending.length }} 项请求等待处理</span>
-        </button>
-        <div v-else class="row"><span class="hint">没有待处理的审批</span></div>
-      </div>
+      <BotApprovals :key="bot.id" :bot-id="bot.id" :configure="configure" :pending="pending" @changed="emit('saved')" />
       <BotMemory v-if="configure" :key="bot.id" :bot="bot" @saved="emit('saved')" />
       <div class="list-head">最近会话</div>
       <div class="list">

@@ -60,6 +60,7 @@ pub(crate) async fn proxy(request: Request) -> Response {
     for name in [
         "content-type", "accept", "range", "x-amb-lang",
         "x-signature-ed25519", "x-signature-timestamp", "x-bot-appid",
+        "x-boost-hook-timestamp", "x-boost-hook-signature",
     ] {
         if let Some(value) = parts.headers.get(name) {
             outbound = outbound.header(name, value);
@@ -116,6 +117,7 @@ mod tests {
                 "/boost-bot/amb/static/main.js",
                 "/boost-bot/amb/api/bots/default/chat/stream",
                 "/boost-bot/amb/hooks/qq/acct_example",
+                "/boost-bot/amb/hooks/custom/acct_example",
             ] {
                 let request = axum::http::Request::builder()
                     .uri(path)
