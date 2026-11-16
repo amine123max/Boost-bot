@@ -7,6 +7,7 @@
 | 工具 | 要求 |
 | --- | --- |
 | Node.js | 22.13+，推荐 24 LTS，与内置 Bot ABI 匹配 |
+| npm | Bot 依赖安装使用 11.6.2，与本地验证及发行工具链一致 |
 | pnpm | 10.30.3，按前端元数据固定 |
 | Rust | 当前稳定版，本地验证使用 1.96 |
 | 原生构建 | C/C++、CMake、Perl 与平台 SDK |
@@ -31,6 +32,7 @@
 从仓库根目录执行：
 
 ```sh
+npm install --global npm@11.6.2
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop

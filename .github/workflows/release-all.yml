@@ -59,6 +59,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Use the verified Bot dependency installer
+        run: npm install --global npm@11.6.2 --no-audit --no-fund
       - uses: pnpm/action-setup@v4
         with:
           version: 10.30.3

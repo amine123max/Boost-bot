@@ -171,6 +171,7 @@ Web 直接入口为 **12000**。桌面版管理本机 Rust/Node 运行时，不�
 ```sh
 git clone https://github.com/amine123max/Boost-bot.git
 cd Boost-bot
+npm install --global npm@11.6.2
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop

@@ -18,7 +18,7 @@ const targetArch = requestedArch === 'x86_64' ? 'x64' : requestedArch;
 if (!['x64','arm64'].includes(targetArch)) throw new Error(`Unsupported Bot architecture: ${targetArch}`);
 const cross = targetArch !== process.arch;
 function run(command, args, cwd = root) {
-  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32', windowsHide: true });
+  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32' && command.endsWith('.cmd'), windowsHide: true });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Boost Bot preparation failed: ${command} ${args.join(' ')}`);
 }

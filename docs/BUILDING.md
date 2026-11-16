@@ -7,6 +7,7 @@
 | Tool | Requirement |
 | --- | --- |
 | Node.js | 22.13+; 24 LTS recommended, matching the bundled Bot ABI |
+| npm | 11.6.2 for Bot dependency installation, matching the verified local and release toolchain |
 | pnpm | 10.30.3, pinned by frontend metadata |
 | Rust | Current stable; local validation uses 1.96 |
 | Native build | C/C++ compiler, CMake, Perl and platform SDK |
@@ -31,6 +32,7 @@ The build includes SQLite/SQLCipher and vendored crypto; no database server is r
 Run from the repository root:
 
 ```sh
+npm install --global npm@11.6.2
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop

@@ -171,6 +171,7 @@ Screenshots use isolated demonstration data. [Interface gallery](docs/SCREENSHOT
 ```sh
 git clone https://github.com/amine123max/Boost-bot.git
 cd Boost-bot
+npm install --global npm@11.6.2
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop
