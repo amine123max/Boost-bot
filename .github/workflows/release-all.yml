@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.portable_only && '[{"os":"windows-latest","target":"x86_64-pc-windows-msvc","bundles":"nsis"}]' || '[{"os":"windows-latest","target":"x86_64-pc-windows-msvc","bundles":"nsis"},{"os":"macos-15","target":"aarch64-apple-darwin","bundles":"dmg"}]') }}
+        include: ${{ fromJSON(inputs.portable_only && '[{"os":"windows-2022","target":"x86_64-pc-windows-msvc","bundles":"nsis"}]' || '[{"os":"windows-2022","target":"x86_64-pc-windows-msvc","bundles":"nsis"},{"os":"macos-15","target":"aarch64-apple-darwin","bundles":"dmg"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       BOOST_UPDATE_REPO: ${{ github.repository }}
@@ -58,9 +58,13 @@ jobs:
         run: mkdir -p "$TMPDIR"
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.12.0'
       - name: Use the verified Bot dependency installer
         run: npm install --global npm@11.6.2 --no-audit --no-fund
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.12'
       - uses: pnpm/action-setup@v4
         with:
           version: 10.30.3
@@ -80,6 +84,8 @@ jobs:
           pnpm -C frontend install --frozen-lockfile
           pnpm -C frontend run build:desktop
       - name: Prepare embedded Bot runtime
+        env:
+          npm_config_python: ${{ steps.python.outputs.python-path }}
         run: node scripts/prepare-boost-bot.mjs
       - name: Verify desktop storage and updater regressions
         if: ${{ !inputs.portable_only }}

@@ -6,7 +6,7 @@
 
 | 工具 | 要求 |
 | --- | --- |
-| Node.js | 22.13+，推荐 24 LTS，与内置 Bot ABI 匹配 |
+| Node.js | 22.13+，发行构建固定 24.12.0，与已验证 Bot ABI 一致 |
 | npm | Bot 依赖安装使用 11.6.2，与本地验证及发行工具链一致 |
 | pnpm | 10.30.3，按前端元数据固定 |
 | Rust | 当前稳定版，本地验证使用 1.96 |
@@ -19,7 +19,7 @@
 
 | 平台 | 依赖 |
 | --- | --- |
-| Windows | Visual Studio Build Tools C++ 桌面工作负载、MSVC、Windows SDK；桌面需 WebView2 |
+| Windows | Visual Studio 2022 Build Tools C++ 桌面工作负载、MSVC、Windows SDK；桌面需 WebView2 |
 | Windows SQLCipher | vendored OpenSSL 需要原生 Strawberry Perl，不能以 MSYS Perl 替代 |
 | macOS | Xcode Command Line Tools，在目标架构准备 Bot 并构建 |
 | Linux 服务 | C/C++、CMake、Perl、pkg-config，兼容原生依赖及私有可写数据目录 |

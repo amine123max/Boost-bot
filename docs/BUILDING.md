@@ -6,7 +6,7 @@
 
 | Tool | Requirement |
 | --- | --- |
-| Node.js | 22.13+; 24 LTS recommended, matching the bundled Bot ABI |
+| Node.js | 22.13+; release builds pin 24.12.0, matching the verified Bot ABI |
 | npm | 11.6.2 for Bot dependency installation, matching the verified local and release toolchain |
 | pnpm | 10.30.3, pinned by frontend metadata |
 | Rust | Current stable; local validation uses 1.96 |
@@ -19,7 +19,7 @@
 
 | Platform | Dependencies |
 | --- | --- |
-| Windows | Visual Studio Build Tools with C++ Desktop workload, MSVC, Windows SDK; WebView2 for desktop |
+| Windows | Visual Studio 2022 Build Tools with C++ Desktop workload, MSVC, Windows SDK; WebView2 for desktop |
 | Windows SQLCipher | Native Strawberry Perl for vendored OpenSSL; MSYS Perl is not a substitute |
 | macOS | Xcode Command Line Tools; build and prepare Bot on the target architecture |
 | Linux service | C/C++, CMake, Perl, pkg-config; supported native dependencies and private writable data |
