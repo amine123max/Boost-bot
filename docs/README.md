@@ -24,7 +24,6 @@ Guides are organized by technical responsibility. The normal direct Web entry is
 | Security / 安全 | [Read](../SECURITY.md) | [阅读](../SECURITY.zh-CN.md) |
 | Documentation standards / 文档规范 | [Read](DOCUMENTATION.md) | [阅读](DOCUMENTATION.zh-CN.md) |
 | Repository review / 仓库审查 | [Read](REPOSITORY-AUDIT.md) | [阅读](REPOSITORY-AUDIT.zh-CN.md) |
-| Engineering work plan / 工程任务 | [Read](../update.en.md) | [阅读](../update.md) |
 
 ## Operating manuals
 

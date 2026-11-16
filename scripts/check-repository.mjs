@@ -48,7 +48,7 @@ function walk(directory, predicate) {
 for (const path of walk(root, path => relative(root, path).split(/[\\/]/).some(part => ['test', 'tests', '__tests__'].includes(part))))
   errors.push(`layout: standalone test file ${relative(root, path)}`);
 const documents = [
-  ...readdirSync(root).filter(name => name.endsWith('.md')).map(name => resolve(root, name)),
+  ...readdirSync(root).filter(name => name.endsWith('.md') && !['update.md','update.en.md','task.md'].includes(name)).map(name => resolve(root, name)),
   ...walk(resolve(root, 'docs'), path => path.endsWith('.md')),
   ...['frontend','backend','bot','docker','nginx','scripts'].flatMap(name =>
     ['README.md','README.zh-CN.md'].map(file => resolve(root, name, file)).filter(existsSync)),

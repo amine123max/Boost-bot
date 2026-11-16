@@ -73,6 +73,10 @@ codex resume 019cbbf9-0037-73b1-b353-1cd0946a1acd
 
 # Project-local temporary work
 /tmp/
+# Local implementation plans and task records
+/update.md
+/update.en.md
+/task.md
 /frontend/out/
 /frontend/.next/
 /frontend/test-results/

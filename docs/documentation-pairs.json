@@ -8,7 +8,9 @@
     "docs/ko/"
   ],
   "excludedFiles": [
-    "task.md"
+    "task.md",
+    "update.md",
+    "update.en.md"
   ],
   "pairs": [
     {
@@ -246,10 +248,6 @@
     {
       "en": "TESTING.md",
       "zh": "TESTING.zh-CN.md"
-    },
-    {
-      "en": "update.en.md",
-      "zh": "update.md"
     },
     {
       "en": "docs/releases/v0.5.0.md",

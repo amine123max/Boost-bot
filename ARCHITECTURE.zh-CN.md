@@ -1,6 +1,6 @@
 # 系统架构
 
-[English](ARCHITECTURE.md) · [项目首页](README.zh-CN.md) · [配置参考](docs/CONFIGURATION.zh-CN.md) · [工程计划](update.md)
+[English](ARCHITECTURE.md) · [项目首页](README.zh-CN.md) · [配置参考](docs/CONFIGURATION.zh-CN.md)
 
 Boost 采用共享 Rust 核心服务，分别承接桌面管理、Web 管理、模型推理和 Bot 执行。架构按数据流、身份与资源预算划分，SQLite 负责持久化，Nginx 和 FastAPI 为可选部署组件。
 
@@ -83,7 +83,7 @@ flowchart LR
 
 熔断按稳定来源 ID 隔离账号与聚合渠道。60 秒窗口采用 1 秒统计桶，至少 20 个有效样本且错误率严格大于 50% 时打开 30 秒，半开仅允许一个逻辑探测。客户端错误、本地限流与取消不计作上游故障；上游 429 继续走独立冷却。已输出流式内容或产生工具副作用的请求不能当作无副作用任务重放。
 
-结算使用服务生成的 trace 与 key 组成唯一身份，历史无身份记录保持原样。请求日志与 Token 数据在同一事务提交；重复 finalize 复用结算事件，钱包按请求日志 ID 幂等扣费。限速和在途控制不等于严格的累计预算预留；后者的剩余工作见 T10。
+结算使用服务生成的 trace 与 key 组成唯一身份，历史无身份记录保持原样。请求日志与 Token 数据在同一事务提交；重复 finalize 复用结算事件，钱包按请求日志 ID 幂等扣费。限速和在途控制不等于严格的累计预算预留；持久跨进程恢复不属于当前预留实现。
 
 实现依据：[资源限制](backend/service/src/gateway/request_limits.rs)、[熔断](backend/service/src/gateway/routing/circuit.rs)、[协议模块](backend/service/src/gateway/README.md)。
 
@@ -121,7 +121,7 @@ flowchart LR
   Host --> State[("会话 / outbox")]
 ```
 
-Web 从会话推导 actor，服务负责归属检查和进程托管。Bot 通过受权平台 key 调用模型，渠道保留签名校验与消息去重，浏览器不获得内部 RPC 凭据。工作目录和审批不等同操作系统沙箱，跨平台权限隔离属于 T12。
+Web 从会话推导 actor，服务负责归属检查和进程托管。Bot 通过受权平台 key 调用模型，渠道保留签名校验与消息去重，浏览器不获得内部 RPC 凭据。工作目录和审批不等同操作系统沙箱，系统沙箱需要独立的平台级执行约束。
 
 ## Nginx 与网络接入
 
@@ -143,6 +143,6 @@ Bot 虚拟主机连接上限为 512；FastAPI 每 worker 默认 256 活跃、512
 
 根 Cargo 工作区包含 core/service/web/start，桌面包保留独立 lockfile。Vite 输出 `frontend/out`，Web 嵌入此产物，Tauri 引用同一产物；Node/Bot 资源在打包前准备。
 
-启动器对其创建的 Service/Web 使用有界指数重启预算，退出最多排空 30 秒。更新验签及主/Bot 加密分别有回归。schema 兼容回退、持久额度恢复与平台沙箱仍需独立验收。
+启动器对其创建的 Service/Web 使用有界指数重启预算，退出时为子进程预留最多 30 秒。更新验签及主/Bot 加密分别有回归。schema 兼容回退、持久额度恢复与平台沙箱仍需独立验收。
 
-[验证要求](TESTING.md) · [配置](docs/CONFIGURATION.zh-CN.md) · [安全](SECURITY.md) · [实施批次](update.md)
+[验证要求](TESTING.md) · [配置](docs/CONFIGURATION.zh-CN.md) · [安全](SECURITY.md)

@@ -1,6 +1,6 @@
 # 验证说明
 
-[English](TESTING.md) · [构建](docs/BUILDING.zh-CN.md) · [工程计划](update.md)
+[English](TESTING.md) · [构建](docs/BUILDING.zh-CN.md) · [系统架构](ARCHITECTURE.zh-CN.md)
 
 仓库保留产品源码内的 Rust 单元测试；独立测试目录与专属测试包命令已按用户要求移除。构建通过仅证明该环境下的类型检查/编译，不代表真实上游、操作系统和发布包全部通过。
 

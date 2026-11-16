@@ -1,6 +1,6 @@
 # Security
 
-[简体中文](SECURITY.zh-CN.md) · [Architecture](ARCHITECTURE.md) · [Hardening plan](update.md)
+[简体中文](SECURITY.zh-CN.md) · [Architecture](ARCHITECTURE.md)
 
 ## Reporting
 
@@ -38,4 +38,4 @@ Capacity controls are process-local. They bound admission and buffered input but
 
 Do not commit databases, private keys, passwords, Authorization/Cookie headers, access/refresh/ID tokens, internal RPC credentials or platform keys. Redact URLs containing secrets and diagnostic SQL. Preserve [licenses and notices](bot/THIRD_PARTY_NOTICES_en.md).
 
-Release checks cover version consistency, tamper rejection where implemented, platform packaging, checksums and schema compatibility. Fixed HTTPS download URLs or SHA-256 files alone do not establish publisher authenticity; signing and rollback requirements remain explicit in T05/T15.
+Release checks cover version consistency, tamper rejection where implemented, platform packaging, checksums and schema compatibility. Fixed HTTPS download URLs or SHA-256 files alone do not establish publisher authenticity; Ed25519 authenticates current assets, while compatible downgrade remains a separate requirement.

@@ -24,7 +24,6 @@
 | 安全 | [阅读](../SECURITY.zh-CN.md) | [Read](../SECURITY.md) |
 | 文档规范 | [阅读](DOCUMENTATION.zh-CN.md) | [Read](DOCUMENTATION.md) |
 | 仓库审查 | [阅读](REPOSITORY-AUDIT.zh-CN.md) | [Read](REPOSITORY-AUDIT.md) |
-| 工程任务 | [阅读](../update.md) | [Read](../update.en.md) |
 
 ## 运行手册
 

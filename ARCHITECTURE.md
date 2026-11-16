@@ -1,6 +1,6 @@
 # System architecture
 
-[简体中文](ARCHITECTURE.zh-CN.md) · [Overview](README.md) · [Configuration](docs/CONFIGURATION.md) · [Engineering plan](update.md)
+[简体中文](ARCHITECTURE.zh-CN.md) · [Overview](README.md) · [Configuration](docs/CONFIGURATION.md)
 
 Boost shares one Rust service across desktop management, Web management, model inference and agent execution. Identity boundaries and resource budgets separate these paths. SQLite owns persistence; Nginx and FastAPI are optional deployment components.
 
@@ -83,7 +83,7 @@ Defaults are 20 QPS, burst 20, 24 global in-flight requests and 8 per model; per
 
 Circuits isolate stable account and aggregate-source IDs. A 60-second window uses one-second buckets; at least 20 eligible samples and an error rate strictly greater than 50% open a circuit for 30 seconds. Half-open admits one logical probe. Client errors, local limits and cancellation do not count as provider failures; upstream 429 uses separate cooldown policy. Retry decisions must account for already-delivered stream bytes and tool side effects.
 
-Settlement derives a unique identity from the server trace and key. Historical rows remain unchanged. Request logs and token data commit in one transaction; duplicate finalization reuses the event, and wallet charges are idempotent by request-log ID. Rate and in-flight admission are distinct from strict cumulative-budget reservation; the remaining work is tracked in T10.
+Settlement derives a unique identity from the server trace and key. Historical rows remain unchanged. Request logs and token data commit in one transaction; duplicate finalization reuses the event, and wallet charges are idempotent by request-log ID. Rate and in-flight admission are distinct from strict cumulative-budget reservation; durable cross-process recovery is outside the current reservation contract.
 
 Sources: [admission](backend/service/src/gateway/request_limits.rs), [circuits](backend/service/src/gateway/routing/circuit.rs), [gateway modules](backend/service/src/gateway/README.md).
 
@@ -121,7 +121,7 @@ flowchart LR
   Host --> State[("Conversations / outbox")]
 ```
 
-Web derives the actor from the session; Service enforces ownership and hosts the process. Bots use authorized platform keys for inference. Channel signatures and message deduplication remain independent of internal RPC authentication. Browsers do not receive internal RPC credentials. Working-directory restrictions and approvals are not equivalent to OS sandboxing; platform isolation is tracked in T12.
+Web derives the actor from the session; Service enforces ownership and hosts the process. Bots use authorized platform keys for inference. Channel signatures and message deduplication remain independent of internal RPC authentication. Browsers do not receive internal RPC credentials. Working-directory restrictions and approvals are not equivalent to OS sandboxing; OS sandboxing requires separate platform-specific enforcement.
 
 ## Nginx and network ingress
 
@@ -145,6 +145,6 @@ Sources: [Nginx](nginx/README.md), [Bot ingress](bot/backend/api/README.md), [Do
 
 The root Cargo workspace contains core/service/web/start; desktop retains its independent lockfile. Vite emits `frontend/out`; Web embeds that output and Tauri references it. Node/Bot preparation precedes packaging.
 
-The launcher restarts its owned Service/Web children with a bounded exponential budget and drains shutdown up to 30 seconds. Signed-update verification and main/Bot storage have separate regressions. Schema-compatible rollback, durable quota recovery and platform sandboxing remain explicit follow-up gates.
+The launcher restarts its owned Service/Web children with a bounded exponential budget and allows up to 30 seconds for owned services to exit. Signed-update verification and main/Bot storage have separate regressions. Schema-compatible rollback, durable quota recovery and platform sandboxing remain explicit follow-up gates.
 
-[Validation](TESTING.md) · [Configuration](docs/CONFIGURATION.md) · [Security](SECURITY.md) · [Implementation batches](update.md)
+[Validation](TESTING.md) · [Configuration](docs/CONFIGURATION.md) · [Security](SECURITY.md)

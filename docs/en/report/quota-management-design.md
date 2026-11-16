@@ -43,4 +43,4 @@ Settlement identity is server-generated and key-scoped. Logs/token records commi
 
 Present source/model/key aggregates, remaining/unknown states, price provenance and effective time. Members only receive owned data; global source policy is administrator-controlled. Missing usage must not appear as zero.
 
-Verify expiry/window rollover, retained-history totals, custom-price preservation, ownership, duplicate settlement, concurrent budget admission and negative/unsupported balance responses. [Engineering plan](../../../update.en.md) distinguishes delivered controls from remaining audit, reconciliation and recovery work.
+Verify expiry/window rollover, retained-history totals, custom-price preservation, ownership, duplicate settlement, concurrent budget admission and negative/unsupported balance responses. [system architecture](../../../ARCHITECTURE.md) distinguishes delivered controls from remaining audit, reconciliation and recovery work.

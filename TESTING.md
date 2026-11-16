@@ -1,6 +1,6 @@
 # Validation
 
-[简体中文](TESTING.zh-CN.md) · [Build](docs/BUILDING.md) · [Engineering plan](update.en.md)
+[简体中文](TESTING.zh-CN.md) · [Build](docs/BUILDING.md) · [system architecture](ARCHITECTURE.md)
 
 The repository retains inline Rust unit tests. Standalone test directories and dedicated test package commands were removed at the user's request. Compilation establishes type/build compatibility in the tested environment, not acceptance of every provider, operating system or release package.
 

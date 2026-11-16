@@ -1,6 +1,6 @@
 # 安全说明
 
-[English](SECURITY.md) · [系统架构](ARCHITECTURE.zh-CN.md) · [加固计划](update.md)
+[English](SECURITY.md) · [系统架构](ARCHITECTURE.zh-CN.md)
 
 ## 报告方式
 
@@ -38,4 +38,4 @@
 
 不得提交数据库、私钥、密码、Authorization/Cookie、access/refresh/ID token、内部 RPC 凭据和平台 key。URL 中的秘密与诊断 SQL 同样脱敏。保留[许可与第三方声明](bot/THIRD_PARTY_NOTICES.md)。
 
-发布验收覆盖版本、已实现的篡改拒绝、平台打包、校验和及 schema 兼容。HTTPS 固定来源或 SHA-256 文件本身不证明发布者身份；签名和回滚要求由 T05/T15 明确跟踪。
+发布验收覆盖版本、已实现的篡改拒绝、平台打包、校验和及 schema 兼容。HTTPS 固定来源或 SHA-256 文件本身不证明发布者身份；当前通过 Ed25519 验证附件，兼容降级仍需独立实现。

@@ -59,7 +59,7 @@ Circuits isolate account and aggregate IDs. Network/5xx failures are eligible; l
 
 Server-generated trace identity includes a random process nonce. Settlement combines that identity with the key, so client-provided IDs cannot suppress billing. Request-log/token rows commit together; duplicate finalization reuses the record. Wallet request charges are checked under an immediate transaction and deducted once.
 
-Historical rows are preserved. Exact provider billing, crash-consistent reservations and cross-process budgets remain distinct requirements; see [T10](../../../../update.md).
+Historical rows are preserved. Exact provider billing, crash-consistent reservations and cross-process budgets remain distinct requirements; see [technical boundaries](../../../../ARCHITECTURE.md).
 
 ## Changes and verification
 

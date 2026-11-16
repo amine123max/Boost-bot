@@ -50,7 +50,7 @@ Thanks to Linux DO for providing a place for technical discussion and open-sourc
 | Agent workspace | Conversations, tasks, approvals, tools and signed messaging channels |
 | Operations | Source circuits, request diagnostics, bounded queues, upstream proxies, managed sing-box and native monitoring |
 
-Protocol support depends on the configured upstream. Main SQLCipher and per-actor Bot encryption are explicitly enabled; workspaces/logs are outside database encryption. Acceptance and remaining work are tracked in the [engineering plan](update.en.md).
+Protocol support depends on the configured upstream. Main SQLCipher and per-actor Bot encryption are explicitly enabled; workspaces/logs are outside database encryption. Implementation boundaries and validation are described in the [system architecture](ARCHITECTURE.md).
 
 ## Architecture
 

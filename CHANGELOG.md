@@ -6,7 +6,7 @@ Published versions and downloadable assets are maintained in [GitHub Releases](h
 
 ## 0.5.1 reliability refresh
 
-Verified WAL and explicit main/Bot encryption, resource-domain RPC scheduling, bounded gateway admission, source circuits, idempotent settlement and signed-update verification. Gateway controls now open from Boost advanced settings; detailed explanations use SVG hints. See [release notes](docs/releases/v0.5.1.md), [measured capacity](docs/PERFORMANCE.md) and [remaining scope](update.en.md).
+Verified WAL and explicit main/Bot encryption, resource-domain RPC scheduling, bounded gateway admission, source circuits, idempotent settlement and signed-update verification. Gateway controls now open from Boost advanced settings; detailed explanations use SVG hints. See [release notes](docs/releases/v0.5.1.md), [measured capacity](docs/PERFORMANCE.md) and [technical boundaries](ARCHITECTURE.md).
 
 ## Historical records
 

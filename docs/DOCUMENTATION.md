@@ -13,12 +13,11 @@ README retains the project identity, community acknowledgement, current screensh
 | Document family | Convention |
 | --- | --- |
 | Root/module guide | NAME.md and NAME.zh-CN.md |
-| Chinese-led engineering plan | update.md and update.en.md |
 | Existing language manuals | docs/en and docs/zh-CN with explicit pair mapping |
 | Release notes | Matching English/Chinese files; workflow publishes paired content |
 | Third-party legal notices | Translated explanations; original license grant remains verbatim |
 
-The machine-readable [pair registry](documentation-pairs.json) names each maintained public pair. Existing Russian/Korean translations remain additional locale material. Bundled personas, skill instructions and template Markdown are runtime/vendor inputs, not renamed by public-guide maintenance; historical task.md is a separate working record. They retain their entry semantics and provenance rather than receiving placeholder translations.
+The machine-readable [pair registry](documentation-pairs.json) names each maintained public pair. Existing Russian/Korean translations remain additional locale material. Bundled personas, skill instructions and template Markdown are runtime/vendor inputs, not renamed by public-guide maintenance; local implementation plans and task records are excluded from Git. They retain their entry semantics and provenance rather than receiving placeholder translations.
 
 For a behavior/default change, update both paired versions in the same delivery. Preserve equivalent scope, not identical word count. Navigation and diagrams must lead to the matching locale. A bilingual title in one file is not a substitute for a paired guide.
 
