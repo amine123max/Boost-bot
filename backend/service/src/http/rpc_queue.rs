@@ -1,22 +1,41 @@
+use super::rpc_policy::{classify, Resource, RpcClass};
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll, Wake, Waker};
 use std::time::{Duration, Instant};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{
+    OwnedRwLockReadGuard, OwnedRwLockWriteGuard, OwnedSemaphorePermit, RwLock, Semaphore,
+};
 
 pub(super) const RPC_QUEUE_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const RPC_CONCURRENCY: usize = 6;
 const RPC_MAX_WAITING: usize = 256;
+const RPC_READ_CONCURRENCY: usize = 16;
+const RPC_RESOURCE_MAX_WAITING: usize = 32;
 
 /// Shared by all users, connections and HTTP entrypoints in one service process.
-pub(super) struct RpcQueue {
+pub(crate) struct RpcQueue {
     running: Arc<Semaphore>,
     admitted: Arc<Semaphore>,
+    reads: Arc<Semaphore>,
+    barrier: Arc<RwLock<()>>,
+    resources: [(Arc<Semaphore>, Arc<Semaphore>); 7],
+    write_concurrency: usize,
+    write_capacity: usize,
+    rejected: AtomicU64,
+    timed_out: AtomicU64,
+    admitted_total: AtomicU64,
+    wait_microseconds: AtomicU64,
 }
 
 pub(super) struct RpcPermit {
     _running: OwnedSemaphorePermit,
-    _admitted: OwnedSemaphorePermit,
+    _admitted: Option<OwnedSemaphorePermit>,
+    _resource: Option<OwnedSemaphorePermit>,
+    _resource_admitted: Option<OwnedSemaphorePermit>,
+    _shared: Option<OwnedRwLockReadGuard<()>>,
+    _exclusive: Option<OwnedRwLockWriteGuard<()>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,10 +49,27 @@ impl RpcQueue {
         Self {
             running: Arc::new(Semaphore::new(concurrency)),
             admitted: Arc::new(Semaphore::new(concurrency + max_waiting)),
+            reads: Arc::new(Semaphore::new(RPC_READ_CONCURRENCY)),
+            barrier: Arc::new(RwLock::new(())),
+            resources: std::array::from_fn(|_| {
+                (
+                    Arc::new(Semaphore::new(1)),
+                    Arc::new(Semaphore::new(
+                        max_waiting.min(RPC_RESOURCE_MAX_WAITING) + 1,
+                    )),
+                )
+            }),
+            write_concurrency: concurrency,
+            write_capacity: concurrency + max_waiting,
+            rejected: AtomicU64::new(0),
+            timed_out: AtomicU64::new(0),
+            admitted_total: AtomicU64::new(0),
+            wait_microseconds: AtomicU64::new(0),
         }
     }
 
     // Holding the admission permit also bounds futures waiting for execution.
+    #[cfg(test)]
     async fn acquire_slot(&self) -> Result<RpcPermit, QueueError> {
         let admitted = self
             .admitted
@@ -48,23 +84,153 @@ impl RpcQueue {
             .map_err(|_| QueueError::Full)?;
         Ok(RpcPermit {
             _running: running,
-            _admitted: admitted,
+            _admitted: Some(admitted),
+            _resource: None,
+            _resource_admitted: None,
+            _shared: None,
+            _exclusive: None,
         })
     }
 
+    #[cfg(test)]
     pub(super) async fn acquire(&self) -> Result<RpcPermit, QueueError> {
         self.acquire_with_timeout(RPC_QUEUE_WAIT_TIMEOUT).await
     }
 
+    #[cfg(test)]
     async fn acquire_with_timeout(&self, timeout: Duration) -> Result<RpcPermit, QueueError> {
         tokio::time::timeout(timeout, self.acquire_slot())
             .await
             .map_err(|_| QueueError::Timeout)?
     }
 
+    async fn acquire_class(&self, class: RpcClass) -> Result<RpcPermit, QueueError> {
+        if class == RpcClass::Read {
+            // Reads never accumulate a hidden queue, including behind maintenance.
+            let shared = self
+                .barrier
+                .clone()
+                .try_read_owned()
+                .map_err(|_| QueueError::Full)?;
+            let running = self
+                .reads
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| QueueError::Full)?;
+            return Ok(RpcPermit {
+                _running: running,
+                _admitted: None,
+                _resource: None,
+                _resource_admitted: None,
+                _shared: Some(shared),
+                _exclusive: None,
+            });
+        }
+        let resource = match class {
+            RpcClass::Write(resource) => resource,
+            _ => Resource::Maintenance,
+        } as usize;
+        let (serial, capacity) = &self.resources[resource];
+        // Reserve both bounded capacities before waiting; one hot domain cannot fill the process.
+        let resource_admitted = capacity
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| QueueError::Full)?;
+        let admitted = self
+            .admitted
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| QueueError::Full)?;
+        let resource = serial
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| QueueError::Full)?;
+        let (shared, exclusive) = if class == RpcClass::Exclusive {
+            (None, Some(self.barrier.clone().write_owned().await))
+        } else {
+            (Some(self.barrier.clone().read_owned().await), None)
+        };
+        // Crucially, waiting for a domain never consumes a global execution slot.
+        let running = self
+            .running
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| QueueError::Full)?;
+        Ok(RpcPermit {
+            _running: running,
+            _admitted: Some(admitted),
+            _resource: Some(resource),
+            _resource_admitted: Some(resource_admitted),
+            _shared: shared,
+            _exclusive: exclusive,
+        })
+    }
+
+    pub(super) async fn acquire_for(&self, method: &str) -> Result<RpcPermit, QueueError> {
+        let started = Instant::now();
+        let result =
+            tokio::time::timeout(RPC_QUEUE_WAIT_TIMEOUT, self.acquire_class(classify(method)))
+                .await
+                .unwrap_or(Err(QueueError::Timeout));
+        self.record_admission(started, &result);
+        result
+    }
+
+    pub(super) fn acquire_blocking_for(&self, method: &str) -> Result<RpcPermit, QueueError> {
+        let started = Instant::now();
+        let result = self.block_on_slot(self.acquire_class(classify(method)));
+        self.record_admission(started, &result);
+        result
+    }
+
+    fn record_admission(&self, started: Instant, result: &Result<RpcPermit, QueueError>) {
+        match result {
+            Ok(_) => {
+                self.admitted_total.fetch_add(1, Ordering::Relaxed);
+                self.wait_microseconds.fetch_add(
+                    started.elapsed().as_micros().min(u64::MAX as u128) as u64,
+                    Ordering::Relaxed,
+                );
+            }
+            Err(QueueError::Full) => {
+                self.rejected.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(QueueError::Timeout) => {
+                self.timed_out.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    pub(crate) fn snapshot(&self) -> RpcQueueSnapshot {
+        let active_writes = self
+            .write_concurrency
+            .saturating_sub(self.running.available_permits());
+        let admitted = self
+            .write_capacity
+            .saturating_sub(self.admitted.available_permits());
+        RpcQueueSnapshot {
+            active_writes,
+            active_reads: RPC_READ_CONCURRENCY.saturating_sub(self.reads.available_permits()),
+            waiting_writes: admitted.saturating_sub(active_writes),
+            write_concurrency: self.write_concurrency,
+            read_concurrency: RPC_READ_CONCURRENCY,
+            waiting_limit: self.write_capacity.saturating_sub(self.write_concurrency),
+            per_resource_waiting_limit: RPC_RESOURCE_MAX_WAITING,
+            rejected_total: self.rejected.load(Ordering::Relaxed),
+            timed_out_total: self.timed_out.load(Ordering::Relaxed),
+            admitted_total: self.admitted_total.load(Ordering::Relaxed),
+            wait_microseconds_total: self.wait_microseconds.load(Ordering::Relaxed),
+        }
+    }
+
     /// The legacy tiny_http workers have no Tokio runtime. A thread waker lets
     /// them use the same fair semaphore as Axum, without a second queue/pool.
-    pub(super) fn acquire_blocking(&self) -> Result<RpcPermit, QueueError> {
+    fn block_on_slot(
+        &self,
+        future: impl Future<Output = Result<RpcPermit, QueueError>>,
+    ) -> Result<RpcPermit, QueueError> {
         struct ThreadWaker(std::thread::Thread);
         impl Wake for ThreadWaker {
             fn wake(self: Arc<Self>) {
@@ -76,7 +242,7 @@ impl RpcQueue {
         }
         let waker = Waker::from(Arc::new(ThreadWaker(std::thread::current())));
         let mut context = Context::from_waker(&waker);
-        let mut future = std::pin::pin!(self.acquire_slot());
+        let mut future = std::pin::pin!(future);
         let deadline = Instant::now() + RPC_QUEUE_WAIT_TIMEOUT;
         loop {
             if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
@@ -89,11 +255,32 @@ impl RpcQueue {
             std::thread::park_timeout(remaining);
         }
     }
+
+    #[cfg(test)]
+    fn acquire_blocking(&self) -> Result<RpcPermit, QueueError> {
+        self.block_on_slot(self.acquire_slot())
+    }
 }
 
-pub(super) fn global() -> &'static RpcQueue {
+pub(crate) fn global() -> &'static RpcQueue {
     static QUEUE: OnceLock<RpcQueue> = OnceLock::new();
     QUEUE.get_or_init(|| RpcQueue::new(RPC_CONCURRENCY, RPC_MAX_WAITING))
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RpcQueueSnapshot {
+    pub active_writes: usize,
+    pub active_reads: usize,
+    pub waiting_writes: usize,
+    pub write_concurrency: usize,
+    pub read_concurrency: usize,
+    pub waiting_limit: usize,
+    pub per_resource_waiting_limit: usize,
+    pub rejected_total: u64,
+    pub timed_out_total: u64,
+    pub admitted_total: u64,
+    pub wait_microseconds_total: u64,
 }
 
 #[cfg(test)]
@@ -188,5 +375,123 @@ mod tests {
     #[test]
     fn the_service_queue_is_process_global() {
         assert!(std::ptr::eq(global(), global()));
+    }
+
+    #[test]
+    fn hot_resource_is_bounded_without_occupying_other_execution_slots() {
+        runtime().block_on(async {
+            let queue = RpcQueue::new(6, 256);
+            let first = queue.acquire_for("account/import").await.unwrap();
+            let mut waiting = Vec::new();
+            for _ in 0..RPC_RESOURCE_MAX_WAITING {
+                let mut future = Box::pin(queue.acquire_for("account/import"));
+                assert!(future.as_mut().now_or_never().is_none());
+                waiting.push(future);
+            }
+            assert!(matches!(
+                queue.acquire_for("account/import").await,
+                Err(QueueError::Full)
+            ));
+            assert_eq!(queue.running.available_permits(), 5);
+            let key = queue.acquire_for("apikey/create").await.unwrap();
+            let read = queue.acquire_for("account/list").await.unwrap();
+            assert_eq!(queue.running.available_permits(), 4);
+            drop(waiting);
+            drop((first, key, read));
+            assert_eq!(queue.admitted.available_permits(), 262);
+            assert_eq!(queue.resources[0].1.available_permits(), 33);
+        });
+    }
+
+    #[test]
+    fn same_resource_stays_fifo_and_cancellation_releases_capacity() {
+        runtime().block_on(async {
+            let queue = RpcQueue::new(6, 256);
+            let first = queue.acquire_for("account/import").await.unwrap();
+            let mut second = Box::pin(queue.acquire_for("account/import"));
+            let mut third = Box::pin(queue.acquire_for("account/warmup"));
+            assert!(second.as_mut().now_or_never().is_none());
+            assert!(third.as_mut().now_or_never().is_none());
+            drop(first);
+            assert!(third.as_mut().now_or_never().is_none());
+            let second = second.await.unwrap();
+            drop(third);
+            assert_eq!(queue.resources[0].1.available_permits(), 32);
+            drop(second);
+            assert_eq!(queue.resources[0].1.available_permits(), 33);
+        });
+    }
+
+    #[test]
+    fn reads_are_independent_bounded_and_never_queued() {
+        runtime().block_on(async {
+            let queue = RpcQueue::new(1, 1);
+            let writer = queue.acquire_for("account/import").await.unwrap();
+            let mut reads = Vec::new();
+            for _ in 0..RPC_READ_CONCURRENCY {
+                reads.push(queue.acquire_for("account/list").await.unwrap());
+            }
+            assert!(matches!(
+                queue.acquire_for("account/list").await,
+                Err(QueueError::Full)
+            ));
+            drop(reads.pop());
+            assert!(queue.acquire_for("account/list").await.is_ok());
+            drop((reads, writer));
+        });
+    }
+
+    #[test]
+    fn cross_domain_barrier_waits_for_reads_and_blocks_new_work() {
+        runtime().block_on(async {
+            let queue = RpcQueue::new(6, 256);
+            let read = queue.acquire_for("account/list").await.unwrap();
+            let mut maintenance = Box::pin(queue.acquire_for("account/delete"));
+            assert!(maintenance.as_mut().now_or_never().is_none());
+            assert!(matches!(
+                queue.acquire_for("account/list").await,
+                Err(QueueError::Full)
+            ));
+            let mut key = Box::pin(queue.acquire_for("apikey/create"));
+            assert!(key.as_mut().now_or_never().is_none());
+            assert_eq!(queue.running.available_permits(), 6);
+            drop(read);
+            let maintenance = maintenance.await.unwrap();
+            assert!(key.as_mut().now_or_never().is_none());
+            drop(maintenance);
+            assert!(key.await.is_ok());
+        });
+    }
+
+    #[test]
+    fn timeout_cancels_domain_wait_without_executing_or_leaking_permits() {
+        runtime().block_on(async {
+            let queue = RpcQueue::new(6, 256);
+            let first = queue.acquire_for("account/import").await.unwrap();
+            assert!(tokio::time::timeout(
+                Duration::from_millis(1),
+                queue.acquire_for("account/import")
+            )
+            .await
+            .is_err());
+            assert_eq!(queue.resources[0].1.available_permits(), 32);
+            drop(first);
+            assert!(queue.acquire_for("account/import").await.is_ok());
+            assert_eq!(queue.resources[0].1.available_permits(), 33);
+        });
+    }
+
+    #[test]
+    fn sync_and_async_entries_share_resource_ordering() {
+        let queue = Arc::new(RpcQueue::new(6, 256));
+        let first = runtime()
+            .block_on(queue.acquire_for("account/import"))
+            .unwrap();
+        let other = queue.clone();
+        let worker =
+            std::thread::spawn(move || other.acquire_blocking_for("account/warmup").is_ok());
+        drop(first);
+        assert!(worker.join().unwrap());
+        assert_eq!(queue.running.available_permits(), 6);
     }
 }

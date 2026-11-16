@@ -24,10 +24,19 @@ fn wait_for_host(rx: std::sync::mpsc::Receiver<HostStartup>) -> Result<u16, Stri
     let started = std::time::Instant::now();
     let mut limit = Duration::from_secs(45);
     loop {
-        let remaining = limit.checked_sub(started.elapsed()).ok_or("Boost Bot启动超时")?;
-        match rx.recv_timeout(remaining).map_err(|_| "Boost Bot启动未完成")? {
+        let remaining = limit
+            .checked_sub(started.elapsed())
+            .ok_or("Boost Bot启动超时")?;
+        match rx
+            .recv_timeout(remaining)
+            .map_err(|_| "Boost Bot启动未完成")?
+        {
             HostStartup::Migrating => limit = Duration::from_secs(600),
-            HostStartup::Ready(port) => return port.filter(|port| *port > 0).ok_or_else(|| "Boost Bot启动端口无效".into()),
+            HostStartup::Ready(port) => {
+                return port
+                    .filter(|port| *port > 0)
+                    .ok_or_else(|| "Boost Bot启动端口无效".into())
+            }
             HostStartup::Failed(error) => return Err(error),
         }
     }
@@ -210,11 +219,15 @@ fn gateway_key(actor: &RpcActor, scope: &str) -> Result<String, String> {
 pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
     // Cold-starting one user's runtime must not stall every other user's API.
     // Shutdown waits for admitted starts before draining the process map.
-    let _lifecycle = LIFECYCLE.get_or_init(|| RwLock::new(())).read()
+    let _lifecycle = LIFECYCLE
+        .get_or_init(|| RwLock::new(()))
+        .read()
         .map_err(|_| "Boost Bot lifecycle unavailable")?;
     let actor_scope = scope(actor)?;
     let actor_start = start_lock(&actor_scope)?;
-    let _actor_start = actor_start.lock().map_err(|_| "Boost Bot startup unavailable")?;
+    let _actor_start = actor_start
+        .lock()
+        .map_err(|_| "Boost Bot startup unavailable")?;
     let mut hosts = HOSTS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -227,7 +240,9 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
             });
         }
     }
-    if let Some(host)=hosts.remove(&actor_scope) { model_sources::revoke(&host.source_token); }
+    if let Some(host) = hosts.remove(&actor_scope) {
+        model_sources::revoke(&host.source_token);
+    }
     drop(hosts);
     let root = runtime_root()?;
     let base_url = gateway_base_url()?;
@@ -246,6 +261,14 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
+    let database_key = match std::env::var_os("BOOST_DB_PATH") {
+        Some(path) => {
+            boost_core::storage::derive_bot_database_key(std::path::Path::new(&path), &actor_scope)
+                .map_err(|e| e.to_string())?
+                .map(|key| key.iter().map(|b| format!("{b:02x}")).collect::<String>())
+        }
+        None => None,
+    };
     let mut command = Command::new(node_binary(&root));
     command
         .arg(root.join("dist/backend/src/boost-host.js"))
@@ -265,6 +288,7 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
         .spawn()
         .map_err(|e| format!("启动 Boost Bot 失败（需要 Node.js 22.13+）：{e}"))?;
     let payload = json!({ "dataDir": data_dir, "token": token, "baseUrl": base_url,
+        "databaseKey": database_key,
         "apiKey": key, "allowTools": actor.is_admin(), "parentPid": std::process::id(),
         "sourceBroker": {"url":format!("{}/_boost/bot/model-sources",base_url.trim_end_matches("/v1")),"token":source_lease.token} });
     if let Err(error) = writeln!(
@@ -309,7 +333,10 @@ pub(crate) fn ensure_host(actor: &RpcActor) -> Result<Endpoint, String> {
             ));
         }
     };
-    let mut hosts = HOSTS.get().ok_or("Boost Bot hosts unavailable")?.lock()
+    let mut hosts = HOSTS
+        .get()
+        .ok_or("Boost Bot hosts unavailable")?
+        .lock()
         .map_err(|_| "Boost Bot host lock unavailable")?;
     hosts.insert(
         actor_scope,
@@ -335,7 +362,9 @@ pub(crate) fn open(actor: &RpcActor, desktop: bool) -> Result<Value, String> {
 }
 
 pub(crate) fn shutdown() {
-    let Ok(_lifecycle) = LIFECYCLE.get_or_init(|| RwLock::new(())).write() else { return; };
+    let Ok(_lifecycle) = LIFECYCLE.get_or_init(|| RwLock::new(())).write() else {
+        return;
+    };
     let Some(hosts) = HOSTS.get() else {
         return;
     };

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HelpHint from "./HelpHint.vue";
+import GatewayResourceSettings from "./GatewayResourceSettings.vue";
 import DialogActions from "@/components/DialogActions.vue";
 import { computed, ref } from "vue";
 import BoostIcon from "./BoostIcon.vue";
@@ -24,6 +25,7 @@ const busy = ref(false);
 const configuration = ref("");
 const codexConfig = ref<CodexConfig | null>(null);
 const expanded = ref(false);
+const english = computed(() => boost.settings?.locale?.startsWith("en"));
 const transport = ref({
   upstreamStreamTimeoutMs: boost.settings?.upstreamStreamTimeoutMs ?? 300000,
   upstreamTotalTimeoutMs: boost.settings?.upstreamTotalTimeoutMs ?? 0,
@@ -34,6 +36,7 @@ const title = computed(
     ({
       interface: "界面设置",
       transport: "传输设置",
+      gateway: english.value ? "Gateway settings" : "网关设置",
       config: "当前配置",
       serviceConfig: "服务配置",
       environment: "环境配置",
@@ -98,13 +101,15 @@ async function saveTransport() {
 }
 </script>
 <template>
-  <PanelCard title="Boost 高级设置" icon="settings"
+  <PanelCard :title="english ? 'Boost advanced settings' : 'Boost 高级设置'" icon="settings"
     ><button class="setting-link" @click="guide = true">
       <span>配置方法</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="kind = 'interface'">
       <span>界面设置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openTransport">
       <span>传输设置</span><BoostIcon name="settings" :size="16" /></button
+    ><button v-if="boost.settings?.resourceLimits" class="setting-link" @click="kind = 'gateway'">
+      <span>{{ english ? 'Gateway settings' : '网关设置' }}</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openConfig">
       <span>当前配置</span><BoostIcon name="settings" :size="16" /></button
     ><button class="setting-link" @click="openServiceConfig">
@@ -160,6 +165,7 @@ async function saveTransport() {
         <button class="primary" @click="kind = ''">完成</button>
       </DialogActions></template
     >
+    <GatewayResourceSettings v-else-if="kind === 'gateway'" @busy="busy = $event" />
     <form
       v-else-if="kind === 'transport'"
       class="form-stack"

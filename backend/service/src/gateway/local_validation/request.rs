@@ -1747,6 +1747,7 @@ pub(super) fn build_local_validation_result(
             native_codex_client,
         );
         return Ok(LocalValidationResult {
+            admission: None,
             trace_id,
             incoming_headers,
             storage,
@@ -2054,6 +2055,7 @@ pub(super) fn build_local_validation_result(
     ensure_anthropic_model_is_listed(&storage, effective_protocol_type, model_for_log.as_deref())?;
 
     Ok(LocalValidationResult {
+        admission: None,
         trace_id,
         incoming_headers,
         storage,
@@ -2087,7 +2089,6 @@ pub(super) fn build_local_validation_result(
         method,
     })
 }
-
 
 #[cfg(test)]
 mod images_generation_tests {

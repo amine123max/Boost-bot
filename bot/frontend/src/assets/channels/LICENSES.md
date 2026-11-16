@@ -1,5 +1,7 @@
 # SVG license notices
 
+[简体中文](LICENSES.zh-CN.md)
+
 Simple Icons assets are provided under CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
 
 

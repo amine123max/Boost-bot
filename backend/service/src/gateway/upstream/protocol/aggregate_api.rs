@@ -987,6 +987,19 @@ pub(in super::super) fn proxy_aggregate_request(
 
     let total_candidates = aggregate_api_candidates.len();
     for (candidate_idx, candidate) in aggregate_api_candidates.into_iter().enumerate() {
+        let Some(circuit) =
+            crate::gateway::circuit::global().acquire(&format!("aggregate:{}", candidate.id))
+        else {
+            last_attempt_error = Some("upstream circuit open".to_string());
+            last_failure_status = 503;
+            continue;
+        };
+        let attempts = if circuit.is_probe() {
+            1
+        } else {
+            AGGREGATE_API_RETRY_ATTEMPTS_PER_CHANNEL + 1
+        };
+        let mut circuit_status = 499;
         attempted_aggregate_api_ids.push(candidate.id.clone());
         let candidate_id = candidate.id.clone();
         let candidate_upstream_model =
@@ -1019,7 +1032,7 @@ pub(in super::super) fn proxy_aggregate_request(
         };
 
         let mut succeeded = false;
-        for attempt_idx in 0..=AGGREGATE_API_RETRY_ATTEMPTS_PER_CHANNEL {
+        for attempt_idx in 0..attempts {
             if super::super::support::deadline::is_expired(request_deadline) {
                 let message = "aggregate api request timeout".to_string();
                 let request = request
@@ -1161,11 +1174,12 @@ pub(in super::super) fn proxy_aggregate_request(
                         true,
                     );
                     let message = format!("aggregate api upstream error: {err}");
+                    circuit_status = 0;
                     last_attempt_url = Some(url.as_str().to_string());
                     last_attempt_supplier_name = candidate_supplier_name.clone();
                     last_attempt_error = Some(message);
                     last_failure_status = 502;
-                    if attempt_idx < AGGREGATE_API_RETRY_ATTEMPTS_PER_CHANNEL {
+                    if attempt_idx + 1 < attempts {
                         continue;
                     }
                     break;
@@ -1174,6 +1188,7 @@ pub(in super::super) fn proxy_aggregate_request(
 
             if !upstream.status().is_success() {
                 let status_code = upstream.status().as_u16();
+                circuit_status = status_code;
                 let upstream_request_id = first_upstream_header(
                     upstream.headers(),
                     &["x-request-id", "x-oai-request-id"],
@@ -1198,7 +1213,7 @@ pub(in super::super) fn proxy_aggregate_request(
                 last_attempt_supplier_name = candidate_supplier_name.clone();
                 last_attempt_error = Some(message);
                 last_failure_status = 502;
-                if attempt_idx < AGGREGATE_API_RETRY_ATTEMPTS_PER_CHANNEL {
+                if attempt_idx + 1 < attempts {
                     continue;
                 }
                 break;
@@ -1270,6 +1285,11 @@ pub(in super::super) fn proxy_aggregate_request(
             } else {
                 status_code
             };
+            circuit_status = if bridge.delivery_error.is_some() {
+                499
+            } else {
+                status_code
+            };
             let usage = bridge.usage;
 
             super::super::super::record_gateway_request_outcome(
@@ -1325,6 +1345,7 @@ pub(in super::super) fn proxy_aggregate_request(
             break;
         }
 
+        circuit.finish(circuit_status);
         if succeeded {
             return Ok(());
         }

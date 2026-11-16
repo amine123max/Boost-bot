@@ -64,6 +64,8 @@ export interface AppSettings {
   modelForwardRules: string;
   compactModelForwardRules: string;
   accountMaxInflight: number;
+  resourceLimits: GatewayResourceLimits | null;
+  storageSecurity: StorageSecurityState | null;
   quotaGuard: QuotaGuardSettings;
   gatewayOriginator: string;
   gatewayOriginatorDefault: string;
@@ -85,6 +87,26 @@ export interface AppSettings {
   theme: string;
   appearancePreset: string;
   [key: string]: unknown;
+}
+
+export interface GatewayResourceLimits {
+  globalQps: number;
+  burst: number;
+  keyRpm: number;
+  maxInflight: number;
+  modelMaxInflight: number;
+  maxRequestBodyBytes: number;
+  bufferedBodyBudgetBytes: number;
+}
+
+export interface StorageSecurityState {
+  encrypted: boolean;
+  provider: "none" | "keyring" | "key_file";
+  encryptionRequested: boolean;
+  requiresRestart: boolean;
+  sqlcipherAvailable: boolean;
+  botEncryptionPolicy: string;
+  integrity: string;
 }
 
 export interface BillingModeLock {

@@ -1,10 +1,13 @@
-use axum::body::{to_bytes, Body};
+use axum::body::Body;
 use axum::extract::State;
 use axum::http::{header, Request as HttpRequest, Response, StatusCode};
 use axum::routing::{any, get, post};
 use axum::Router;
+use futures_util::StreamExt;
 use reqwest::Client;
 use std::io;
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Semaphore;
 
 use crate::http::proxy_bridge::run_proxy_server;
 use crate::http::proxy_request::{build_target_url, filter_request_headers};
@@ -14,6 +17,12 @@ const DEFAULT_FRONT_PROXY_MAX_BLOCKING_THREADS: usize = 32;
 const DEFAULT_FRONT_PROXY_WORKER_THREADS: usize = 2;
 const ENV_FRONT_PROXY_MAX_BLOCKING_THREADS: &str = "BOOST_FRONT_PROXY_MAX_BLOCKING_THREADS";
 const ENV_FRONT_PROXY_WORKER_THREADS: &str = "BOOST_FRONT_PROXY_WORKER_THREADS";
+const FRONT_PROXY_MAX_INFLIGHT: usize = 64;
+
+fn proxy_admission() -> &'static Arc<Semaphore> {
+    static LIMIT: OnceLock<Arc<Semaphore>> = OnceLock::new();
+    LIMIT.get_or_init(|| Arc::new(Semaphore::new(FRONT_PROXY_MAX_INFLIGHT)))
+}
 
 #[derive(Clone)]
 struct ProxyState {
@@ -112,10 +121,29 @@ async fn proxy_handler(
     State(state): State<ProxyState>,
     request: HttpRequest<Body>,
 ) -> Response<Body> {
+    let permit = match proxy_admission().clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            let mut response = text_error_response(
+                StatusCode::TOO_MANY_REQUESTS,
+                "front_proxy_capacity_exhausted",
+            );
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, "1".parse().unwrap());
+            return response;
+        }
+    };
     let (parts, body) = request.into_parts();
     let prefer_raw_errors = crate::gateway::prefers_raw_errors_for_http_headers(&parts.headers);
     let target_url = build_target_url(&state.backend_base_url, &parts.uri);
-    let max_body_bytes = crate::gateway::front_proxy_max_body_bytes();
+    let configured = crate::gateway::front_proxy_max_body_bytes();
+    let resource_limit = crate::gateway::request_limits::current().max_request_body_bytes;
+    let max_body_bytes = if configured == 0 {
+        resource_limit
+    } else {
+        configured.min(resource_limit)
+    };
 
     if let Some(content_length) = parts
         .headers
@@ -141,41 +169,44 @@ async fn proxy_handler(
     }
 
     let outbound_headers = filter_request_headers(&parts.headers);
-    let read_limit = if max_body_bytes == 0 {
-        usize::MAX
-    } else {
-        max_body_bytes
-    };
-    let body_bytes = match to_bytes(body, read_limit).await {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            let message = if max_body_bytes == 0 {
-                crate::gateway::bilingual_error("请求体过大", "request body too large")
-            } else {
-                crate::gateway::bilingual_error(
-                    "请求体过大",
-                    format!("request body too large: content-length>{max_body_bytes}"),
-                )
-            };
-            log_proxy_error(
-                StatusCode::PAYLOAD_TOO_LARGE,
-                target_url.as_str(),
-                message.as_str(),
-            );
-            return text_error_response(
-                StatusCode::PAYLOAD_TOO_LARGE,
-                crate::gateway::error_message_for_client(prefer_raw_errors, message),
-            );
-        }
-    };
+    // Forward with backpressure instead of buffering every request twice.
+    // The backend reads a complete, budgeted body before any model side effect.
+    let body_stream = body.into_data_stream().scan(0usize, move |seen, chunk| {
+        let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e));
+        let result = chunk.and_then(|bytes| {
+            if bytes.len() > max_body_bytes.saturating_sub(*seen) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "boost_request_body_limit_exceeded",
+                ));
+            }
+            *seen += bytes.len();
+            Ok(bytes)
+        });
+        futures_util::future::ready(Some(result))
+    });
 
     let mut builder = state.client.request(parts.method, target_url.as_str());
     builder = builder.headers(outbound_headers);
-    builder = builder.body(body_bytes);
+    builder = builder.body(reqwest::Body::wrap_stream(body_stream));
 
     let upstream = match builder.send().await {
         Ok(response) => response,
         Err(err) => {
+            let mut cause: Option<&(dyn std::error::Error + 'static)> = Some(&err);
+            let mut oversized = false;
+            while let Some(error) = cause {
+                oversized |= error
+                    .to_string()
+                    .contains("boost_request_body_limit_exceeded");
+                cause = error.source();
+            }
+            if oversized {
+                return text_error_response(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "request body too large",
+                );
+            }
             let message = crate::gateway::bilingual_error(
                 "后端代理请求失败",
                 format!("backend proxy error: {err}"),
@@ -197,7 +228,11 @@ async fn proxy_handler(
         upstream.headers(),
     );
 
-    match response_builder.body(Body::from_stream(upstream.bytes_stream())) {
+    let response_stream = futures_util::stream::unfold(
+        (upstream.bytes_stream(), permit),
+        |(mut stream, permit)| async move { stream.next().await.map(|chunk| (chunk, (stream, permit))) },
+    );
+    match response_builder.body(Body::from_stream(response_stream)) {
         Ok(response) => response,
         Err(err) => {
             let message = crate::gateway::bilingual_error(
@@ -241,7 +276,10 @@ async fn responses_handler(
 /// 返回函数执行结果
 fn build_front_proxy_app(state: ProxyState) -> Router {
     Router::new()
-        .route("/_boost/bot/model-sources", any(crate::bot::model_sources::handle))
+        .route(
+            "/_boost/bot/model-sources",
+            any(crate::bot::model_sources::handle),
+        )
         .route("/boost-bot/", any(crate::bot::http::proxy))
         .route("/boost-bot/{*path}", any(crate::bot::http::proxy))
         .route("/rpc", post(crate::http::rpc_endpoint::handle_rpc_http))

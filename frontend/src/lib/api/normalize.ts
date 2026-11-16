@@ -2009,6 +2009,8 @@ export function normalizeEnvOverrideCatalog(
  */
 export function normalizeAppSettings(payload: unknown): AppSettings {
   const source = asObject(payload);
+  const limits = asObject(source.resourceLimits);
+  const security = asObject(source.storageSecurity);
   return {
     updateAutoCheck: asBoolean(source.updateAutoCheck, true),
     dailyTrafficCleanupEnabled: asBoolean(source.dailyTrafficCleanupEnabled, true),
@@ -2057,6 +2059,24 @@ export function normalizeAppSettings(payload: unknown): AppSettings {
       source.compactModelForwardRules ?? source.compact_model_forward_rules,
     ),
     accountMaxInflight: asInteger(source.accountMaxInflight, 1, 0),
+    storageSecurity: Object.keys(security).length ? {
+      encrypted: asBoolean(security.encrypted),
+      provider: security.provider === "keyring" || security.provider === "key_file" ? security.provider : "none",
+      encryptionRequested: asBoolean(security.encryptionRequested),
+      requiresRestart: asBoolean(security.requiresRestart),
+      sqlcipherAvailable: asBoolean(security.sqlcipherAvailable),
+      botEncryptionPolicy: asString(security.botEncryptionPolicy),
+      integrity: asString(security.integrity, "unknown"),
+    } : null,
+    resourceLimits: Object.keys(limits).length ? {
+      globalQps: asInteger(limits.globalQps, 20),
+      burst: asInteger(limits.burst, 20, 1),
+      keyRpm: asInteger(limits.keyRpm, 0),
+      maxInflight: asInteger(limits.maxInflight, 24, 1),
+      modelMaxInflight: asInteger(limits.modelMaxInflight, 8, 1),
+      maxRequestBodyBytes: asInteger(limits.maxRequestBodyBytes, 33554432, 1024),
+      bufferedBodyBudgetBytes: asInteger(limits.bufferedBodyBudgetBytes, 67108864, 1024),
+    } : null,
     quotaGuard: normalizeQuotaGuard(source.quotaGuard ?? source.quota_guard),
     gatewayOriginator:
       asString(source.gatewayOriginator) || DEFAULT_CODEX_ORIGINATOR,

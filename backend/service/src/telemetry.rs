@@ -129,6 +129,7 @@ pub(crate) struct ServiceTelemetry {
     pub(crate) cpu_model: String,
     pub(crate) logical_cores: usize,
     pub(crate) system_memory_bytes: u64,
+    pub(crate) management_queue: crate::http::rpc_queue::RpcQueueSnapshot,
 }
 
 struct Sampler {
@@ -210,6 +211,7 @@ pub(crate) fn snapshot() -> ServiceTelemetry {
             .unwrap_or_default(),
         logical_cores: cores,
         system_memory_bytes: sample.system.total_memory(),
+        management_queue: crate::http::rpc_queue::global().snapshot(),
     }
 }
 

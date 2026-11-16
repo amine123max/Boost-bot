@@ -57,6 +57,7 @@ fn any_process_env_has_value(names: &[&str]) -> bool {
 /// # 返回
 /// 无
 pub fn sync_runtime_settings_from_storage() {
+    crate::gateway::request_limits::load();
     crate::proxy_policy::load();
     crate::proxy_kernel::start_automatic();
     let settings = list_app_settings_map();

@@ -238,6 +238,19 @@ pub(super) fn current_app_settings_value(
         "webAccessPasswordConfigured": web_access_password_configured(),
     });
     if let Some(object) = result.as_object_mut() {
+        if let Some(path) = std::env::var_os("BOOST_DB_PATH") {
+            let status = boost_core::storage::security_status(std::path::Path::new(&path))
+                .map_err(|e| e.to_string())?;
+            object.insert(
+                "storageSecurity".to_string(),
+                serde_json::to_value(status).map_err(|e| e.to_string())?,
+            );
+        }
+        object.insert(
+            "resourceLimits".to_string(),
+            serde_json::to_value(crate::gateway::request_limits::current())
+                .map_err(|e| e.to_string())?,
+        );
         object.insert("webAuthMode".to_string(), current_web_auth_mode().into());
         object.insert(
             "webAuthModeOptions".to_string(),

@@ -591,7 +591,10 @@ async fn async_main() {
 fn main() {
     boost_service::portable::bootstrap_current_process();
     boost_service::init_logging();
-    let _ = boost_service::initialize_storage_if_needed();
+    if let Err(error) = boost_service::initialize_storage_if_needed() {
+        eprintln!("storage initialization failed: {error}");
+        std::process::exit(1);
+    }
     boost_service::sync_runtime_settings_from_storage();
 
     let runtime = tokio::runtime::Runtime::new().expect("create tokio runtime");

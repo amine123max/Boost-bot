@@ -1,5 +1,5 @@
-# Architecture / 架构说明
+# 系统架构
 
-The current frontend, backend and Bot boundaries are documented in [ARCHITECTURE.md](../../ARCHITECTURE.md).
+[English](../en/ARCHITECTURE.md)
 
-当前前端、后端和 Bot 的职责、进程与存储边界统一维护于根目录架构说明。构建路径见 [BUILDING.md](../BUILDING.md)。
+当前中文系统架构统一维护于[对应指南](../../ARCHITECTURE.zh-CN.md)，说明职责、命令、证据与限制。此语言入口为导航别名，不作为独立内容副本。

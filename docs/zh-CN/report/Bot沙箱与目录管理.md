@@ -1,5 +1,7 @@
 # Bot 沙箱与目录管理
 
+[English](../../en/report/bot-storage-and-workspaces.md)
+
 在 Bot「设置 → 数据与智能体 → 存储」中填写**运行 Boost 的电脑上的绝对文件夹路径**，然后保存。网页版填写的是服务器路径。留空保留当前目录。
 
 选择 `D:\AI` 后，工作文件按以下结构整理；选择的文件夹已经叫 Boost 时不会再嵌套一层 Boost：

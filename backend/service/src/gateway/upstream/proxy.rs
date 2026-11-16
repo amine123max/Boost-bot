@@ -533,6 +533,7 @@ pub(in super::super) fn proxy_validated_request(
     debug: bool,
 ) -> Result<(), String> {
     let LocalValidationResult {
+        admission: _admission,
         trace_id,
         incoming_headers,
         storage,

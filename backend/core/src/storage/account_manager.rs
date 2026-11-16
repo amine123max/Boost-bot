@@ -1,5 +1,74 @@
 use std::collections::HashMap;
 
+#[cfg(test)]
+mod settlement_tests {
+    use super::*;
+    use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn concurrent_duplicate_charges_deduct_once() {
+        let directory = std::env::temp_dir().join(format!(
+            "boost-charge-{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("settlement.db");
+        {
+            let db = Storage::open(&path).unwrap();
+            db.init().unwrap();
+            db.conn.execute("INSERT INTO app_wallets (id, owner_kind, owner_id, balance_credit_micros,
+                frozen_credit_micros, status, created_at, updated_at) VALUES ('wallet', 'user', 'owner', 10000, 0, 'active', 1, 1)", []).unwrap();
+            let barrier = Arc::new(Barrier::new(8));
+            let workers: Vec<_> = (0..8)
+                .map(|i| {
+                    let path = path.clone();
+                    let barrier = barrier.clone();
+                    std::thread::spawn(move || {
+                        let db = Storage::open(path).unwrap();
+                        let charge = AppWalletLedgerEntry {
+                            id: format!("attempt-{i}"),
+                            wallet_id: "wallet".into(),
+                            entry_kind: "request_charge".into(),
+                            amount_credit_micros: -1000,
+                            balance_after_credit_micros: 0,
+                            request_log_id: Some(7),
+                            api_key_id: None,
+                            pricing_rule_id: None,
+                            raw_usage_json: None,
+                            note: None,
+                            created_by_user_id: None,
+                            created_at: 2,
+                        };
+                        barrier.wait();
+                        db.adjust_wallet_balance(&charge).unwrap()
+                    })
+                })
+                .collect();
+            let ids: Vec<_> = workers.into_iter().map(|w| w.join().unwrap().id).collect();
+            assert!(ids.iter().all(|id| id == &ids[0]));
+            assert_eq!(
+                db.conn
+                    .query_row("SELECT balance_credit_micros FROM app_wallets", [], |r| r
+                        .get::<_, i64>(
+                        0
+                    ))
+                    .unwrap(),
+                9000
+            );
+            assert_eq!(db.request_charge_ledger_entry_count().unwrap(), 1);
+        }
+        let resolved = directory.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        assert!(directory
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("boost-charge-"));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+}
+
 use rusqlite::{params, OptionalExtension, Result, Row};
 
 use super::{
@@ -382,7 +451,28 @@ impl Storage {
         &self,
         ledger: &AppWalletLedgerEntry,
     ) -> Result<AppWalletLedgerEntry> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = rusqlite::Transaction::new_unchecked(
+            &self.conn,
+            rusqlite::TransactionBehavior::Immediate,
+        )?;
+        if ledger.entry_kind == "request_charge" {
+            if let Some(request_id) = ledger.request_log_id {
+                let existing = tx.query_row(
+                    "SELECT id, wallet_id, entry_kind, amount_credit_micros, balance_after_credit_micros,
+                     request_log_id, api_key_id, pricing_rule_id, raw_usage_json, note,
+                     created_by_user_id, created_at FROM app_wallet_ledger_entries
+                     WHERE request_log_id = ?1 AND entry_kind = 'request_charge' ORDER BY created_at, id LIMIT 1",
+                    [request_id], |row| Ok(AppWalletLedgerEntry {
+                        id: row.get(0)?, wallet_id: row.get(1)?, entry_kind: row.get(2)?,
+                        amount_credit_micros: row.get(3)?, balance_after_credit_micros: row.get(4)?,
+                        request_log_id: row.get(5)?, api_key_id: row.get(6)?, pricing_rule_id: row.get(7)?,
+                        raw_usage_json: row.get(8)?, note: row.get(9)?, created_by_user_id: row.get(10)?, created_at: row.get(11)?,
+                    })).optional()?;
+                if let Some(existing) = existing {
+                    return Ok(existing);
+                }
+            }
+        }
         let balance_after = tx.query_row(
             "SELECT balance_credit_micros + ?2
              FROM app_wallets

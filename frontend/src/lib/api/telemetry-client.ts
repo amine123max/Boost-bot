@@ -1,5 +1,18 @@
 import { invoke, withAddr } from "./transport";
 export interface ServiceTelemetry {
+  managementQueue?: {
+    activeWrites: number;
+    activeReads: number;
+    waitingWrites: number;
+    writeConcurrency: number;
+    readConcurrency: number;
+    waitingLimit: number;
+    perResourceWaitingLimit: number;
+    rejectedTotal: number;
+    timedOutTotal: number;
+    admittedTotal: number;
+    waitMicrosecondsTotal: number;
+  };
   address: string;
   processId: number;
   uploadBytesPerSecond: number;

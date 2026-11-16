@@ -24,6 +24,7 @@ use super::state::{set_last_check, updates_root_dir, write_pending_update};
 pub(super) struct ResolvedUpdateContext {
     pub(super) check: UpdateCheckResponse,
     payload_asset: Option<GitHubAsset>,
+    manifest_asset: Option<GitHubAsset>,
 }
 
 /// 函数 `append_prepare_log`
@@ -331,14 +332,19 @@ fn download_to_file(
             .bearer_auth(token.unwrap())
             .header(reqwest::header::ACCEPT, "application/octet-stream");
     }
-    let mut resp = request
+    let resp = request
         .send()
         .map_err(|err| format!("发起下载请求失败：{err}"))?
         .error_for_status()
         .map_err(|err| format!("下载响应异常：{err}"))?;
 
     let mut file = File::create(target).map_err(|err| format!("创建文件失败：{err}"))?;
-    std::io::copy(&mut resp, &mut file).map_err(|err| format!("写入文件失败：{err}"))?;
+    use std::io::Read;
+    let size = std::io::copy(&mut resp.take(1024 * 1024 * 1024 + 1), &mut file)
+        .map_err(|err| format!("写入文件失败：{err}"))?;
+    if size > 1024 * 1024 * 1024 {
+        return Err("release payload exceeds size limit".into());
+    }
     file.flush()
         .map_err(|err| format!("刷新文件缓冲区失败：{err}"))
 }
@@ -369,7 +375,8 @@ fn asset_download_source<'a>(
         || url.password().is_some()
         || url.port().is_some()
         || !url.path().strip_prefix(&prefix).is_some_and(|tail| {
-            tail.split_once('/').is_some_and(|(tag, file)| !tag.is_empty() && !file.is_empty())
+            tail.split_once('/')
+                .is_some_and(|(tag, file)| !tag.is_empty() && !file.is_empty())
         })
     {
         return Err("发布资产下载地址不属于当前更新仓库".to_string());
@@ -673,7 +680,12 @@ pub(super) fn resolve_update_context() -> Result<ResolvedUpdateContext, String> 
     let has_update = latest_semver > current_semver;
 
     let payload_asset = select_payload_asset(&mode, &latest_semver.to_string(), &release.assets);
-    let can_prepare = has_update && payload_asset.is_some();
+    let manifest_asset = release
+        .assets
+        .iter()
+        .find(|asset| asset.name == super::signature::MANIFEST_NAME)
+        .cloned();
+    let can_prepare = has_update && payload_asset.is_some() && manifest_asset.is_some();
     let fetched_by_fallback = release.assets.is_empty();
 
     let reason = if !has_update {
@@ -684,6 +696,8 @@ pub(super) fn resolve_update_context() -> Result<ResolvedUpdateContext, String> 
         )
     } else if payload_asset.is_none() {
         Some("未找到当前平台/运行模式对应的发布资产".to_string())
+    } else if manifest_asset.is_none() {
+        Some("发布缺少签名清单，不能执行一键更新".to_string())
     } else {
         None
     };
@@ -704,6 +718,7 @@ pub(super) fn resolve_update_context() -> Result<ResolvedUpdateContext, String> 
             checked_at_unix_secs: now_unix_secs(),
         },
         payload_asset,
+        manifest_asset,
     })
 }
 
@@ -754,8 +769,54 @@ pub(super) fn prepare_update_impl(app: &tauri::AppHandle) -> Result<UpdatePrepar
         ),
     );
 
+    if Path::new(&payload_asset.name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        != Some(payload_asset.name.as_str())
+    {
+        return Err("invalid release asset filename".into());
+    }
+    let manifest_asset = context
+        .manifest_asset
+        .as_ref()
+        .ok_or("signed release manifest missing")?;
+    let manifest_path = release_dir.join(super::signature::MANIFEST_NAME);
+    let (manifest_url, authenticated) = asset_download_source(
+        manifest_asset,
+        &context.check.repo,
+        resolve_github_token().is_some(),
+    )?;
+    let mut manifest_request = client
+        .get(manifest_url)
+        .header(reqwest::header::USER_AGENT, USER_AGENT);
+    if authenticated {
+        manifest_request = manifest_request
+            .bearer_auth(resolve_github_token().unwrap())
+            .header(reqwest::header::ACCEPT, "application/octet-stream");
+    }
+    use std::io::Read;
+    let mut manifest_bytes = Vec::new();
+    manifest_request
+        .send()
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .take(64 * 1024 + 1)
+        .read_to_end(&mut manifest_bytes)
+        .map_err(|e| e.to_string())?;
+    if manifest_bytes.len() > 64 * 1024 {
+        return Err("release manifest exceeds size limit".into());
+    }
+    fs::write(&manifest_path, manifest_bytes).map_err(|e| e.to_string())?;
     let payload_path = release_dir.join(&payload_asset.name);
     download_to_file(&client, &payload_asset, &context.check.repo, &payload_path)?;
+    super::signature::verify_payload(
+        &manifest_path,
+        &payload_path,
+        &context.check.repo,
+        &context.check.release_tag,
+        &payload_asset.name,
+    )?;
     append_prepare_log(
         &prepare_log_path,
         &format!("更新资产下载完成：{}", payload_path.display()),
@@ -839,7 +900,11 @@ mod tests {
             "http://github.com/owner/Boost-bot/releases/download/v1.0/Boost.exe",
             "https://github.com/owner/Boost-bot/releases/download/../../other/Boost.exe",
         ] {
-            let asset = GitHubAsset { name: "Boost.exe".into(), browser_download_url: url.into(), api_url: None };
+            let asset = GitHubAsset {
+                name: "Boost.exe".into(),
+                browser_download_url: url.into(),
+                api_url: None,
+            };
             assert!(asset_download_source(&asset, "owner/Boost-bot", false).is_err());
         }
     }

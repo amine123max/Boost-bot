@@ -1,39 +1,48 @@
-# Runtime integration
+# Managed runtime integration
 
-The imported Bot retains conversation streaming and cancellation, bot/group management, memory, approvals, messaging channels, persistent outbox, tasks and rules, file delivery, signed catalog verification, and the DSH tool bridge. Model authentication is supplied only by the Boost host. Independent provider sign-in and gateway reconfiguration are disabled when hosted.
+[简体中文](INTEGRATION.zh-CN.md) · [Bot overview](README.md) · [System architecture](../ARCHITECTURE.md)
 
-The UI title and visible brand are Boost, using the original Bahamas Bold wordmark. The Vue 3 + TypeScript workspace in `frontend/src/` reuses `frontend/styles/design/`, `shell.css`, `chat.css`, and `boost.css` for the original sidebar, chat panel and information panel. Search follows the main Boost sidebar search with Ctrl/Cmd+K, keyboard selection and a modal. Bots without messages show a single vertically centered name; previews come from actual conversation messages. Each Bot can persist an independent color, contour and animation in `settings.appearance`; old records retain stable defaults. Shared SVG rendering respects reduced motion and suspends offscreen animation. License and copyright notices remain in the accompanying license files.
+## Ownership and bootstrap
 
-Run `npm run build` in `bot/` to compile the service and type-check/build the Vue workspace into `dist/ui/workspace/`. Vite is used only during the build; production serves local static assets and the existing authenticated HTTP/SSE APIs. Catalog applications continue to use their sandboxed Bot UI kit, including its existing Preact compatibility runtime; migrating those extension pages is separate from the main workspace migration. The build output includes all runtime styles, fonts and sandbox support under `dist/ui/`; source files are not required in distributions.
+The Rust service owns actor identity, platform-key selection, source-broker leases, child-process lifecycle and authenticated proxying. Node owns conversations, agent sessions, tasks, channels, approvals and workspace tools. FastAPI/Nginx remain optional ingress layers.
 
-Group messages use `POST /groups/:id/messages`, including for member hosts. A member can be selected by stable `@bot-id` as well as display name; stable IDs avoid ambiguity for duplicate names. Each member uses its own group conversation, and automatic relays remain capped at six per user message. Other bots' messages do not grant user authorization. Research workflow nodes use distinct role SVGs; completed research statuses use green backgrounds, incomplete statuses use red backgrounds, and cancelled statuses use amber backgrounds, without status dots.
+A managed host starts with a bounded private stdin bootstrap record containing its data location, loopback gateway address, owned platform key, launch token, actor permissions and optional derived database key. Secrets are not placed on the command line. Node validates the trusted loopback address, registers sensitive values for redaction and holds the data-directory ownership lock before opening state.
 
-Service boundaries are implemented in `backend/service/src/bot/`, Web session proxying in `backend/web/src/bot_proxy.rs`, and desktop IPC in `backend/desktop/src/commands/service.rs`. Bot data is stored below the active Boost database directory as `bots/<actor-scope>/`. Scope names are SHA-256 hashes of the authenticated role and user identity. Bot reuses an existing authorized OpenAI-compatible API key and remembers its id in Boost app settings. Opening/refreshing never creates keys. Disabled keys remain disabled; keys belonging to other users cannot be selected. Secret values remain on the server and are delivered to the Node child through stdin.
+| Boundary | Contract |
+| --- | --- |
+| Actor scope | Stable digest of trusted role/user identity |
+| Launch token | Internal host HTTP authorization |
+| Platform key | Model access, ownership and billing through Boost |
+| Source broker | Server-selected authorized account/aggregate models |
+| Database key | Per-actor HMAC-SHA256 derivation from the main storage key |
+| Data lock | Reject concurrent ownership and unsafe relocation |
 
-Administrator-owned hosts retain the imported tool and channel capabilities. Member hosts disable DSH and reject tool, task, channel-credential and system-configuration mutations server-side. Gateway requests still carry the member-owned API key, enforcing model groups, ownership, billing and quota at the existing gateway.
+Plain standalone mode remains compatible when no encryption key is supplied. Managed encrypted mode converts and verifies existing Bot SQLite before normal startup; files, logs and arbitrary workspace outputs remain outside database encryption.
 
-Build/runtime environment variables are documented in `README.md`. The source trees `bots/`, `backend/src/`, `frontend/`, `assets/`, `dsh-runtime/plugins/` and `shared/` belong to Boost and do not refer to an external checkout at runtime.
+## HTTP and streaming
 
-The sidebar now exposes real channel conversations as a second level under their owning Bot. Selecting one reads its original history and current execution; it does not merge WeChat/Feishu private context into the Web console. Display metadata uses separate channel/date tags without raw peer identifiers. Model/tool activity expands inline with recorded inputs, outputs, duration and token usage. Only explicit provider summary fields are shown for direct model reasoning; absent private reasoning is not invented.
+Web authenticates the browser and derives the actor. Service selects the matching host and forwards the request without allowing caller-selected internal identity. Original request/response bytes, query parameters and SSE framing must survive the transport chain. Disconnect cleanup must release upstream connections and admission reservations.
 
-Direct chat/fallback can persist `settings.modelProtocol` (`auto`, `chat`, `responses`, `messages`) and `settings.modelStreaming` (default true). The formats use the same owned gateway endpoint and credentials. Tool-enabled agent sessions retain the existing model-native adapter. Model calls have bounded FIFO admission; cumulative UI text updates are coalesced at 32 ms, final text is sent immediately, and slow SSE consumers disconnect rather than accumulating unbounded buffers.
+The optional Python gateway targets a fixed trusted Boost Web origin. It strips private actor/RPC headers, bounds active/waiting requests and input memory, and never automatically replays a mutation. See [FastAPI](backend/api/README.md) and [Nginx](../nginx/README.md).
 
-Group handoffs preserve complete message text instead of silently clipping 6000-character lines. The transfer limit is 128000 characters and 1000 unread messages; exceeding it produces a visible error without advancing the read cursor. Successful turns commit their cursor, failed turns leave the handoff unread. Explicitly delivered group files are copied to each recipient's `handoffs/` workspace with an exact-byte SHA-256 manifest, a 16 MiB file limit and workspace/path validation. Private files not delivered in the group are not shared. Group `requestId` deduplication is in-memory for ten minutes; after a server restart callers must check history before retrying an ambiguous submission.
+## Models and agent execution
 
-Boost and the Bot settings share named avatar presets and the same renderer. Theme transitions reuse Boost's circle expansion/contraction; the embedded frame asks the parent to own the transition so two full-screen snapshots are not taken. The renderer caches computed theme/colors and suspends hidden/offscreen frames.
+A Bot binds only to sources visible to its actor. Catalog discovery cannot grant model access, and source mappings preserve the distinction between account pools and aggregate connections. Agent tool permissions remain independent of model availability.
 
-Service deployment can use the [FastAPI ingress](backend/api/README.md) through the existing nginx configuration. Rust runtime cold starts are locked by actor, so one user's 45-second initialization no longer holds the global host map lock. Native desktop mode remains self-contained. The optional sidecar is deployed separately from the self-contained desktop/Node runtime.
+DSH sessions provide actual execution, tools and approvals. The UI distinguishes recorded structured plans from historical activity. No reasoning text, approval, task progress or completion should be invented to fill a missing event. Group handoffs retain actor membership and file-access checks.
 
-The upstream reference was checked at AnyModelBot `master` commit `bf4c1531bdd50c4436a22bd30e48ae756041005d` (2026-11-13): its README and `src/core/groups.ts` confirm in-app `@` delegation, separate member contexts and a six-relay cap. Boost retains those semantics and adds stable ID mentions, exact handoffs, artifact manifests and bounded requests. This does not claim production channel group-chat support that the reference itself still lists as planned.
+## Storage and relocation
 
-## Source and distribution layout
+The Bot database persists conversations, memory, channel credentials, approvals, tasks and outbound delivery. SQLite uses WAL, a bounded lock wait and an encryption-capable native Node binding. A verified staging conversion preserves schema, rows, rowids, autoincrement high-water marks and integer/BLOB values; unsupported virtual-table layouts are rejected rather than partially converted.
 
-`backend/src/` owns the stateful TypeScript engine; `backend/api/` owns the Python ingress. Vue components stay in `frontend/src/`, styles in `frontend/styles/`, and the specialist sandbox compatibility layer in `frontend/compat/`. Static font/icon files are in `assets/web/`; Bot templates and model metadata remain in `assets/`. Shared avatar code and the locale manifest stay in `shared/`. Build/tool scripts remain in `scripts/`.
+Data and workspace relocation run before channels and schedulers start. Current and pending paths remain distinct; existing targets are not merged, links are checked and interruption state is explicit. Native SQLite binaries must match OS/architecture/Node ABI; cross-architecture copying is rejected by preparation.
 
-`npm run build` replaces generated `dist/`, compiles backend/shared modules, copies runtime styles and sandbox assets, and builds Vue into `dist/ui/workspace/`. The service, Tauri, portable archive and Docker packages all launch `dist/backend/src/boost-host.js` and serve `dist/ui/`. Stage only runtime output, assets, bots, dependencies, tool binaries and license notices; FastAPI uses its separate image. Legacy Bot tests, old Preact workspace screens, experimental runners and one-off probes are removed. Standalone test directories have also been removed from the Boost frontend and Rust packages; inline Rust unit tests remain. Build and runtime acceptance follow the repository TESTING.md.
+## Packaging
 
-## Task and conversation plan presentation
+`scripts/prepare-boost-bot.mjs` uses locked dependencies and builds backend/UI resources. `scripts/stage-boost-bot.mjs` includes the prepared runtime and notices in service distributions. Tauri bundles the root Bot resources; source is not duplicated inside desktop.
 
-The right panel lists tasks for its selected Bot and displays the current conversation's recorded plan separately. Cards show real structured `update_plan` / `TodoWrite` items when available; otherwise recorded activity is explicitly labelled as execution history. They support collapsed steps, task details and export. Selecting another Bot clears the previous Bot's task context; read-only role boundaries are unchanged.
+Built-in skills/personas/templates are executable runtime inputs, not public deployment guides. Preserve their entry filenames and semantics when changing documentation. Third-party license text remains verbatim.
 
-Chat processing also renders the shared plan overview without an outer border, including during a streamed turn when recorded steps become available. Its full activity/summary remains expandable; historical activity stays lazy-loaded. No plan, reasoning text, approval or auto-approval timer is fabricated. Task cards in the right panel retain separate surfaces with 14px vertical spacing.
+## Acceptance
+
+Verify desktop and Web actor isolation, source bindings, startup failure reporting, existing-history migration, JSON/SSE, stop/cancel, channel signatures, durable file delivery and group handoffs. Test real providers/channels separately from isolated fixtures. Follow [TESTING.md](../TESTING.md), and use only task-local temporary data.

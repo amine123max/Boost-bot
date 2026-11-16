@@ -1,5 +1,7 @@
 # Custom HTTP channels / 自定义 HTTP 渠道
 
+[简体中文](CUSTOM_CHANNEL.zh-CN.md)
+
 In **管理聊天渠道 → 添加渠道 → 自定义**, configure a receiving HTTP(S) URL,
 a unique 16–256 character signing secret and, optionally, an outbound API token.
 The robot SVG identifies this option. Accounts can be independently named,

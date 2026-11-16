@@ -1,5 +1,6 @@
 FROM node:24-bookworm-slim AS bot
 WORKDIR /src
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY bot ./bot
 COPY scripts/prepare-boost-bot.mjs ./scripts/prepare-boost-bot.mjs
 COPY scripts/stage-boost-bot.mjs ./scripts/stage-boost-bot.mjs
@@ -8,6 +9,7 @@ RUN node scripts/prepare-boost-bot.mjs && cd bot && npm prune --omit=dev --no-au
 RUN node scripts/stage-boost-bot.mjs /out
 
 FROM rust:1-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends cmake perl pkg-config && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 

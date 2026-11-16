@@ -12,6 +12,7 @@ use std::time::Duration;
 
 const ENV_CANDIDATES: [&str; 3] = ["boost.env", "Boost.env", ".env"];
 const DEFAULT_SERVICE_ADDR: &str = "localhost:12580";
+mod supervisor;
 
 #[cfg(target_os = "windows")]
 mod windows_job {
@@ -649,18 +650,70 @@ fn main() {
         });
     }
 
-    // 监督进程：Ctrl+C 或任一子进程退出则进入关闭流程。
+    let mut service_restart = supervisor::RestartBudget::new();
+    let mut web_restart = supervisor::RestartBudget::new();
+    // Only children owned by this launcher are restarted. Intentional shutdown bypasses this loop.
     loop {
         if should_exit.load(Ordering::SeqCst) {
             break;
         }
         if let Ok(Some(status)) = web_child.try_wait() {
             println!("web 已退出：{status}");
-            break;
+            let Some(delay) = web_restart.failure() else {
+                eprintln!("web 连续启动失败，停止自动重启");
+                break;
+            };
+            let until = std::time::Instant::now() + delay;
+            while std::time::Instant::now() < until && !should_exit.load(Ordering::SeqCst) {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            if should_exit.load(Ordering::SeqCst) {
+                break;
+            }
+            match web_cmd.spawn() {
+                Ok(child) => {
+                    #[cfg(windows)]
+                    if let Some(job) = child_job.as_ref() {
+                        if let Err(error) = job.assign(&child) {
+                            eprintln!("web 子进程守护失败：{error}");
+                        }
+                    }
+                    web_child = child;
+                    web_restart.restarted();
+                }
+                Err(error) => {
+                    eprintln!("web 重启失败：{error}");
+                }
+            }
         }
         if let Ok(Some(status)) = service_child.try_wait() {
             println!("service 已退出：{status}");
-            break;
+            let Some(delay) = service_restart.failure() else {
+                eprintln!("service 连续启动失败，停止自动重启");
+                break;
+            };
+            let until = std::time::Instant::now() + delay;
+            while std::time::Instant::now() < until && !should_exit.load(Ordering::SeqCst) {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            if should_exit.load(Ordering::SeqCst) {
+                break;
+            }
+            match spawn_child(&service_bin, Some(&service_bind_addr)) {
+                Ok(child) => {
+                    #[cfg(windows)]
+                    if let Some(job) = child_job.as_ref() {
+                        if let Err(error) = job.assign(&child) {
+                            eprintln!("service 子进程守护失败：{error}");
+                        }
+                    }
+                    service_child = child;
+                    service_restart.restarted();
+                }
+                Err(error) => {
+                    eprintln!("service 重启失败：{error}");
+                }
+            }
         }
         std::thread::sleep(Duration::from_millis(250));
     }
@@ -672,7 +725,7 @@ fn main() {
     simple_get_best_effort(&service_addr, "/__shutdown");
 
     // 最后兜底：短等后强杀
-    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let web_done = web_child.try_wait().ok().flatten().is_some();
         let service_done = service_child.try_wait().ok().flatten().is_some();

@@ -193,6 +193,7 @@ pub(super) fn finalize_upstream_response(
     model_for_log: Option<&str>,
     attempted_account_ids: Option<&[String]>,
     has_more_candidates: bool,
+    circuit: Option<crate::gateway::circuit::Permit>,
 ) -> Result<FinalizeUpstreamResponseOutcome, String> {
     let status_code = response.status().as_u16();
 
@@ -272,6 +273,9 @@ pub(super) fn finalize_upstream_response(
         upstream_stream_failed,
         client_delivery_failed,
     );
+    if let Some(circuit) = circuit {
+        circuit.finish(status_for_log);
+    }
 
     if upstream_stream_failed {
         super::super::super::mark_account_cooldown(

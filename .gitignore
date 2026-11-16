@@ -27,6 +27,7 @@
 !.env.example
 !.env.sample
 *.pem
+!/backend/desktop/release-public-key.pem
 *.key
 *.p12
 *.pfx

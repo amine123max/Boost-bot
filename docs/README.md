@@ -1,31 +1,37 @@
-# Documentation / 文档中心
+# Documentation
 
-[English overview](../README.md) · [中文首页](../README.zh-CN.md)
+[简体中文](README.zh-CN.md)
 
-The normal browser entry for local use and hosted Web is **12000**. This index separates product documentation from implementation and operating guides.
+Guides are organized by technical responsibility. The normal direct Web entry is port 12000; desktop, service, proxy and optional Bot ingress remain distinct runtime paths.
 
-本地与部署后的正常浏览器入口均为 **12000**。首页介绍产品，各模块文档说明职责，长篇手册保留在语言目录。
+| Topic | English | 简体中文 |
+| --- | --- | --- |
+| Overview / 项目首页 | [Read](../README.md) | [阅读](../README.zh-CN.md) |
+| Architecture and data flow / 系统架构与数据流 | [Read](../ARCHITECTURE.md) | [阅读](../ARCHITECTURE.zh-CN.md) |
+| Runtime configuration / 运行配置 | [Read](CONFIGURATION.md) | [阅读](CONFIGURATION.zh-CN.md) |
+| Build and storage / 构建与存储 | [Read](BUILDING.md) | [阅读](BUILDING.zh-CN.md) |
+| Latency and overload / 延迟与过载 | [Read](PERFORMANCE.md) | [阅读](PERFORMANCE.zh-CN.md) |
+| Usage and accounting / 用量与计量 | [Read](USAGE.md) | [阅读](USAGE.zh-CN.md) |
+| Interface gallery / 界面图集 | [Read](SCREENSHOTS.md) | [阅读](SCREENSHOTS.zh-CN.md) |
+| Frontend / 前端 | [Read](../frontend/README.md) | [阅读](../frontend/README.zh-CN.md) |
+| Rust backend / Rust 后端 | [Read](../backend/README.md) | [阅读](../backend/README.zh-CN.md) |
+| Bot runtime / Bot 运行时 | [Read](../bot/README.md) | [阅读](../bot/README.zh-CN.md) |
+| Bot integration / Bot 集成 | [Read](../bot/INTEGRATION.md) | [阅读](../bot/INTEGRATION.zh-CN.md) |
+| Nginx / Nginx | [Read](../nginx/README.md) | [阅读](../nginx/README.zh-CN.md) |
+| Containers / 容器 | [Read](../docker/README.md) | [阅读](../docker/README.zh-CN.md) |
+| Contributing / 贡献 | [Read](../CONTRIBUTING.md) | [阅读](../CONTRIBUTING.zh-CN.md) |
+| Validation / 验证 | [Read](../TESTING.md) | [阅读](../TESTING.zh-CN.md) |
+| Security / 安全 | [Read](../SECURITY.md) | [阅读](../SECURITY.zh-CN.md) |
+| Documentation standards / 文档规范 | [Read](DOCUMENTATION.md) | [阅读](DOCUMENTATION.zh-CN.md) |
+| Repository review / 仓库审查 | [Read](REPOSITORY-AUDIT.md) | [阅读](REPOSITORY-AUDIT.zh-CN.md) |
+| Engineering work plan / 工程任务 | [Read](../update.en.md) | [阅读](../update.md) |
 
-| Topic / 主题 | Entry / 入口 |
-| --- | --- |
-| Frontend / 前端 | [English](../frontend/README.md) · [中文](../frontend/README.zh-CN.md) |
-| Backend / 后端 | [English](../backend/README.md) · [中文](../backend/README.zh-CN.md) |
-| Bot | [English](../bot/README.md) · [中文](../bot/README.zh-CN.md) |
-| Architecture / 架构 | [ARCHITECTURE.md](../ARCHITECTURE.md) |
-| Build and deployment / 构建部署 | [BUILDING.md](BUILDING.md) |
-| Usage and heatmap / 用量与热力图 | [USAGE.md](USAGE.md) |
-| Verification / 验证 | [TESTING.md](../TESTING.md) |
-| Security / 安全 | [SECURITY.md](../SECURITY.md) |
-| Contributions / 贡献 | [CONTRIBUTING.md](../CONTRIBUTING.md) |
-| Review and cleanup / 审查整理 | [REPOSITORY-AUDIT.md](REPOSITORY-AUDIT.md) |
+## Operating manuals
 
-## Operating manuals / 运维手册
+[English index](en/README.md) · [中文手册](zh-CN/README.md) · [Русский](ru/README.md) · [한국어](ko/README.md)
 
-- [中文手册](zh-CN/README.md)
-- [English manuals](en/README.md)
-- [Русский](ru/README.md)
-- [한국어](ko/README.md)
+Detailed client setup, routing, callbacks, plugin contracts and source-derived internal interfaces live in the language manuals. [Pair registry](documentation-pairs.json) and the documentation checker prevent new public guides from becoming single-language files. Runtime/vendor Markdown keeps its original entry semantics.
 
-## Screenshots / 截图
+## Releases
 
-Final README assets live in [`images/`](images/). Management screens use test fixtures; the Bot host uses a local mock endpoint. Regeneration commands and temporary-output requirements are in [TESTING.md](../TESTING.md).
+Use [latest downloads](https://github.com/amine123max/Boost-bot/releases/latest) and [published history](https://github.com/amine123max/Boost-bot/releases) for actual artifacts. Release notes describe delivered behavior and validation; engineering plans do not imply publication.

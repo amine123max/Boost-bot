@@ -1,5 +1,7 @@
 # 不登陆 Codex 使用 ChatGPT 的 /api/auth/session 在软件中的使用
 
+[English](../../en/report/session-json-import.md)
+
 本文说明一种不走 Codex 登录授权弹窗的导入方式：先在浏览器里读取 ChatGPT 当前登录会话的 `https://chatgpt.com/api/auth/session` JSON，再把整段 JSON 粘贴到 Boost 的“批量导入”里。
 
 > 注意：`/api/auth/session` 返回内容里包含可用于访问账号的敏感 token。只在自己的本机环境复制粘贴，不要发到 Issue、群聊、截图或日志里。本文配图均为脱敏示意。

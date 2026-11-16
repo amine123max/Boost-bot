@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use boost_core::storage::{Account, Storage, Token};
+use bytes::Bytes;
 use std::time::Instant;
 
 use super::super::attempt_flow::transport::UpstreamRequestContext;
@@ -14,6 +14,8 @@ use super::request_setup::UpstreamRequestSetup;
 pub(in super::super) struct CandidateAttemptTrace {
     pub(in super::super) last_attempt_url: Option<String>,
     pub(in super::super) last_attempt_error: Option<String>,
+    pub(in super::super) last_status: Option<u16>,
+    pub(in super::super) circuit: Option<crate::gateway::circuit::Permit>,
 }
 
 pub(in super::super) struct CandidateAttemptParams<'a> {
@@ -71,9 +73,18 @@ pub(in super::super) fn run_candidate_attempt(
         trace,
     } = params;
 
+    if let Some(previous) = trace.circuit.take() {
+        previous.finish(trace.last_status.unwrap_or(499));
+    }
+    let Some(circuit) =
+        crate::gateway::circuit::global().acquire(&format!("account:{}", account.id))
+    else {
+        trace.last_attempt_error = Some("upstream circuit open".to_string());
+        return CandidateUpstreamDecision::Failover;
+    };
     let executor_kind = resolve_gateway_upstream_executor_kind(context.protocol_type());
 
-    execute_candidate_upstream_flow(
+    let decision = execute_candidate_upstream_flow(
         executor_kind,
         storage,
         method,
@@ -97,8 +108,18 @@ pub(in super::super) fn run_candidate_attempt(
         |upstream_url: Option<&str>, status_code, error: Option<&str>| {
             trace.last_attempt_url = upstream_url.map(str::to_string);
             trace.last_attempt_error = error.map(str::to_string);
+            trace.last_status = Some(status_code);
             super::super::super::record_route_quality(&account.id, status_code);
             context.log_attempt_result(&account.id, upstream_url, status_code, error);
         },
-    )
+    );
+    match &decision {
+        CandidateUpstreamDecision::RespondUpstream(response) => {
+            trace.last_status = Some(response.status().as_u16());
+            trace.circuit = Some(circuit);
+        }
+        CandidateUpstreamDecision::Terminal { status_code, .. } => circuit.finish(*status_code),
+        CandidateUpstreamDecision::Failover => circuit.finish(trace.last_status.unwrap_or(0)),
+    }
+    decision
 }

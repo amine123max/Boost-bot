@@ -63,6 +63,8 @@ pub(crate) fn error_message_for_client(
 }
 
 mod anchor_fingerprint;
+#[path = "routing/circuit.rs"]
+pub(crate) mod circuit;
 mod concurrency;
 #[path = "routing/conversation_binding.rs"]
 mod conversation_binding;
@@ -75,10 +77,10 @@ mod error_response;
 mod failover;
 #[path = "observability/http_bridge/mod.rs"]
 mod http_bridge;
-#[path = "request/incoming_headers.rs"]
-mod incoming_headers;
 #[path = "request/image_multipart.rs"]
 mod image_multipart;
+#[path = "request/incoming_headers.rs"]
+mod incoming_headers;
 #[path = "request/local_count_tokens.rs"]
 mod local_count_tokens;
 #[path = "request/local_models.rs"]
@@ -94,20 +96,21 @@ mod official_responses_http;
 #[path = "auth/openai_fallback.rs"]
 mod openai_fallback;
 mod protocol_adapter;
+#[path = "routing/quota_priority.rs"]
+mod quota_priority;
 #[path = "request/request_entry.rs"]
 mod request_entry;
 #[path = "routing/request_gate.rs"]
 mod request_gate;
 #[path = "request/request_helpers.rs"]
 mod request_helpers;
+pub(crate) mod request_limits;
 #[path = "observability/request_log.rs"]
 mod request_log;
 #[path = "request/request_rewrite.rs"]
 mod request_rewrite;
 #[path = "routing/route_hint.rs"]
 mod route_hint;
-#[path = "routing/quota_priority.rs"]
-mod quota_priority;
 #[path = "routing/route_quality.rs"]
 mod route_quality;
 #[path = "core/runtime_config.rs"]
@@ -152,8 +155,8 @@ pub(crate) use request_log::{RequestLogTraceContext, RequestLogUsage};
 use request_rewrite::apply_request_overrides_with_service_tier_and_prompt_cache_key;
 use request_rewrite::{
     apply_request_overrides_with_service_tier_and_forced_prompt_cache_key_scope,
-    apply_request_overrides_with_service_tier_and_prompt_cache_key_scope,
-    convert_responses_body_to_chat_completions_body, compute_upstream_url,
+    apply_request_overrides_with_service_tier_and_prompt_cache_key_scope, compute_upstream_url,
+    convert_responses_body_to_chat_completions_body,
 };
 pub(super) use thread_anchor::{
     resolve_fallback_thread_anchor, resolve_local_conversation_id_with_sticky_fallback,
@@ -377,8 +380,8 @@ fn decode_base64_header_value(input: &[u8]) -> Option<Vec<u8>> {
 pub(super) use incoming_headers::IncomingHeaderSnapshot;
 use local_count_tokens::maybe_respond_local_count_tokens;
 use local_models::maybe_respond_local_models;
-pub(crate) use model_picker::fetch_models_for_picker;
 pub(crate) use model_picker::fetch_models_for_account;
+pub(crate) use model_picker::fetch_models_for_picker;
 use openai_fallback::try_openai_fallback;
 pub(crate) use request_entry::handle_gateway_request;
 use request_gate::{request_gate_lock, RequestGateAcquireError};
@@ -391,9 +394,8 @@ pub(crate) use runtime_config::front_proxy_max_body_bytes;
 pub(crate) use runtime_config::{account_max_inflight_limit, set_account_max_inflight_limit};
 use runtime_config::{
     async_upstream_client_for_account, fresh_async_upstream_client_for_account,
-    request_gate_wait_timeout, trace_body_preview_max_bytes,
-    upstream_client_for_account, upstream_stream_timeout, upstream_total_timeout,
-    DEFAULT_GATEWAY_DEBUG,
+    request_gate_wait_timeout, trace_body_preview_max_bytes, upstream_client_for_account,
+    upstream_stream_timeout, upstream_total_timeout, DEFAULT_GATEWAY_DEBUG,
 };
 use selection::collect_gateway_candidates;
 pub(crate) use selection::{
@@ -980,13 +982,7 @@ pub(crate) fn gateway_collect_routed_candidates(
     storage: &boost_core::storage::Storage,
     key_id: &str,
     model: Option<&str>,
-) -> Result<
-    Vec<(
-        boost_core::storage::Account,
-        boost_core::storage::Token,
-    )>,
-    String,
-> {
+) -> Result<Vec<(boost_core::storage::Account, boost_core::storage::Token)>, String> {
     let mut candidates = collect_gateway_candidates(storage)?;
     apply_route_strategy(&mut candidates, key_id, model);
     Ok(candidates)

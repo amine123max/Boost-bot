@@ -1,4 +1,80 @@
-use rusqlite::{params, params_from_iter, types::Value, Result, Row};
+use rusqlite::{params, params_from_iter, types::Value, OptionalExtension, Result, Row};
+
+#[cfg(test)]
+mod settlement_tests {
+    use super::*;
+
+    #[test]
+    fn repeated_finalize_has_one_usage_record_and_failed_usage_rolls_back_identity() {
+        let db = Storage::open_in_memory().unwrap();
+        db.init().unwrap();
+        let log = RequestLog {
+            trace_id: Some("server-generated-trace".into()),
+            request_path: "/v1/responses".into(),
+            method: "POST".into(),
+            created_at: 100,
+            ..Default::default()
+        };
+        let stat = RequestTokenStat {
+            total_tokens: Some(42),
+            created_at: 100,
+            ..Default::default()
+        };
+        db.conn
+            .execute_batch(
+                "CREATE TRIGGER fail_usage BEFORE INSERT ON request_token_stats
+            BEGIN SELECT RAISE(ABORT, 'injected failure'); END;",
+            )
+            .unwrap();
+        assert!(db.insert_request_log_with_token_stat(&log, &stat).is_err());
+        assert_eq!(
+            db.conn
+                .query_row("SELECT COUNT(*) FROM request_logs", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        db.conn.execute_batch("DROP TRIGGER fail_usage").unwrap();
+        let first = db
+            .insert_request_log_with_token_stat(&log, &stat)
+            .unwrap()
+            .0;
+        assert_eq!(
+            db.insert_request_log_with_token_stat(&log, &stat)
+                .unwrap()
+                .0,
+            first
+        );
+        assert_eq!(
+            db.conn
+                .query_row(
+                    "SELECT SUM(total_tokens) FROM request_token_stats",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            42
+        );
+        assert_eq!(
+            db.conn
+                .query_row("SELECT COUNT(*) FROM request_logs", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        // A genuine new server request must still be billed.
+        let other = RequestLog {
+            trace_id: Some("new-server-trace".into()),
+            ..log
+        };
+        assert_ne!(
+            db.insert_request_log_with_token_stat(&other, &stat)
+                .unwrap()
+                .0,
+            first
+        );
+    }
+}
 
 use crate::usage::{PRIMARY_USAGE_WINDOW_MINUTES, SECONDARY_USAGE_WINDOW_MINUTES};
 
@@ -132,7 +208,27 @@ impl Storage {
         log: &RequestLog,
         stat: &RequestTokenStat,
     ) -> Result<(i64, Option<String>)> {
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = rusqlite::Transaction::new_unchecked(
+            &self.conn,
+            rusqlite::TransactionBehavior::Immediate,
+        )?;
+        let settlement_key = log
+            .trace_id
+            .as_deref()
+            .filter(|trace| !trace.trim().is_empty())
+            .map(|trace| format!("{}:{trace}", log.key_id.as_deref().unwrap_or("<none>")));
+        if let Some(identity) = &settlement_key {
+            if let Some(id) = tx
+                .query_row(
+                    "SELECT id FROM request_logs WHERE settlement_key = ?1",
+                    [identity],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+            {
+                return Ok((id, None));
+            }
+        }
         tx.execute(
             "INSERT INTO request_logs (
                 trace_id, key_id, account_id, initial_account_id, attempted_account_ids_json, initial_aggregate_api_id, attempted_aggregate_api_ids_json,
@@ -174,10 +270,14 @@ impl Storage {
             ],
         )?;
         let request_log_id = tx.last_insert_rowid();
+        tx.execute(
+            "UPDATE request_logs SET settlement_key = ?1 WHERE id = ?2",
+            (&settlement_key, request_log_id),
+        )?;
 
-        // 中文注释：token 统计写入失败不应阻塞 request log 保留（例如 sqlite busy/锁竞争）。
-        // 这里保持“单事务单提交”，但 stat 失败时仍 commit request log。
-        let token_stat_error = tx
+        // A settlement identity must never commit without its corresponding usage.
+        let token_stat_error: Option<String> = None;
+        tx
             .execute(
                 "INSERT INTO request_token_stats (
                     request_log_id, key_id, account_id, model,
@@ -197,9 +297,7 @@ impl Storage {
                     stat.estimated_cost_usd,
                     stat.created_at,
                 ),
-            )
-            .err()
-            .map(|err| err.to_string());
+            )?;
         if token_stat_error.is_none() {
             if let Some(account_id) = stat
                 .account_id

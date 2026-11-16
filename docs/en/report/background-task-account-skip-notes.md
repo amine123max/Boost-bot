@@ -1,21 +1,21 @@
-# Background task account filter table
+# Background account eligibility
 
-Below we only look at "where to filter what status" to facilitate local troubleshooting.
+[简体中文](../../zh-CN/report/后台任务账号跳过说明.md)
 
-| Tasks | Filter Locations | Filter Conditions | Skipped Status/Results | Description |
-| --- | --- | --- | --- | --- |
-| Usage polling thread | [backend/service/src/usage/refresh/batch.rs](../../../backend/service/src/usage/refresh/batch.rs#L91) | `status = disabled`, and the latest event hit a ban or refresh-blocked reason | `disabled`, `account_deactivated`, `workspace_deactivated`, `refresh_token_region_blocked` | Put these accounts into `skipped_ids` first, and then filter them out from the token list |
-| Gateway keep-alive thread | [backend/core/src/storage/accounts.rs](../../../backend/core/src/storage/accounts.rs#L117) | `status = active`, and meet the gateway availability conditions | Accounts other than `active` will not enter the candidate set directly | Instead of traversing all accounts, candidate accounts will be screened first and then kept alive |
-| Token refresh polling | [backend/core/src/storage/tokens.rs](../../../backend/core/src/storage/tokens.rs#L28) | `refresh_token` cannot be empty; the latest status cannot be a deactivated class reason or `refresh_token_region_blocked` | None `refresh_token`, `account_deactivated`, `workspace_deactivated`, `refresh_token_region_blocked` | Only process tokens that can be refreshed and are not paused; after fixing the proxy route, manually restoring the account makes it eligible again |
+## Task filters
 
-## Supplement
+| Task | Eligibility | Implementation |
+| --- | --- | --- |
+| Usage polling | Excludes disabled accounts and terminal account/workspace/region failures | [batch selection](../../../backend/service/src/usage/refresh/batch.rs) |
+| Gateway keepalive | Active, gateway-eligible candidates only | [account candidates](../../../backend/core/src/storage/accounts.rs) |
+| Token refresh | Nonempty refresh token and no suspended terminal/region condition | [token selection](../../../backend/core/src/storage/tokens.rs) |
 
-| Phenomenon | Common causes |
-| --- | --- |
-| It seems "available one second, expired the next second" | The server will not return until the next refresh `refresh_token_expired` |
-| There is no action for gateway keepalive | The candidate account is empty, or there is no `active` available account |
-| No movement in usage polling | The accounts have been filtered out, or there are no accounts that can be processed in the current batch |
+These tasks do not all iterate the same account set. An imported access-token-only account can be usable for inference but ineligible for refresh.
 
-## Shortest conclusion
+## Diagnosis
 
-Both `用量轮询` and `令牌刷新` will filter accounts by status; `网关保活` only recognizes candidate accounts from `active`.
+A refresh failure may be observed only when the next provider refresh occurs. Empty keepalive or polling activity can mean that no eligible candidates remain, not that the scheduler stopped. Check account state, last error, task settings and the current batch before changing worker counts.
+
+After correcting a proxy or region problem, explicitly restore the account according to the existing recovery flow. Do not automatically reactivate banned/deactivated accounts to increase throughput. Source filtering, model permissions and quotas still apply.
+
+Record the current code version and the account's redacted state; line-number references become stale as code moves.

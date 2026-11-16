@@ -21,12 +21,17 @@ const host = JSON.parse(input) as {
   dataDir: string; token: string; baseUrl: string; apiKey: string;
   allowTools: boolean; parentPid: number; defaultModel?: string;
   sourceBroker?: import('./core/model-sources.js').SourceBroker;
+  databaseKey?: string | null;
 };
 if (!host.token || !host.apiKey || !host.dataDir || !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+\/v1$/.test(host.baseUrl)) {
   throw new Error('Invalid Boost host configuration');
 }
 registerSecret(host.token);
 registerSecret(host.apiKey);
+if (host.databaseKey && !/^[0-9a-f]{64}$/.test(host.databaseKey)) throw new Error('Invalid Bot database key');
+if (host.databaseKey) registerSecret(host.databaseKey);
+const databaseKey = host.databaseKey ? Buffer.from(host.databaseKey, 'hex') : undefined;
+delete host.databaseKey;
 // No independent model gateway or provider login. These are internal compatibility
 // switches of the vendored runtime, never new public Boost configuration options.
 if (Boolean(process.env.BOOST_BOT_CATALOG_URL) !== Boolean(process.env.BOOST_BOT_CATALOG_PUBKEY)) throw new Error('Boost Bot 额外目录需要同时配置地址和签名公钥');
@@ -57,7 +62,9 @@ config.magpie = { mode: 'external', binPath: '', externalBaseUrl: host.baseUrl, 
 config.agent.mode = host.allowTools ? 'dsh' : 'off';
 if (host.defaultModel && !config.llm.defaultModel) config.llm.defaultModel = host.defaultModel;
 if(host.sourceBroker && host.sourceBroker.url !== host.baseUrl.replace(/\/v1$/, '')+'/_boost/bot/model-sources')throw new Error('Invalid Boost source broker');
-const app = new App(config,{sourceBroker:host.sourceBroker,dataStorage,dataDirLock});
+const app = new App(config,{sourceBroker:host.sourceBroker,dataStorage,dataDirLock,databaseKey,
+  onDatabaseMigration:()=>fs.writeSync(1,JSON.stringify({boostBotMigration:true})+'\n')});
+databaseKey?.fill(0);
 if (host.allowTools) {
   const bundled = path.join(findAppRoot(), 'bots');
   for (const entry of fs.readdirSync(bundled, { withFileTypes: true })) {

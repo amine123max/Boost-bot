@@ -32,7 +32,7 @@ pub(crate) fn current_gateway_concurrency_recommendation() -> GatewayConcurrency
         .unwrap_or(4)
         .max(1);
     let system = System::new_all();
-    let memory_mib = system.total_memory().saturating_div(1024).max(1);
+    let memory_mib = system.total_memory().saturating_div(1024 * 1024).max(1);
     recommend_gateway_concurrency(cpu_cores, memory_mib)
 }
 

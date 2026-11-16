@@ -481,13 +481,20 @@ fn return_storage_to_pool(path: String, storage: Storage) {
 /// # 返回
 /// 返回函数执行结果
 pub(crate) fn initialize_storage() -> Result<(), String> {
-    let path = std::env::var("BOOST_DB_PATH")
-        .map_err(|_| "BOOST_DB_PATH not set".to_string())?;
+    let path = std::env::var("BOOST_DB_PATH").map_err(|_| "BOOST_DB_PATH not set".to_string())?;
     if !Path::new(&path).exists() {
         log::warn!("storage path missing: {}", path);
     }
     let storage =
         Storage::open(&path).map_err(|err| format!("open storage failed: {} ({})", path, err))?;
+    let integrity = storage
+        .quick_check()
+        .map_err(|err| format!("database integrity check failed: {err}"))?;
+    if integrity != ["ok"] {
+        return Err(
+            "database integrity check failed; writes disabled, explicit recovery required".into(),
+        );
+    }
     storage
         .init()
         .map_err(|err| format!("storage init failed: {} ({})", path, err))?;

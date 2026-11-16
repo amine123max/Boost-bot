@@ -1,9 +1,34 @@
-# Usage statistics / 用量统计
+# Usage and accounting
 
-- Home shows today's USD estimated cost, request count, reported total Tokens and cache hit rate. Dates follow the service's local calendar.
-- API Keys shows lifetime totals from detailed and compacted token statistics, including older records. API-key quota configuration and enforcement are unchanged.
-- The single green heatmap scrolls horizontally with a mouse wheel, drag, trackpad or touch. Its scrollbar is hidden. The date range and range totals follow the visible weeks; the lifetime summary stays fixed. More usage means a darker/stronger green, using one scale across the whole timeline.
-- Daily history is stored independently in migration `074_usage_daily_history`; normal detail retention or clearing request logs does not reset it. Available detailed history is backfilled. Previously compacted records without dates remain in lifetime totals but cannot be placed on the calendar. Their recorded request count is a confirmed lower bound, shown with `≥` and a tooltip.
-- Members receive only their own keys' statistics. Administrators can view all keys. Unknown cache rate (no input Tokens) displays `—`; a failed request to the statistics API displays an error rather than fabricated zeros.
+[简体中文](USAGE.zh-CN.md) · [Quota design](en/report/quota-management-design.md) · [Gateway](../backend/service/src/gateway/README.md)
 
-首页只展示今日数据；密钥页展示长期累计，成本统一使用美元。热力图只有一张，可横向滚动，日期和区间汇总随视口变化，滚动条隐藏。按日汇总独立长期保存，既有密钥额度规则保持不变。
+## Metrics and time
+
+| Metric | Meaning |
+| --- | --- |
+| Home totals | Current service-local calendar day |
+| Key totals | Lifetime detailed and rolled-up token statistics |
+| Reported tokens | Usage supplied by the upstream/adapter |
+| Estimated cost | Local price rules and selected billing model, in USD |
+| Cache hit rate | Cached input divided by eligible input; unknown without a denominator |
+| Day comparison | Signed change against the prior service-local day; rate changes use percentage points |
+
+A missing sample is not zero. Sparse dated days can mean zero activity; undated legacy usage remains unknown for calendar placement. A failed statistics request shows an error rather than fabricated totals.
+
+## Persistence and authorization
+
+Daily history is independent of normal request-detail retention. Migration 074 preserves/backfills available dated history. Older compacted undated records remain in lifetime totals but cannot be assigned a date; any confirmed lower-bound count is explicitly marked.
+
+Members receive only their own keys' statistics. Administrators can access broader summaries. Frontend filtering is not an authorization boundary.
+
+## Settlement and budgets
+
+A server trace/key identity deduplicates finalization. Request logs and token statistics commit atomically; wallet request charges deduct once under an immediate transaction. A new logical server request remains separately billable.
+
+Rate, concurrency and cumulative budgets are different controls. Token-limited text requests need a positive output bound for conservative reservation; provider-hidden context/media and cross-process/crash-safe reservations have additional limits. Local cost remains an estimate until reconciled with a supported provider bill.
+
+## Display
+
+The heatmap represents dated usage on one consistent scale and supports horizontal navigation. Visible-range totals and lifetime totals have different scopes. Color is supplemented by dates, values and accessible labels.
+
+Source: [daily history](../backend/core/src/storage/usage_history.rs), [token statistics](../backend/core/src/storage/request_token_stats.rs), [settlement](../backend/core/src/storage/request_logs.rs), [pricing](../backend/service/src/quota/model_pricing.rs).

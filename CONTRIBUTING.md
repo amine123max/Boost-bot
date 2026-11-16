@@ -1,19 +1,49 @@
-# Contributing / 贡献约定
+# Contributing
 
-Read the root [engineering rules](AGENTS.md), then the relevant [frontend](frontend/AGENTS.md) or [backend](backend/AGENTS.md) rules.
+[简体中文](CONTRIBUTING.zh-CN.md) · [Architecture](ARCHITECTURE.md) · [Validation](TESTING.md)
 
-| Change | Location |
+## Branches and scope
+
+Base contributions on the current `main`. Use a focused topic branch (`codex/<topic>` for agent-created branches unless the user specifies otherwise). Keep product fixes, unrelated formatting and release changes separate unless they belong to one verified delivery. Do not create backup branches, commits or stashes automatically.
+
+| Change | Owner |
 | --- | --- |
-| Management UI | `frontend/src/` |
-| Native desktop | `backend/desktop/` |
-| Gateway and service domains | `backend/service/` |
-| Schema and storage foundation | `backend/core/` |
-| Authenticated Web shell | `backend/web/` |
-| Agent runtime and Bot UI | `bot/` |
-| Deployment | `docker/`, `nginx/`, `.github/`, `scripts/` |
+| Management UI / typed clients | `frontend/src/` |
+| Schema / persistence | `backend/core/` |
+| Gateway / domain policy | `backend/service/` |
+| Web sessions / authenticated proxy | `backend/web/` |
+| Native lifecycle / IPC | `backend/desktop/` |
+| Agent runtime / tools / Bot UI | `bot/` |
+| Packaging / reverse proxy | `scripts/`, `docker/`, `nginx/`, `.github/` |
 
-Keep changes focused. Synchronize backend commands, native registration, Web mapping and frontend wrappers. Add regression coverage for meaningful behavior, preserve static direct navigation and server-side authorization, and run the checks in [TESTING.md](TESTING.md).
+Read [repository rules](AGENTS.md) and the applicable [frontend](frontend/AGENTS.md) or [backend](backend/AGENTS.md) rules. Preserve server authorization, ownership, billing and model access.
 
-改动应聚焦对应职责；涉及命令链时同步 Rust、Tauri 注册、Web 映射及前端封装。更新中英文首页时保持功能、版本来源、截图和访问端口一致。新截图应来自当前运行页面，演示数据需明确标识。
+## Local verification
 
-Use a task-specific root `tmp/` directory for disposable output and subprocess temporary storage. Do not commit credentials, runtime databases, dependency trees or generated build caches. Preserve Bot skills, third-party notices and licenses. Report vulnerabilities through [SECURITY.md](SECURITY.md).
+Install the toolchain and native dependencies in [BUILDING.md](docs/BUILDING.md). Before a PR, run checks appropriate to its scope:
+
+```sh
+node scripts/check-repository.mjs
+pnpm -C frontend run build
+cargo test --workspace --locked
+```
+
+Bot changes additionally require `npm --prefix bot run build`; native changes require `cargo check --manifest-path backend/desktop/Cargo.toml --locked`. Use the actual Boost Web runtime for transport/UI acceptance. A Vite preview alone does not validate sessions or service routing.
+
+Record exact commands, results, platform, test data and skipped checks. Use task-local `tmp/` storage, including subprocess TEMP/TMP/TMPDIR, and clean only that task's output after processes exit.
+
+## Commits and pull requests
+
+Use an imperative subject describing the resulting behavior, with optional `fix:`, `feat:` or `docs:` prefix. A PR should state the concrete trigger, before/after behavior, affected boundaries and verification. Include screenshots for meaningful UI changes and latency/overload evidence for scheduling changes. Do not include real credentials or user data.
+
+Synchronize new commands across Rust implementation, Tauri registration, Web mapping and typed frontend wrappers. New settings need defaults, persistence and restart/hot-reload semantics. Schema changes belong in versioned migrations and need meaningful storage regression coverage.
+
+## Documentation and review
+
+Maintain English and Simplified Chinese public guides together. README contains positioning, technical scope, diagrams, screenshots, startup and documentation entrypoints. Protocol inventories and detailed operational contracts belong in dedicated guides. Every code path, default and release statement must be traceable to current source or recorded validation.
+
+The repository maintainer reviews and merges changes; this guide does not define additional unpublished roles or branch protections. The existing [workflow](.github/workflows/release-all.yml) builds releases; do not imply that it is a PR CI pipeline. Report vulnerabilities through [SECURITY.md](SECURITY.md).
+
+## Release gate
+
+Confirm version consistency, retained licenses/notices, bilingual notes, build/runtime checks and matching asset checksums. Published tags and assets require explicit authorization to replace; do not force-update them as routine cleanup.

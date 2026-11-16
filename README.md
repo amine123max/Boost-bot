@@ -1,10 +1,8 @@
-<p align="center">
-  <img src="assets/images/favicon.png" width="88" alt="Boost mascot" />
-</p>
+<p align="center"><img src="assets/images/favicon.png" width="88" alt="Boost logo" /></p>
 
 <h1 align="center">Boost</h1>
 
-<p align="center">A self-hosted AI account manager, compatible API gateway, and agent workspace.</p>
+<p align="center">A self-hosted AI account manager, compatible model gateway, and agent workspace.</p>
 
 <p align="center"><a href="README.zh-CN.md">简体中文</a> · <a href="docs/README.md">Documentation</a> · <a href="SECURITY.md">Security</a> · <a href="https://github.com/amine123max/Boost-bot/releases">Releases</a></p>
 
@@ -12,159 +10,198 @@
   <img src="https://img.shields.io/badge/Vue-3-42B883?style=flat-square&amp;logo=vuedotjs&amp;logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 5.9" />
   <img src="https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&amp;logo=vite&amp;logoColor=white" alt="Vite 7" />
-  <img src="https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&amp;logo=rust&amp;logoColor=white" alt="Rust 2021" />
+  <img src="https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&amp;logo=rust&amp;logoColor=white" alt="Rust 2021 edition" />
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?style=flat-square&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 22.13+" />
-  <img src="https://img.shields.io/badge/SQLite-local-003B57?style=flat-square&amp;logo=sqlite&amp;logoColor=white" alt="SQLite local" />
-  <a href="https://github.com/amine123max/Boost-bot/releases/latest"><img src="https://img.shields.io/github/v/release/amine123max/Boost-bot?style=flat-square&amp;label=Release" alt="Latest GitHub release" /></a>
-  <a href="https://github.com/amine123max/Boost-bot/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-166534?style=flat-square" alt="MIT" /></a>
+  <img src="https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&amp;logo=sqlite&amp;logoColor=white" alt="SQLite WAL" />
 </p>
 
-Boost unifies AI accounts, model routing, API keys, usage monitoring, and an embedded agent workspace. Run it as a Tauri desktop application or a self-hosted Web console backed by the same Rust service.
+Boost is a desktop and self-hosted workspace for managing AI accounts, routing model requests and running agents. It combines a Rust gateway, a Vue interface and an embedded Node.js Bot runtime, with SQLite persistence and shared authorization across desktop and Web deployments.
 
-![Boost dashboard](docs/images/dashboard-dark.png)
+[![Release workflow](https://github.com/amine123max/Boost-bot/actions/workflows/release-all.yml/badge.svg)](https://github.com/amine123max/Boost-bot/actions/workflows/release-all.yml)
+[![Latest release](https://img.shields.io/github/v/release/amine123max/Boost-bot)](https://github.com/amine123max/Boost-bot/releases/latest)
+[![License](https://img.shields.io/github/license/amine123max/Boost-bot)](LICENSE)
+
+![Boost management dashboard](docs/images/dashboard-dark.png)
 
 ## Linux DO community and acknowledgements
 
 Boost is an independent open-source project shared with the [Linux DO](https://linux.do/) community. Community feedback and contributions are welcome. It is independently maintained and is not an official Linux DO project.
 
-Thanks to [Linux DO](https://linux.do/) for providing a place for technical discussion and open-source sharing. Community members are welcome to help improve Boost.
+Thanks to Linux DO for providing a place for technical discussion and open-source sharing.
 
 ## Releases
 
-**[Download the latest release](https://github.com/amine123max/Boost-bot/releases/latest)** · [All releases](https://github.com/amine123max/Boost-bot/releases)
+**[Download the latest release](https://github.com/amine123max/Boost-bot/releases/latest)** · [Release history and notes](https://github.com/amine123max/Boost-bot/releases)
 
-The Release badge reads the latest published version directly from GitHub. Version details and available downloads are maintained on the Releases page.
-
-| Platform | Release format |
+| Platform | Package |
 | --- | --- |
-| Windows x64 | Desktop portable EXE (`Boost_0.5.1_x64.exe`) / NSIS installer (`-setup.exe`) |
-| macOS Apple Silicon | Disk image (`.dmg`) |
+| Windows x64 | Portable EXE and NSIS installer on the [latest release](https://github.com/amine123max/Boost-bot/releases/latest) |
+| macOS Apple Silicon | DMG on the [latest release](https://github.com/amine123max/Boost-bot/releases/latest) |
+| Integrity | [Latest SHA-256 checksums](https://github.com/amine123max/Boost-bot/releases/latest/download/SHA256SUMS.txt) |
 
-These are the packaging targets defined by the release workflow. Download availability follows the published release.
+## Capabilities
 
-## Features
-
-| Area | Capabilities |
+| Area | Technical scope |
 | --- | --- |
-| Accounts | Import, authorization, availability checks, usage windows, and routing preferences. |
-| API gateway | OpenAI-style Responses and Chat Completions, streaming, tools, model mapping, and aggregate upstreams. |
-| Keys and models | Key ownership, access policies, quotas, model catalog, source routing, pricing, and local provider SVG labels (including a generic fallback for new families). |
-| Operations | Request logs, telemetry, account tests, proxy-node measurements, and managed sing-box integration. |
-| Bot workspace | Conversations, memory, tasks, approvals, messaging channels, and role-controlled tools. |
-| Desktop and appearance | Tray integration, user-controlled updates, light/dark modes, and 17 accent colors. |
+| Account management | Authorization, import, availability checks and usage windows |
+| Model gateway | Responses / Chat Completions, JSON / SSE, tools, source mapping and failover |
+| Access and accounting | Key ownership, model access, token budgets, rate/concurrency admission and idempotent settlement |
+| Agent workspace | Conversations, tasks, approvals, tools and signed messaging channels |
+| Operations | Source circuits, request diagnostics, bounded queues, upstream proxies, managed sing-box and native monitoring |
 
-Protocol capabilities depend on the configured upstream and model. See the [documentation](docs/README.md) for deployment and authorization boundaries.
+Protocol support depends on the configured upstream. Main SQLCipher and per-actor Bot encryption are explicitly enabled; workspaces/logs are outside database encryption. Acceptance and remaining work are tracked in the [engineering plan](update.en.md).
 
-Models imported from aggregate APIs are excluded from automatic account-pool assignments. An account can use the same model through its own remote discovery or manual source configuration. Account warmup selects the upstream model from the target account's mappings.
+## Architecture
 
-Model billing can sync TokenRhythm prices for the three configured DeepSeek/GLM models. CNY quotes are converted to USD using the latest published Frankfurter/ECB reference rate at synchronization; the rate and its date remain available beside the provider name. Failed synchronization preserves existing prices and custom overrides.
+```mermaid
+flowchart LR
+  Client["Desktop / Web / model clients"] --> Access["Authenticated access"]
+  Access --> Service["Management / inference service"]
+  Service --> Models["Model upstreams"]
+  Service <-->|"persistent state"| DB[("SQLite")]
+  Service <-->|"tasks / results"| Bot["Bot runtime"]
+```
 
-Management controls track pending operations independently. Each service process shares one FIFO management RPC queue across all browsers and users: six active requests, up to 256 waiting, and a 60-second queue wait limit. Local packages use the same queue in their local service. Each client also limits outstanding RPCs to six; waiting does not lock unrelated controls. Usage history details start collapsed. These limits are separate from gateway inference limits; Nginx forwards RPCs with a longer timeout and no automatic replay.
+Direct Web access uses port **12000**. Desktop runs its own managed Rust/Node runtime; Nginx and FastAPI are optional. See [system architecture](ARCHITECTURE.md) for RPC budgets, identity boundaries, persistence and stream handling.
 
-Home and Keys display separate usage cards with signed changes over the previous day. Cache hit rate changes use percentage points (pp); equal values show unchanged, and unavailable comparisons are explicitly labelled. Sparse days with no dated activity count as zero unless undated legacy records make the baseline unknown. Usage details start collapsed, including when returning to the page.
+| Layer | Technical responsibilities |
+| --- | --- |
+| Vue 3 / TypeScript / Vite | Typed clients, shared desktop/Web UI and static route output |
+| Tauri 2 / Rust | Native IPC, windows/tray, managed local services and desktop updates |
+| Axum / Tokio / tiny_http | Session gateway, JSON-RPC dispatch, bounded management admission and HTTP compatibility |
+| reqwest / protocol adapters | Model routing, HTTP JSON, SSE, supported WebSocket paths and tool-call translation |
+| SQLite / SQLCipher / Node native binding | Main and actor-scoped Bot databases, WAL, verified conversion and independent key derivation |
+| Nginx / FastAPI | Optional TLS ingress, authenticated forwarding, stream preservation and bounded Bot admission |
+| Node.js / DSH / sing-box | Stateful agents and tools; optional managed upstream network egress |
 
-Settings → Text display offers independent Chinese, English, and numeric fonts, including Times New Roman for English and numbers, with a live preview. Choices are saved locally and applied before the page loads. Fonts use local installations with system fallbacks.
+| Resource boundary | Default policy |
+| --- | --- |
+| Management RPC | 6 executing writes, bounded resource queues, 16 read slots, cross-domain barrier |
+| Inference | 20 QPS / burst 20, 24 global and 8 per-model in-flight; storage headroom preserved |
+| Input memory | 32 MiB per body, 64 MiB buffered inference input; front-proxy backpressure |
+| Upstream faults | Source-isolated circuits, bounded half-open probing and healthy-source failover |
+| Data protection | Explicit SQLCipher main storage; derived per-actor Bot keys; wrong-key fail-closed startup |
+| Releases | Ed25519-signed asset manifest bound to tag, source commit, platform and SHA-256 |
+
+These are per-process budgets. Deployment capacity and latency depend on hardware, payloads and upstreams; see the [load validation](docs/PERFORMANCE.md).
 
 ## Screenshots
 
-Management screenshots use isolated demonstration data. Bot screenshots show the installed runtime with a temporary acceptance conversation; private history and credentials are excluded.
+**Account pool**
 
-<details>
-<summary>Accounts, models, and platform keys</summary>
-
-![Account management](docs/images/accounts.png)
+![Account pool and availability](docs/images/accounts.png)
 
 <br />
 
 **Model workspace**
 
-![Model workspace](docs/images/models.png)
+![Model sources and mappings](docs/images/models.png)
 
 <br />
 
 **Platform keys**
 
-![Platform key management](docs/images/platform-keys.png)
-
-</details>
-
-<details>
-<summary>Theme settings and Bot workspace</summary>
-
-![Theme settings](docs/images/settings-light.png)
+![Platform keys and access policies](docs/images/platform-keys.png)
 
 <br />
 
 **Bot workspace**
 
-Web replies use a borderless layout; channel replies keep theme-matched bubbles with timestamps and copy controls. The sidebar can collapse to icons while retaining the animated Boost avatar.
+![Bot conversations and execution workspace](docs/images/bot-workspace.png)
 
-![Bot workspace](docs/images/bot-workspace.png)
+<br />
+
+**Bot library**
 
 ![Bot library](docs/images/bot-library.png)
 
-The information panel groups tasks, channels, account management, approvals and memory into aligned collapsible sections. Memory previews use cached AI titles while management preserves the original text. The shared channel picker includes signed custom HTTP bridges. This panel image uses isolated demonstration data.
+<br />
 
-<img src="docs/images/bot-channels.png" width="320" alt="Collapsible information panel with compact messaging channels" />
+**Bot model sources**
 
-**Per-Bot model source and compact settings**
+![Per-Bot model sources](docs/images/bot-model-sources.png)
 
-![Bot model source](docs/images/bot-model-sources.png)
+<br />
+
+**Bot settings**
 
 ![Bot settings](docs/images/bot-settings.png)
 
-Bot settings can relocate sandbox files into `Boost/bots/<workspace>/workspaces/<bot>` on another drive or folder. The change takes effect on restart and preserves historical file paths. See the [sandbox directory guide](docs/zh-CN/report/Bot沙箱与目录管理.md).
+<br />
 
-The current Bot workspace's conversation database and channel settings can also move to a separate `Boost/bots/<workspace>/data` directory on restart. Existing paths remain compatible; desktop users can reveal the active directory in the file manager. Boost account-pool and billing storage remain separate.
+**Bot storage**
 
-![Bot sandbox storage](docs/images/bot-storage.png)
+![Bot data and workspace directories](docs/images/bot-storage.png)
 
-</details>
+<br />
+
+**Tasks, channels and approvals**
+
+<img src="docs/images/bot-channels.png" width="320" alt="Bot tasks, channels, approvals and memory panel" />
+
+<br />
+
+**Appearance settings**
+
+![Boost light-theme appearance settings](docs/images/settings-light.png)
+
+<br />
+
+**Gateway settings**
+
+![Gateway admission settings under Boost advanced settings](docs/images/resource-settings.png)
+
+<br />
+
+**Storage security**
+
+![Database encryption and integrity status](docs/images/storage-security.png)
+
+<br />
+
+Screenshots use isolated demonstration data. [Interface gallery](docs/SCREENSHOTS.md) groups the views by subsystem.
 
 ## Quick start
 
-For a source build, install Node.js 22.13+ (24 LTS recommended), pnpm 10.30.3, and a current stable Rust toolchain. Run from the repository root:
+**Prerequisites:** Node.js 22.13+ (24 LTS recommended), pnpm 10.30.3, stable Rust and a native C/C++ toolchain. See [platform dependencies](docs/BUILDING.md#platform-dependencies--系统依赖).
 
-```bash
+**Install and build** from a source checkout:
+
+```sh
+git clone https://github.com/amine123max/Boost-bot.git
+cd Boost-bot
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop
 cargo build --locked -p boost-service -p boost-web -p boost-start
+```
+
+**Run:**
+
+```sh
 cargo run --locked -p boost-start
 ```
 
-Open **[http://localhost:12000](http://localhost:12000)**. Both local use and hosted Web deployments use **port 12000** as the normal browser entry.
+**Verify:** open [http://localhost:12000](http://localhost:12000); the management UI or sign-in screen should load. This verifies startup; model calls require a configured upstream and platform key. [Desktop packaging and Docker](docs/BUILDING.md) have separate instructions.
 
-For desktop installers, Docker, development hot reload, and persistent storage, see the [build guide](docs/BUILDING.md).
+## Configuration and documentation
 
-Desktop user data, logs, runtimes and updates are organized under `~/.boost`; Windows/Linux WebView profiles use `~/.boost/cache/webview`. Upgrades migrate existing application data. See the [storage layout](docs/BUILDING.md#desktop-user-storage--桌面用户存储).
-
-All Bots share one runtime per content version. Portable rebuilds reuse unchanged runtime files, and unused older versions are retired in the background after a successful startup; sessions and workspaces stay separate.
-
-## Repository
-
-| Directory | Responsibility |
+| Topic | Reference |
 | --- | --- |
-| [`frontend/`](frontend/README.md) | Vue interface, typed API clients, and browser tests. |
-| [`backend/`](backend/README.md) | Rust storage, service, Web gateway, launcher, and Tauri desktop shell. |
-| [`bot/`](bot/README.md) | Agent runtime, Bot UI, channels, tasks, and built-in skills. |
-| [`nginx/`](nginx/README.md) | Reverse-proxy configuration. |
-| [`docker/`](docker/README.md) | Container builds and deployment. |
-| [`scripts/`](scripts/README.md) | Development, packaging, and verification tools. |
+| Runtime configuration and environment example | [Configuration](docs/CONFIGURATION.md) · [.env.example](.env.example) |
+| Components, RPC, Nginx and persistence | [Architecture](ARCHITECTURE.md) |
+| Build, storage and deployment | [Build guide](docs/BUILDING.md) · [Docker](docker/README.md) · [Nginx](nginx/README.md) |
+| Agent runtime and channel integration | [Bot](bot/README.md) · [Integration](bot/INTEGRATION.md) |
+| Usage and diagnostics | [Usage](docs/USAGE.md) · [Operating manuals](docs/README.md) |
+| Screenshots | [Interface gallery](docs/SCREENSHOTS.md) |
 
-## Documentation
+## Contributing and security
 
-[Architecture](ARCHITECTURE.md) · [Build and deployment](docs/BUILDING.md) · [Testing](TESTING.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
-
-## Star history
-
-[![Boost Star History Chart](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)
+See [contribution workflow](CONTRIBUTING.md), [validation commands](TESTING.md) and [security reporting](SECURITY.md). Release jobs are defined in the [release workflow](.github/workflows/release-all.yml); its status badge describes release builds, not a separate pull-request CI pipeline.
 
 ## License
 
-MIT. Preserve the [project license](LICENSE) and [third-party notices](bot/THIRD_PARTY_NOTICES.md) when redistributing.
+Licensed under [MIT](LICENSE); redistribution must preserve [third-party notices](bot/THIRD_PARTY_NOTICES.md).
 
-The desktop API defaults to `http://localhost:12580/v1`; the Web management UI uses `http://localhost:12000`. Saved legacy local port 48760 migrates to 12580; explicit environment overrides and remote addresses are preserved. Closing the main window hides it and opens a standalone confirmation with Minimize, Exit and Remember my choice. Minimize shows the floating monitor while the service continues running; the default close behavior can be changed in System Settings. The compact monitor snaps to the top or either side, switches orientation, and returns to the main window on double-click. Settings → Floating monitor controls quota, task progress, TPS, upload, download and memory visibility; its size follows the selected items. Task monitoring supports the built-in Bot and local Codex, Claude Code and DeepSeek Harness logs. Reported task progress takes priority; otherwise an uneven timer reaches 80% in ten minutes and waits for completion before showing 100%. Missing token-rate samples show “—”. Update sources are fixed at build time and cannot be overridden by historical runtime settings. Sidebar search supports Ctrl+K, page navigation and settings shortcuts with role filtering; 22px page headings align with the brand row.
-
-Bot now lists channel conversations beneath each agent and expands execution traces inline. Service deployments can route `/boost-bot/` through the [FastAPI gateway](bot/backend/api/README.md) using the nginx configuration and Compose overlay; the native desktop runtime remains self-contained.
+[![Star history](https://api.star-history.com/svg?repos=amine123max/Boost-bot&type=Date)](https://star-history.com/#amine123max/Boost-bot&Date)

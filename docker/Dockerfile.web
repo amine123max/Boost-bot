@@ -12,6 +12,7 @@ COPY bot/shared /src/bot/shared
 RUN pnpm install --frozen-lockfile && pnpm run build
 
 FROM rust:1-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends cmake perl pkg-config && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 

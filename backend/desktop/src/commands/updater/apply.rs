@@ -99,11 +99,7 @@ fn portable_executable_candidates() -> &'static [&'static str] {
     if cfg!(target_os = "windows") {
         &["Boost-portable.exe", "Boost.exe"]
     } else if cfg!(target_os = "macos") {
-        &[
-            "Boost-portable.app",
-            "Boost.app",
-            "Boost",
-        ]
+        &["Boost-portable.app", "Boost.app", "Boost"]
     } else {
         &["Boost-portable", "Boost"]
     }
@@ -607,6 +603,7 @@ fn launch_installer(installer_path: &Path) -> Result<(), String> {
 pub(super) fn apply_portable_impl(app: tauri::AppHandle) -> Result<UpdateActionResponse, String> {
     let pending = read_pending_update(&app)?
         .ok_or_else(|| "未找到已准备更新，请先调用 app_update_prepare".to_string())?;
+    super::signature::verify_pending(&pending)?;
 
     if pending.mode != "portable" {
         return Err("已准备更新并非便携模式".to_string());
@@ -679,6 +676,7 @@ pub(super) fn apply_portable_impl(app: tauri::AppHandle) -> Result<UpdateActionR
 pub(super) fn launch_installer_impl(app: tauri::AppHandle) -> Result<UpdateActionResponse, String> {
     let pending = read_pending_update(&app)?
         .ok_or_else(|| "未找到已准备更新，请先调用 app_update_prepare".to_string())?;
+    super::signature::verify_pending(&pending)?;
     if pending.mode != "installer" {
         return Err("已准备更新并非安装包模式".to_string());
     }

@@ -2,7 +2,7 @@
 import { nextTick, ref, useId } from "vue";
 import BoostIcon from "./BoostIcon.vue";
 import SpringSurface from "./SpringSurface.vue";
-const props = defineProps<{ text: string; label?: string }>();
+const props = defineProps<{ text: string; label?: string; icon?: "info" | "circle-alert" }>();
 const id = useId();
 const trigger = ref<HTMLElement>();
 const tooltip = ref<HTMLElement>();
@@ -30,7 +30,7 @@ function hide() {
     class="help-hint"
     @mouseenter="show"
     @mouseleave="hide"
-    @keydown.esc.stop="hide"
+    @keydown.esc.prevent.stop="hide"
   >
     <span
       ref="trigger"
@@ -46,7 +46,7 @@ function hide() {
       @keydown.enter.prevent.stop="open ? hide() : show()"
       @keydown.space.prevent.stop="open ? hide() : show()"
     >
-      <BoostIcon name="info" :size="14" />
+      <BoostIcon :name="props.icon || 'info'" :size="14" />
     </span>
     <SpringSurface kind="tooltip"
       ><span

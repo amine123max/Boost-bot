@@ -1,115 +1,117 @@
-# Build and deployment / 构建与部署
+# Build and deployment
 
-Normal local and hosted browser access uses **`http://localhost:12000`** or **`http://<server>:12000`**. Other ports below are internal or development-only.
-
-正常本地及部署后的浏览器入口统一为 **12000**。下列其他端口仅用于内部通信或开发调试。
+[简体中文](BUILDING.zh-CN.md) · [Architecture](../ARCHITECTURE.md) · [Configuration](CONFIGURATION.md)
 
 ## Toolchain
 
 | Tool | Requirement |
 | --- | --- |
-| Node.js | 22.13+; 24 LTS recommended |
-| pnpm | 10.30.3, pinned by `frontend/package.json` |
-| npm | Use checked-in Bot lockfiles with `npm ci` |
-| Rust | Current stable; verified with 1.96 |
-| Desktop | Tauri 2 CLI and platform prerequisites |
-| Containers | Docker with Compose v2, for container builds only |
+| Node.js | 22.13+; 24 LTS recommended, matching the bundled Bot ABI |
+| pnpm | 10.30.3, pinned by frontend metadata |
+| Rust | Current stable; local validation uses 1.96 |
+| Native build | C/C++ compiler, CMake, Perl and platform SDK |
+| Desktop CLI | Tauri 2 CLI |
+| Containers | Docker and Compose v2 |
+| Optional Bot ingress | Python 3.11+ |
 
-All commands below start at the repository root unless a working directory is specified.
+### Platform dependencies / 系统依赖
 
-## Service + Web
+| Platform | Dependencies |
+| --- | --- |
+| Windows | Visual Studio Build Tools with C++ Desktop workload, MSVC, Windows SDK; WebView2 for desktop |
+| Windows SQLCipher | Native Strawberry Perl for vendored OpenSSL; MSYS Perl is not a substitute |
+| macOS | Xcode Command Line Tools; build and prepare Bot on the target architecture |
+| Linux service | C/C++, CMake, Perl, pkg-config; supported native dependencies and private writable data |
+| Linux desktop | Service toolchain plus Tauri 2 WebKitGTK 4.1, GTK 3, librsvg and indicator development packages |
 
-```bash
+The build includes SQLite/SQLCipher and vendored crypto; no database server is required. The Bot SQLite binding is native: prepare dependencies on the target OS/architecture and Node ABI. Required dependency/tool downloads need network access.
+
+## Service and Web
+
+Run from the repository root:
+
+```sh
 pnpm -C frontend install --frozen-lockfile
 node scripts/prepare-boost-bot.mjs
 pnpm -C frontend run build:desktop
 cargo build --locked --release -p boost-service -p boost-web -p boost-start
 ```
 
-Launch `target/release/boost-start` (`boost-start.exe` on Windows). It starts Service and Web together. Open **12000**. For a distributable service package, include the three matching binaries and stage the prepared Bot beside them:
+Launch `target/release/boost-start` (`.exe` on Windows). Open `http://localhost:12000`; verify the management/login page. Service model traffic normally uses 12580. Model acceptance requires an authorized source and key.
 
-```bash
-node scripts/stage-boost-bot.mjs <package-directory>
+Web embeds `frontend/out` by default, so rebuild Web after changing static assets. `BOOST_WEB_ROOT` can select an explicit UI directory. A plain Vite server does not provide the Web session/RPC runtime.
+
+For a service package, ship the three matching binaries and stage the prepared Bot:
+
+```sh
+node scripts/stage-boost-bot.mjs output/service
 ```
 
-The output contains `boost-bot/` with its Node executable, runtime dependencies, UI, skills and notices. Prepare on the target OS/architecture; copying native tools from another platform is not supported.
-
-`boost-web` embeds `frontend/out/` by default. `BOOST_WEB_ROOT` can select an explicit static directory; build the frontend before compiling Web. `BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` should point to writable persistent storage. Relative service paths are resolved against the executable directory.
+Prepare that runtime on the destination OS/architecture. The package includes Node, native SQLite, tools, UI, skills and notices.
 
 ## Desktop
 
-```bash
+From the independent desktop package:
+
+```sh
 cd backend/desktop
 cargo tauri dev
 cargo tauri build
 ```
 
-`backend/desktop/tauri.conf.json` points to `../../frontend/out`. Its pre-build hooks prepare Bot and run the frontend script. Installers are written to `backend/desktop/target/release/bundle/`; the root workspace output remains `target/`.
+Hooks prepare Bot and static UI. Tauri references `../../frontend/out`; installers are written under the desktop target bundle directory. Desktop keeps its own Cargo.lock and target; the root service workspace is separate.
 
-Windows helpers: `scripts/rebuild.ps1`; macOS: `scripts/rebuild-macos.sh`; Linux: `scripts/rebuild-linux.sh`. Use their dry-run options before cleanup-oriented rebuilds. See the scripts themselves for supported arguments.
+Use the existing Windows/macOS/Linux rebuild helpers only after reading their supported options. Do not use cleanup-oriented rebuilds to terminate a user's running instance or remove unrelated outputs.
 
-### Desktop user storage / 桌面用户存储
+## Desktop user storage / 桌面用户存储
 
-Desktop builds use `~/.boost` (`C:\Users\<user>\.boost` on Windows). The installer and portable EXE share this directory. No additional environment variables are required.
-
-桌面版统一使用用户主目录下的 `.boost`；安装版与免安装版共用数据，无需新增环境变量。
-
-| Directory | Contents / 内容 |
+| Directory below `~/.boost` | Contents |
 | --- | --- |
-| `data/` | `boost.db`, local RPC credential, installation identity, Bot conversations and owned proxy state / 数据库、RPC 凭据、安装标识、Bot 对话及代理状态 |
-| `cache/webview/` | Shared Windows/Linux WebView profile, UI preferences and browser cache / 多窗口共用的 WebView 配置、界面偏好和缓存 |
-| `logs/` | Desktop logs and gateway diagnostics / 桌面日志与网关诊断日志 |
-| `runtime/bot-runtime/` | Versioned Bot runtime extracted by the portable EXE / 免安装版解包的版本化 Bot 运行时 |
-| `updates/` | Downloaded update packages and update state / 更新包与更新状态 |
+| `data/` | Main database, local credentials, installation identity and default Bot data |
+| `cache/webview/` | Shared Windows/Linux WebView profile and UI preferences |
+| `logs/` | Desktop and gateway diagnostics |
+| `runtime/bot-runtime/` | Content-versioned shared runtime |
+| `updates/` | Update payloads and state |
 
-The first upgraded launch imports existing AppData/XDG application data without initializing or pruning the source database. SQLite snapshots include uncheckpointed WAL transactions, including Bot messages. Existing destination files are not overwritten; a completion marker prevents repeated imports. Legacy database files remain in their original directory. WebView2 profiles, extracted runtimes, logs and update directories move when the destination is absent. Quit the old Boost process before upgrading; a locked profile causes a migration error rather than starting with empty UI preferences.
+Installer and portable Windows builds share this layout. Explicit database/token paths retain priority. Profile identifiers isolate non-primary builds. Standalone Service/Web use executable-relative defaults or configured volumes. macOS native WebKit website storage remains OS-managed.
 
-首次升级会导入原 AppData/XDG 目录的数据，SQLite 快照包含尚未 checkpoint 的 WAL 记录；迁移过程不初始化或清理原数据库。已有目标文件不会覆盖，完成标记防止重复导入。旧数据库保留在原目录；目标不存在时迁移 WebView2 配置、运行时、日志与更新目录。升级前退出旧 Boost；配置目录被占用时会提示迁移失败，避免静默丢失界面偏好。
+Legacy application-data migration preserves existing destination files and uses completion markers. It is distinct from SQLCipher conversion. Close old instances first; an occupied profile or encrypted database must not be treated as an empty store.
 
-`BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` still override database and RPC credential paths, with relative paths resolved against the executable. Non-primary desktop identifiers are isolated below `~/.boost/profiles/<identifier>/`. Standalone Service/Web/Docker storage defaults and configured volumes are unchanged. macOS WebKit's native website storage remains OS-managed because WKWebView does not support a custom data directory; Boost-owned data, logs, runtimes and updates use `.boost` on macOS as well.
+## Storage encryption
 
-显式配置的 `BOOST_DB_PATH`、`BOOST_RPC_TOKEN_FILE` 继续生效；相对路径仍相对可执行文件解析。QA 等独立桌面标识使用 `.boost/profiles/<identifier>/`。Service/Web/Docker 的默认路径和持久卷不变。macOS 的 WebKit 原生站点存储由系统管理，其他 Boost 数据、日志、运行时和更新统一放在 `.boost`。
+Enable main encryption explicitly in Settings or configure a private `BOOST_DB_KEY_FILE` before startup. The desktop credential provider stores the key outside the database. Multiple Service/Web processes must use the same provider; headless containers normally use a read-only mounted secret.
 
-## Development-only ports
+Conversion requires exclusive access, verifies encrypted staging data and replaces the original only on success. It does not create an automatic backup. Wrong/missing keys fail startup. Bot keys are independently derived per actor; existing Bot data converts on next host startup. Files outside the databases remain outside this coverage.
 
-| Purpose | Normal mode | Coordinated source development |
-| --- | --- | --- |
-| User-facing Web | **12000** | 48861, isolated developer gateway |
-| Internal service/RPC | 12580 | 48860 |
-| Vite HMR | Not used | 3005 |
-| Browser regression server | Not used | 3200 by default; `BOOST_TEST_PORT` overrides |
+## Development and containers
 
-```bash
+```sh
 pnpm -C frontend run dev:full
 ```
 
-This development helper starts matching binaries and a hot-reload frontend, with isolated development listeners. It does not change the normal application's **12000** entry. A plain Vite server is not a complete service-mode deployment.
+The coordinated helper uses isolated development listeners: service 48860, Web 48861 and Vite 3005. Normal application entry remains 12000.
 
-## Containers and reverse proxy
-
-```bash
+```sh
 docker compose -f docker/docker-compose.all-in-one.yml config --quiet
 docker compose -f docker/docker-compose.all-in-one.yml up --build -d
 ```
 
-The source-build files use the new `frontend/` and `backend/` paths. See [Docker](../docker/README.md) for split services and persistent volumes. [Nginx](../nginx/README.md) documents the optional TLS reverse proxy and streaming/header requirements.
+See [Docker](../docker/README.md) and [Nginx](../nginx/README.md) for persistent volumes, network exposure, TLS and stream handling.
 
-## Releases
+## Release artifacts
 
-The [release workflow](../.github/workflows/release-all.yml) builds Windows x64 desktop portable EXE and NSIS installer, plus an Apple Silicon macOS DMG, from a version tag. Validate versions first:
+The [release workflow](../.github/workflows/release-all.yml) builds Windows x64 portable EXE/NSIS and macOS arm64 DMG. Match all version fields to the release tag with `scripts/check-release-version.mjs`.
 
-```bash
-node scripts/check-release-version.mjs v0.5.1
-```
+The portable build embeds the complete prepared runtime; `scripts/package-portable.py` produces the EXE. Runtime archive identity is content-derived, so unchanged runtime files reuse the cache. Active older runtimes are retained while referenced; runtime cache cleanup does not remove databases or workspaces.
 
-After preparing the Bot runtime and frontend on Windows, run `python scripts/package-portable.py` to build `output/Boost_0.5.1_x64.exe`. Pass `--target x86_64-pc-windows-msvc` for an explicit Rust target. The portable Cargo feature embeds the complete Bot runtime inside the native desktop executable; first launch extracts it into the application's versioned runtime cache. No manual extraction or installation is required. Build the NSIS installer before this command, using the normal desktop feature set.
+Release publishing signs `update-manifest.json` using the repository signing secret. Its public verifier is bundled in the client. Signature, target, tag, source commit, size and digest are checked before applying an update. All three desktop artifacts are required for a complete signed release; do not use a partial portable-only refresh to produce a mixed-source release.
 
-The packaging script sets `BOOST_EMBEDDED_BOT_ARCHIVE` and `BOOST_EMBEDDED_BOT_DIGEST` only for the portable Cargo build. They identify the project-local temporary runtime archive and a SHA-256 cache key derived from relative paths, file lengths and contents, independent of ZIP timestamps or compression metadata; users do not need to configure them when launching the desktop program.
+## Verification
 
-Portable archive metadata is deterministic: rebuilding identical runtime files reuses the same cache directory, irrespective of source file timestamps. All Bot instances share that runtime. After successfully preparing the current version, startup removes unused completed versions under `~/.boost/runtime/bot-runtime`; versions referenced by running executables or working directories are retained. Cleanup failures do not prevent startup. This cache contains Node and required dependencies, not Bot databases, sessions, credentials or sandboxes; these remain in their separately configured data/workspace locations. One installed copy of the runtime dependencies is still required.
+Run the scope-specific checks in [TESTING.md](../TESTING.md). Keep disposable scripts, data, subprocess TEMP/TMP/TMPDIR and package caches in a task-specific project `tmp/`. Preserve deliverables outside tmp before cleanup. Record platform/package tests that could not run on the current host.
 
-Version fields must match across the root Cargo workspace, native desktop manifest/configuration and frontend package. Build jobs define intended targets; validate platform-specific artifacts before distributing them. Update behavior and release configuration are documented in [中文](zh-CN/release/自动更新与GitHub发布.md) and [English](en/report/app-updates-and-releases.md).
+## Validation record
 
-## Verification and screenshots
+On Windows x64, 2026-11-16: frontend and Bot builds, workspace Rust tests (512 passed/3 ignored), Web (18), native check, storage (11), updater (18) and isolated Web settings acceptance passed. Public-document pairing/relative links and Compose configuration passed.
 
-See [TESTING.md](../TESTING.md). Task-controlled temporary files belong in a dedicated directory under root `tmp/`; set `TEMP`, `TMP` and `TMPDIR` for subprocesses. Documentation screenshots are final assets under `docs/images/`, not disposable test output.
+Docker image builds were not executed because the local daemon was unavailable (dockerDesktopLinuxEngine pipe missing). Nginx was not installed, so nginx -t was not executed. macOS/Linux package execution, production TLS and real-provider/channel acceptance require their target environments. Target-host release CI builds do not constitute manual installer acceptance.

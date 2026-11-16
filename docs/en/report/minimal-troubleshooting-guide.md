@@ -1,37 +1,27 @@
-# Minimal Troubleshooting Guide
+# Troubleshooting
 
-Use this guide to quickly locate the most common startup, relay, and model-refresh problems.
+[简体中文](../../zh-CN/report/最小排障手册.md)
 
-## What to check first
+## Locate the failed boundary
 
-1. Read the [Runtime and Deployment Guide](runtime-and-deployment-guide.md).
-2. Then read the [FAQ and Account Routing Rules](faq-and-account-routing-rules.md).
+| Symptom | Check first |
+| --- | --- |
+| Cannot open UI | Process, listener, embedded assets, Web session and proxy route |
+| Storage startup fails | Key provider, permissions, lock owner, disk space and integrity |
+| Unauthorized | Web session vs internal RPC credential vs platform key |
+| Model unavailable | Catalog visibility, source mapping, actor permission and source state |
+| 429 | Temporary rate/concurrency rejection vs cumulative quota exhaustion |
+| Stream stalls | Upstream first byte, buffering, idle deadline and disconnect cleanup |
+| Repeated upstream failure | Attempt chain, source cooldown/circuit and remaining candidates |
 
-## Recommended troubleshooting order
+Use the [architecture](../../../ARCHITECTURE.md) to identify which process owns the failure. Correct the effective runtime setting rather than an unrelated browser preference.
 
-### 1. Confirm the service is running
+## Evidence
 
-- Check whether the desktop app or service process is actually running.
-- Confirm that the listen address, port, and proxy settings are correct.
-- Review logs for database connection failures, port conflicts, or permission errors.
+Correlate the server trace, path, model/source ID, status and timing. Preserve redacted error summaries and test conditions; do not copy complete prompts, response bodies, credentials or private paths into a public issue. Do not reinitialize a database because a key is unavailable.
 
-### 2. Confirm the request reaches the gateway
+## Recovery
 
-- Make sure the client is really sending requests to the current gateway address.
-- Check the request log for the matching path and status code.
-- For third-party clients, verify that both the API key and base URL are correct.
+Retry only when the error indicates a safe retry. A management execution timeout can have an unknown result; inspect the operation before resubmitting a mutation. A provider circuit opens to reduce pressure; increasing concurrency does not repair the provider.
 
-### 3. Confirm the model and account are available
-
-- Check whether the account is disabled, expired, or quota-limited.
-- Refresh usage and retry.
-- If the account is banned, go through the account cleanup flow first.
-
-### 4. Check streaming and tool-call behavior
-
-- Verify that `tool_calls`, SSE end events, and restored fields are not being lost.
-
-## If it still fails
-
-- Follow the documentation links in README.
-- Preserve the failed request, response, and request-log entries before continuing the investigation.
+Validate fixes with the same reproduction and both relevant runtime modes. See [configuration](../../CONFIGURATION.md), [routing FAQ](faq-and-account-routing-rules.md) and [validation](../../../TESTING.md).

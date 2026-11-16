@@ -1,5 +1,7 @@
 # Changelog
 
+[简体中文](../zh-CN/CHANGELOG.md)
+
 This file records externally visible changes to Boost and serves as the single source of truth for version history.
 It follows Keep a Changelog with a lightweight adaptation for this repository.
 

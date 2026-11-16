@@ -1,84 +1,41 @@
-# SECURITY
+# Security
 
-默认语言：简体中文
+[简体中文](SECURITY.zh-CN.md) · [Architecture](ARCHITECTURE.md) · [Hardening plan](update.md)
 
-其他语言入口：
+## Reporting
 
-- English: [docs/en/SECURITY.md](docs/en/SECURITY.md)
-- Русский: [docs/ru/Безопасность.md](docs/ru/Безопасность.md)
-- 한국어: [docs/ko/보안.md](docs/ko/보안.md)
+Report account-token leaks, authorization bypass, cross-actor access, unsafe updates, sandbox failures and exploitable resource exhaustion privately through the repository owner's published contact or an established private channel. A public issue should contain impact and affected versions only, without live secrets or a reusable exploit.
 
-## 支持范围
+Include the version/commit, runtime mode, platform, prerequisites, minimal reproduction, expected/actual behavior and redacted evidence. Findings are assessed and fixed according to reproducibility and impact; no unverified response-time guarantee is stated.
 
-Boost 当前仍在快速迭代，但会尽量处理合理范围内的安全问题报告。
+## Trust boundaries
 
-优先关注的问题包括：
+| Boundary | Enforcement |
+| --- | --- |
+| Web session | Server derives role and actor; client headers cannot choose identity |
+| Internal RPC | Dedicated internal credential plus trusted actor context |
+| Model access | Platform key, ownership, model access and local billing/quota policy |
+| Bot | Actor-scoped process/data and authorized model key |
+| Public callback | Per-account signature, time window and deduplication |
+| Storage | Local filesystem ownership; optional main SQLCipher and per-actor encrypted Bot storage |
+| Updates | Fixed source and current updater checks; signing hardening tracked separately |
 
-- 账号 token、RPC token、平台 key 泄露风险
-- Web 访问密码绕过
-- 本地网关未授权访问
-- 敏感日志泄露
-- 影响桌面端、service、web 三端的高危远程利用问题
+An authenticated administrator is privileged. Local users who control application files or the running process are outside the protection provided by role checks or at-rest encryption. Directory restrictions and application approvals are not a complete OS sandbox.
 
-## 报告方式
+## Storage and key handling
 
-请不要在公开 Issue 中直接披露可复现的敏感漏洞细节、有效 token 或账号数据。
+Default builds include SQLCipher; encryption is enabled explicitly through Settings or bootstrap configuration. Existing plain databases remain compatible. Desktop keys use the OS credential store; headless deployments can use a restricted explicit key file. Missing/wrong keys fail startup without generating a replacement or initializing an empty database.
 
-建议通过以下方式私下联系维护者：
+Encrypted main storage derives independent per-actor Bot keys. A Bot converts its existing database on its next managed start. Workspace files, logs, configuration files and exports are not automatically encrypted. Preserve the original key for recovery; a database file alone is insufficient. No automatic backups or automatic restore are enabled by these changes.
 
-- GitHub 仓库所有者主页联系方式
-- 已建立的私下沟通渠道
+## Deployment
 
-如果暂时只能通过 Issue 联系，请只描述影响范围，不要附带：
+Local mode uses loopback by default; explicit environment and saved bind mode can expose listeners. Review Docker published ports and Nginx upstreams, terminate TLS where appropriate and retain authentication on every entrypoint. Do not publish internal RPC tokens or permit caller-selected actor headers.
 
-- 有效 access token
-- refresh token
-- id token
-- RPC token
-- API key 明文
-- 可直接复用的攻击脚本
+Capacity controls are process-local. They bound admission and buffered input but cannot guarantee responsiveness under unlimited traffic or OS-level resource exhaustion. Monitor overload, disk capacity and effective configuration.
 
-## 我们希望收到的内容
+## Redaction and release checks
 
-请尽量提供：
+Do not commit databases, private keys, passwords, Authorization/Cookie headers, access/refresh/ID tokens, internal RPC credentials or platform keys. Redact URLs containing secrets and diagnostic SQL. Preserve [licenses and notices](bot/THIRD_PARTY_NOTICES_en.md).
 
-1. 影响范围
-2. 复现步骤
-3. 触发条件
-4. 预期结果与实际结果
-5. 是否需要登录 / 是否需要本地网络条件
-6. 日志片段或截图（注意脱敏）
-
-## 敏感信息处理约定
-
-提交日志、截图、配置前，请先脱敏以下内容：
-
-- `Authorization` 头
-- `Cookie`
-- `Set-Cookie`
-- `access_token`
-- `refresh_token`
-- `id_token`
-- `BOOST_RPC_TOKEN`
-- 任何可直接复用的代理账号或平台密钥
-
-## 仓库内安全约束
-
-- 不要把真实 token、密码、cookie、API key 提交到仓库。
-- 不要在 README、Issue、PR、文档里贴可直接使用的敏感值。
-- 新增日志时，优先记录结构化上下文，不直接输出明文敏感数据。
-- 新增设置项时，区分“适合持久化的配置”和“只能在环境变量中提供的敏感值”。
-
-## 当前已知边界
-
-- 项目默认面向本地部署与自托管使用场景，不承诺公网暴露下的全自动安全加固。
-- 如果启用 `0.0.0.0` 监听或将 Web / service 暴露到局域网或公网，部署者需要自行承担网络暴露风险，并配合：
-  - 强密码
-  - 反向代理访问控制
-  - 网络边界限制
-
-## 响应原则
-
-- 能确认的问题会尽量复现并评估影响等级。
-- 修复完成后，会在合适版本中发布，不会在公开渠道提前暴露敏感细节。
-- 如问题不属于仓库本身，而是部署配置不当，也会给出边界说明。
+Release checks cover version consistency, tamper rejection where implemented, platform packaging, checksums and schema compatibility. Fixed HTTPS download URLs or SHA-256 files alone do not establish publisher authenticity; signing and rollback requirements remain explicit in T05/T15.

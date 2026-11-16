@@ -1,31 +1,40 @@
-# Docker deployment / 容器部署
+# Container deployment
 
-[Project](../README.md) · [中文首页](../README.zh-CN.md) · [Build guide](../docs/BUILDING.md)
+[简体中文](README.zh-CN.md) · [Build guide](../docs/BUILDING.md) · [Nginx](../nginx/README.md)
 
-The Dockerfiles build `frontend/`, `backend/` and the prepared `bot/` runtime from this checkout. The user-facing Web port is **12000**.
+## Deployment variants
 
-Dockerfile 从当前源码构建前端、后端和 Bot 运行时，用户访问端口为 **12000**。
-
-| File | Purpose / 用途 |
+| File | Purpose |
 | --- | --- |
-| `docker-compose.all-in-one.yml` | Source-built Service + Web + Bot in one container / 一体化源码构建 |
-| `docker-compose.yml` | Separate source-built Service and Web containers / 分离式源码构建 |
-| `docker-compose.release.yml` | Existing registry images; set `BOOST_RELEASE_TAG` / 既有镜像部署 |
-| `Dockerfile.*.release` | Wrap already-built binaries / 预构建二进制镜像 |
+| `docker-compose.all-in-one.yml` | Build Service, Web and prepared Bot in one container |
+| `docker-compose.yml` | Build separate Service and Web containers |
+| `docker-compose.bot-api.yml` | Optional FastAPI Bot ingress overlay |
+| `docker-compose.release.yml` | Deploy existing registry images with an explicit release tag |
+| Root `docker-compose.yml` | Separate registry-image example; not a current-source build |
 
-From the repository root:
+## Source build
 
-```bash
+Docker with Compose v2 and access to build dependencies are required. From the repository root:
+
+```sh
 docker compose -f docker/docker-compose.all-in-one.yml config --quiet
 docker compose -f docker/docker-compose.all-in-one.yml up --build -d
 ```
 
-Open `http://localhost:12000`. The named `boost-data` volume persists `/data`; retain it across container updates. `BOOST_DB_PATH` and `BOOST_RPC_TOKEN_FILE` point into this volume. Split deployments share the same data/token volume.
+Open `http://localhost:12000` and verify the management/login page. Native Bot dependencies must match the target OS, architecture and Node ABI; source preparation validates the installed SQLite addon.
 
-访问 `http://localhost:12000`。`boost-data` 命名卷持久化 `/data`，更新容器时保留该卷；数据库和 RPC Token 位于其中。分离式部署需要共享数据和 Token 卷。
+## Persistence and encryption
 
-The root `docker-compose.yml` is a separate registry-image example, not a source build. Its image tag and registry are deployment choices; it is not a substitute for validating the current checkout's build.
+The named `boost-data` volume owns `/data`. Preserve it across updates. Split services share the database and internal credential volume; consistent key provisioning is also required when SQLCipher is enabled.
 
-根目录 Compose 是独立的既有镜像示例，不从当前源码构建。其仓库与标签属于部署配置，不代表当前源码已经验证。
+For headless encryption, mount a private key file read-only and set `BOOST_DB_KEY_FILE` to its container path in every process that opens the main database. Do not put a real key into Compose, an image layer or Git. Existing plaintext conversion requires an exclusive maintenance startup; stop other database users first. A persistent data volume is not a backup.
 
-For TLS and streaming requirements see [Nginx](../nginx/README.md). Native tools in containers require compatible OS/architecture; computer-control features require a usable graphical environment.
+## Networking and lifecycle
+
+Containers listen explicitly on their internal interfaces; published host ports and Nginx define external exposure. Review 12000/12580 publishing separately. Use service DNS inside a Compose network, not another container's loopback.
+
+Container restart policies own container recovery. The native launcher supervises only its children; avoid adding unrelated nested supervisors. Computer-control tools require a usable graphical environment and applicable permissions.
+
+## Acceptance
+
+Validate Compose syntax, image builds, persistent restart, key availability, login/roles, model JSON/SSE, disconnect cleanup and overload. Test Nginx/TLS in the actual deployment. A Windows-host syntax check alone does not certify Linux images or external providers.

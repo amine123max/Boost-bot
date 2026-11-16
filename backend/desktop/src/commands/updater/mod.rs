@@ -3,6 +3,7 @@ mod github;
 mod model;
 mod prepare;
 mod runtime;
+mod signature;
 mod state;
 
 pub use model::{

@@ -59,7 +59,12 @@ pub(crate) fn handle_gateway_request(mut request: Request) -> Result<(), String>
                     err.status_code,
                     None,
                 );
-                if let Some(storage) = super::open_storage() {
+                // Admission overload must not wait for storage just to persist a rejection.
+                if let Some(storage) = if err.retry_after.is_none() {
+                    super::open_storage()
+                } else {
+                    None
+                } {
                     super::write_request_log(
                         &storage,
                         super::request_log::RequestLogTraceContext {
@@ -86,11 +91,19 @@ pub(crate) fn handle_gateway_request(mut request: Request) -> Result<(), String>
                     super::prefers_raw_errors_for_tiny_http_request(&request),
                     err.message.as_str(),
                 );
-                let response = super::error_response::terminal_text_response(
+                let mut response = super::error_response::terminal_text_response(
                     err.status_code,
                     response_message,
                     Some(trace_id.as_str()),
                 );
+                if let Some(seconds) = err.retry_after {
+                    if let Ok(header) = tiny_http::Header::from_bytes(
+                        b"Retry-After",
+                        seconds.max(1).to_string().as_bytes(),
+                    ) {
+                        response = response.with_header(header);
+                    }
+                }
                 let _ = request.respond(response);
                 return Ok(());
             }

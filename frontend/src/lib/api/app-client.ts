@@ -198,8 +198,9 @@ function readAppSession(value: unknown): AppSessionResult {
   };
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, "backgroundTasks"> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, "backgroundTasks" | "storageSecurity"> & {
   backgroundTasks?: Partial<BackgroundTaskSettings>;
+  storageEncryptionEnabled?: boolean;
 };
 
 export const appClient = {

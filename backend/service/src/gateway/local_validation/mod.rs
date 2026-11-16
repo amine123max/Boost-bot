@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use boost_core::storage::ConversationBinding;
+use bytes::Bytes;
 use reqwest::Method;
 use tiny_http::Request;
 
@@ -10,6 +10,7 @@ mod io;
 mod request;
 
 pub(super) struct LocalValidationResult {
+    pub(super) admission: Option<super::request_limits::Admission>,
     pub(super) trace_id: String,
     pub(super) incoming_headers: super::IncomingHeaderSnapshot,
     pub(super) storage: crate::storage_helpers::StorageHandle,
@@ -43,9 +44,11 @@ pub(super) struct LocalValidationResult {
     pub(super) method: Method,
 }
 
+#[derive(Debug)]
 pub(super) struct LocalValidationError {
     pub(super) status_code: u16,
     pub(super) message: String,
+    pub(super) retry_after: Option<u64>,
 }
 
 impl LocalValidationError {
@@ -63,6 +66,17 @@ impl LocalValidationError {
         Self {
             status_code,
             message: message.into(),
+            retry_after: None,
+        }
+    }
+}
+
+impl From<super::request_limits::Rejected> for LocalValidationError {
+    fn from(error: super::request_limits::Rejected) -> Self {
+        Self {
+            status_code: 429,
+            message: error.reason.to_string(),
+            retry_after: Some(error.retry_after),
         }
     }
 }
@@ -82,19 +96,34 @@ pub(super) fn prepare_local_request(
     trace_id: String,
     debug: bool,
 ) -> Result<LocalValidationResult, LocalValidationError> {
-    let body = io::read_request_body(request)?;
+    let mut admission =
+        super::request_limits::global().enter(crate::storage_helpers::storage_max_connections())?;
+    let body = io::read_request_body(request, &mut admission)?;
     let incoming_headers = super::IncomingHeaderSnapshot::from_request(request);
     let platform_key = io::extract_platform_key_or_error(request, &incoming_headers, debug)?;
 
     let storage = auth::open_storage_or_error()?;
     let api_key = auth::load_active_api_key(&storage, &platform_key, request.url(), debug)?;
 
-    request::build_local_validation_result(
+    let mut validated = request::build_local_validation_result(
         request,
         trace_id,
         incoming_headers,
         storage,
         body,
         api_key,
-    )
+    )?;
+    admission.authenticate(&validated.key_id, validated.model_for_log.as_deref())?;
+    if validated.request_method == "POST"
+        && !validated.path.contains("countTokens")
+        && !validated.path.contains("count_tokens")
+    {
+        admission.reserve_quota(
+            &validated.storage,
+            &validated.key_id,
+            validated.passthrough_body.as_ref(),
+        )?;
+    }
+    validated.admission = Some(admission);
+    Ok(validated)
 }

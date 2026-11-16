@@ -1,5 +1,7 @@
 # Boost Bot FastAPI gateway
 
+[简体中文](README.zh-CN.md)
+
 The service deployment uses `nginx → FastAPI → Boost Web → Rust service → actor-scoped Node Bot engine`. FastAPI is the async HTTP ingress for `/boost-bot/`; it does not replace the stateful agent engine, SQLite ownership checks, model gateway, or channel integrations. Native desktop mode continues to use its managed loopback Rust/Node runtime and does not require Python.
 
 Start the sidecar together with the existing service/Web deployment:

@@ -25,7 +25,9 @@ function run(command, args, cwd = root) {
 try {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 22 || (major === 22 && minor < 13)) throw new Error('Boost Bot requires Node.js 22.13+');
-  if (['typescript', 'vue', 'vite', 'vue-tsc', '@vitejs/plugin-vue'].some(name => !existsSync(resolve(root, 'node_modules', name)))) run(npm, ['ci', '--no-audit', '--no-fund']);
+  if (['typescript', 'vue', 'vite', 'vue-tsc', '@vitejs/plugin-vue', 'better-sqlite3-multiple-ciphers'].some(name => !existsSync(resolve(root, 'node_modules', name)))) run(npm, ['ci', '--no-audit', '--no-fund']);
+  if (cross) throw new Error('Encrypted Bot SQLite contains a native addon; prepare on the target OS and architecture.');
+  run(process.execPath, ['--input-type=module','-e', 'import Database from "better-sqlite3-multiple-ciphers"; const db=new Database(":memory:"); db.prepare("SELECT 1").get(); db.close();']);
   if (!process.argv.includes('--skip-tools')) {
     if (cross) run(process.execPath, ['scripts/prepare-dsh.mjs','--os',process.platform,'--cpu',targetArch]);
     else if (!existsSync(resolve(root, 'dsh-runtime/node_modules/@deepseek-ai/dsh-sdk-client/package.json'))) run(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], resolve(root, 'dsh-runtime'));

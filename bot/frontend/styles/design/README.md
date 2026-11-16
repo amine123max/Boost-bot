@@ -1,5 +1,7 @@
 # Boost Bot design styles
 
+[简体中文](README.zh-CN.md)
+
 These are the existing Boost Bot styles used by the Vue workspace and specialist
 Bot sandbox. Directory restructuring preserves their layout, colors and motion.
 

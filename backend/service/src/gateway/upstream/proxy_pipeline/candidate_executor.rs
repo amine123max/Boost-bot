@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use boost_core::storage::{Account, Storage, Token};
+use bytes::Bytes;
 use std::time::Instant;
 use tiny_http::Request;
 
@@ -475,6 +475,7 @@ pub(in super::super) fn execute_candidate_sequence(
                     attempt_model_for_log,
                     Some(attempted_account_ids.as_slice()),
                     context.has_more_candidates(idx),
+                    attempt_trace.circuit.take(),
                 )? {
                     FinalizeUpstreamResponseOutcome::Handled => {
                         if let Err(err) = super::super::super::conversation_binding::record_conversation_binding_terminal_response(

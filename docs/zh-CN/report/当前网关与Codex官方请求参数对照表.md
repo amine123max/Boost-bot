@@ -1,31 +1,25 @@
-# 当前网关与官方 Codex 不一致项
+# 网关协议兼容边界
 
-只保留当前最需要继续处理的请求头差异。
+[English](../../en/report/gateway-vs-codex-official-params.md)
 
-## `/v1/responses` 请求头
+## 兼容矩阵
 
-| 字段 | 官方 Codex | 当前网关 | 当前差异 |
-| --- | --- | --- | --- |
-| `Authorization` | `Bearer <官方账号 token>` | `Bearer <当前账号 token>` | 网关会替换账号 token |
-| `User-Agent` | `codex_cli_rs/<编译时版本> (<os/version; <arch>) <terminal>` | `codex_cli_rs/<数据库配置版本> (<os/version; <arch>) <terminal>` | 官方版本号来自 `env!("CARGO_PKG_VERSION")`，我们当前改成了数据库可配；最终值可手动同步，但来源不一致 |
-| `x-client-request-id` | 固定等于 `conversation_id` | 优先等于线程锚点 | 切号切线程时会变成新的线程锚点 |
-| `session_id` | 固定等于 `conversation_id` | 优先等于线程锚点 | 普通 `/responses` 没有线程锚点时不再发送 |
-| `x-codex-turn-state` | 同一 turn 内回放 | 同一线程稳定时回放 | 切号或线程换代时会主动丢弃 |
+| 范围 | 网关责任 | 限制 |
+| --- | --- | --- |
+| Responses | 请求规范化及支持的响应/流适配 | 上游模型/提供商必须支持 |
+| Chat Completions | 按配置转换消息和工具调用 | Responses 能力不一定都有等价表达 |
+| Anthropic/Gemini 原生 | 专属路径、认证和负载 | 能力仍由提供商决定 |
+| SSE | 保留事件、终止状态和用量 | 中途失败不能透明重试完整请求 |
+| 工具 | 保留名称、参数、调用 ID 和结果关联 | 已执行副作用不能安全重放 |
+| 会话身份 | 原生锚点及配置亲和 | 切换来源可能改变上游会话 |
+| 用量 | 提取观测 Token 并按本地价格估算 | 不替代供应商账单 |
 
-## 当前结论
+兼容不等于与所有官方客户端/服务版本行为完全相同。未知字段和适配器覆盖规则按实际代码与回归审查。
 
-1. 现在最值得继续收的差异就是这 5 项请求头/传输层行为。
-2. `gatewayOriginator` 设置值目前仍会保留在本地配置里，但已经不再影响实际出站 `originator`，真实出站固定为官方默认值 `codex_cli_rs`。
-3. `User-Agent` 版本号这一项，官方来源是编译时包版本；当前网关为了方便手动追平官方，改成了数据库字段可配。
+## 变更约定
 
-## 源码依据
+覆盖两个 OpenAI 风格端点、JSON/SSE 和 tools/tool_calls，验证缺失/额外字段、终止事件、取消、错误体、流用量与来源映射。透传路径避免不必要 JSON 改写，按需保持原始字节。
 
-- 官方 `codex`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\core\src\client.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\codex-api\src\endpoint\responses.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\codex-api\src\requests\headers.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\core\src\default_client.rs`
-- 当前网关
-  - [transport.rs](../../../backend/service/src/gateway/upstream/attempt_flow/transport.rs)
-  - [codex_headers.rs](../../../backend/service/src/gateway/upstream/headers/codex_headers.rs)
-  - [runtime_config.rs](../../../backend/service/src/gateway/core/runtime_config.rs)
+依据：[协议适配](../../../backend/service/src/gateway/protocol_adapter/)、[请求校验](../../../backend/service/src/gateway/local_validation/)、[上游执行](../../../backend/service/src/gateway/upstream/)和 [HTTP bridge](../../../backend/service/src/gateway/observability/http_bridge/)。
+
+传输边界见[请求头与参数策略](当前网关与Codex请求头和参数差异表.md)。README 不维护未经验证的未来模型参数清单。

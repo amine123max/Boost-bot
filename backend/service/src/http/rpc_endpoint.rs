@@ -4,6 +4,7 @@ use axum::response::{IntoResponse, Response as AxumResponse};
 use boost_core::rpc::types::{
     JsonRpcError, JsonRpcErrorObject, JsonRpcMessage, JsonRpcRequest, JsonRpcResponse,
 };
+use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use tiny_http::Request;
 use tiny_http::Response;
@@ -326,7 +327,12 @@ pub(crate) async fn handle_rpc_http(headers: HeaderMap, body: String) -> AxumRes
         return response;
     }
     let actor = rpc_actor_from_axum_headers(&headers);
-    let permit = match rpc_queue::global().acquire().await {
+    let method = match serde_json::from_str::<JsonRpcMessage>(&body) {
+        Ok(JsonRpcMessage::Request(request)) => request.method,
+        Ok(JsonRpcMessage::Notification(_)) => return (StatusCode::OK, "").into_response(),
+        _ => return (StatusCode::BAD_REQUEST, "{}").into_response(),
+    };
+    let permit = match rpc_queue::global().acquire_for(&method).await {
         Ok(permit) => permit,
         Err(error) => {
             let (status, body) = queue_error_response(&body, error);
@@ -413,8 +419,18 @@ pub fn handle_rpc(mut request: Request) {
 
     let actor = rpc_actor_from_request_headers(&request);
     let mut body = String::new();
-    if request.as_reader().read_to_string(&mut body).is_err() {
+    if request
+        .as_reader()
+        .take(2 * 1024 * 1024 + 1)
+        .read_to_string(&mut body)
+        .is_err()
+    {
         let _ = request.respond(Response::from_string("{}").with_status_code(400));
+        return;
+    }
+    if body.len() > 2 * 1024 * 1024 {
+        let _ =
+            request.respond(Response::from_string("request body too large").with_status_code(413));
         return;
     }
     if body.trim().is_empty() {
@@ -422,7 +438,18 @@ pub fn handle_rpc(mut request: Request) {
         return;
     }
 
-    let _permit = match rpc_queue::global().acquire_blocking() {
+    let method = match serde_json::from_str::<JsonRpcMessage>(&body) {
+        Ok(JsonRpcMessage::Request(request)) => request.method,
+        Ok(JsonRpcMessage::Notification(_)) => {
+            let _ = request.respond(Response::from_string(""));
+            return;
+        }
+        _ => {
+            let _ = request.respond(Response::from_string("{}").with_status_code(400));
+            return;
+        }
+    };
+    let _permit = match rpc_queue::global().acquire_blocking_for(&method) {
         Ok(permit) => permit,
         Err(error) => {
             let (status, body) = queue_error_response(&body, error);

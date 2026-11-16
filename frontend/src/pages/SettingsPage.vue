@@ -9,6 +9,7 @@ import GitHubLink from "@/components/GitHubLink.vue";
 import PanelCard from "@/components/PanelCard.vue";
 import SettingsToggle from "@/components/SettingsToggle.vue";
 import AdvancedSettings from "@/components/AdvancedSettings.vue";
+import StorageSecuritySettings from "@/components/StorageSecuritySettings.vue";
 import TypographySettings from "@/components/TypographySettings.vue";
 import ThemeColorSettings from "@/components/ThemeColorSettings.vue";
 import BotAppearanceSettings from "@/components/BotAppearanceSettings.vue";
@@ -380,6 +381,7 @@ async function saveAddress() {
           </form>
         </SettingControl>
       </PanelCard>
+      <StorageSecuritySettings v-if="isAdmin" />
       <AdvancedSettings v-if="isAdmin" />
       <PanelCard title="关于 Boost" icon="info"
         ><template #actions><GitHubLink /></template>

@@ -441,7 +441,9 @@ impl Storage {
     /// # 返回
     /// 返回函数执行结果
     pub fn delete_account(&mut self, account_id: &str) -> Result<()> {
-        let tx = self.conn.transaction()?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM account_metadata WHERE account_id = ?1",
             [account_id],
@@ -539,7 +541,9 @@ impl Storage {
     /// 返回函数执行结果
     pub fn set_preferred_account(&mut self, account_id: Option<&str>) -> Result<()> {
         let now = now_ts();
-        let tx = self.conn.transaction()?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         tx.execute("UPDATE accounts SET preferred = 0 WHERE preferred != 0", [])?;
         if let Some(account_id) = account_id {
             let normalized_account_id = account_id.trim();
@@ -890,9 +894,8 @@ fn workspace_plan_clause(account_alias: &str, usage_alias: &str) -> String {
     let subscription_account_plan =
         workspace_plan_expr("LOWER(TRIM(COALESCE(s.account_plan_type, '')))");
     let subscription_plan = workspace_plan_expr("LOWER(TRIM(COALESCE(s.plan_type, '')))");
-    let usage_plan = workspace_plan_expr(&format!(
-        "LOWER(COALESCE({usage_alias}.credits_json, ''))"
-    ));
+    let usage_plan =
+        workspace_plan_expr(&format!("LOWER(COALESCE({usage_alias}.credits_json, ''))"));
     format!(
         "({usage_plan}
           OR EXISTS (

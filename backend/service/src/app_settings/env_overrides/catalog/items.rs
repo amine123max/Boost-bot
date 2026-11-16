@@ -14,6 +14,8 @@ pub(crate) const APP_SETTINGS_ENV_UNSUPPORTED_KEYS: &[&str] = &[
     "BOOST_DB_PATH",
     "BOOST_RPC_TOKEN",
     "BOOST_RPC_TOKEN_FILE",
+    "BOOST_DB_KEY_FILE",
+    "BOOST_DB_ENCRYPTION",
 ];
 
 pub(crate) const APP_SETTINGS_ENV_RESERVED_KEYS: &[&str] = &[
@@ -326,7 +328,7 @@ pub(crate) const ENV_OVERRIDE_CATALOG: &[EnvOverrideCatalogItem] = &[
         "Trace 队列容量",
         ENV_OVERRIDE_SCOPE_SERVICE,
         ENV_OVERRIDE_APPLY_MODE_RUNTIME,
-        "0",
+        "4096",
     ),
     EnvOverrideCatalogItem::new(
         ENV_TOKEN_REFRESH_AHEAD_SECS,

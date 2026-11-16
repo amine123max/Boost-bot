@@ -1,5 +1,7 @@
 # Channel brand SVG sources
 
+[简体中文](README.zh-CN.md)
+
 - WeChat, Telegram, Discord: [Simple Icons](https://github.com/simple-icons/simple-icons), CC0.
 - Slack: [Simple Icons 14.15.0](https://github.com/simple-icons/simple-icons/tree/14.15.0), CC0.
 - QQ: [Simple Icons 13.21.0](https://github.com/simple-icons/simple-icons/tree/13.21.0), CC0.

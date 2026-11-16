@@ -1,5 +1,13 @@
 # 第三方声明 / Third-Party Notices
 
+[English](THIRD_PARTY_NOTICES_en.md)
+
+## SQLite 加密驱动
+
+Boost 托管 Bot 使用 better-sqlite3-multiple-ciphers 13.1.1（MIT），包含 SQLite3 Multiple Ciphers；其许可和原始声明随 node_modules 一并分发。主库包含 SQLCipher（Copyright 2008–2020 Zetetic LLC，BSD-style）和 OpenSSL（Apache-2.0）；完整原文分别见 [SQLCipher](LICENSES/SQLCipher.txt) 和 [OpenSSL](LICENSES/OpenSSL.txt)，随桌面、服务及容器 Bot 资源分发。数据库接口变更不改变上游组件许可。
+
+驱动声明：Copyright (c) 2021–2026 Mahesh Bandara Wijerathna；Copyright (c) 2017 Joshua Wise；Copyright (c) 2019–2026 Ulrich Telle。
+
 简体中文 | [English](./THIRD_PARTY_NOTICES_en.md) | [日本語](./THIRD_PARTY_NOTICES_ja.md) | [한국어](./THIRD_PARTY_NOTICES_ko.md) | [Русский](./THIRD_PARTY_NOTICES_ru.md)
 
 anymodel bot 自身以 MIT 许可发布（见 LICENSE）。以下组件随本程序分发或被移植，各自保留原许可。

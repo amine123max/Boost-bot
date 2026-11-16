@@ -1,56 +1,33 @@
-# FAQ and Account Routing Rules
+# Routing and operational FAQ
 
-## Common issues
-- Authorization callback fails: first check whether `BOOST_LOGIN_ADDR` is already in use, or use manual callback parsing in the UI.
-- Model list or request is blocked by a challenge page: first check your proxy exit, header differences, and account status. Do not fall back to the old compatibility path or upstream-cookie troubleshooting.
-- Still blocked by Cloudflare / WAF: stop following the old compatibility path. Troubleshooting should now follow the `Codex-First` direction only.
-- `Some data failed to refresh, available data is shown` appears frequently: automatic refresh now only logs failures; manual refresh shows failed items and sample errors. Check the `Background Tasks` settings and the service logs.
-- Running service / web standalone: if the current directory is not writable, such as an install directory, set `BOOST_DB_PATH` to a writable path.
-- `502/503` on macOS behind a proxy: make sure the system proxy does not intercept local loopback traffic (`localhost/127.0.0.1` should go through `DIRECT`), and make sure the address uses lowercase `localhost:<port>`.
+[简体中文](../../zh-CN/report/FAQ与账号命中规则.md)
 
-## Migration notes
+## Source selection
 
-### `Codex-First`
+| Policy | Meaning |
+| --- | --- |
+| Ordered | Try eligible candidates in configured order; failures can advance the chain |
+| Balanced | Rotate eligible candidates within key/model scope, subject to explicit health policy |
+| Quota priority | Prefer eligible sources according to configured remaining-window policy |
+| Manual/source binding | Restrict selection to the authorized configured source and mappings |
 
-The repository has now settled on a `Codex-First` direction:
+Earlier sort does not guarantee a hit. Disabled state, missing credentials, model mismatch, quota windows, cooldown, circuit and in-flight capacity can exclude a source.
 
-- The old compatibility path is no longer the primary route.
-- Each session binds to only one active account.
-- Manual account switching changes the upstream thread, and automatic switching does the same.
+Native conversation anchors retain priority over an unrelated body cache key. Switching accounts can require a different upstream thread generation; model routing must not reuse incompatible provider state.
 
-### Current behavior vs target behavior
+## Common failures
 
-Current behavior:
+| Issue | Diagnosis |
+| --- | --- |
+| OAuth callback unavailable | Check callback listener/port and supported manual completion |
+| Provider challenge or regional denial | Check authorized account status, configured network exit and provider response |
+| Loopback intercepted by a system proxy | Exempt local loopback according to the deployment's network policy |
+| Standalone storage not writable | Configure writable persistent paths and key-file permissions |
+| Imported models use the wrong source | Inspect mappings; aggregate discovery cannot grant account-pool access |
+| Temporary capacity rejection | Inspect Retry-After and active/waiting budgets rather than increasing every layer |
 
-- `balanced` still rotates strictly by `Key + Model`.
-- Session-to-account binding is still moving from `per-request rotation` to `session binding`.
+Do not recommend removed compatibility switches or promise future session behavior as current functionality.
 
-Target behavior:
+## Trace interpretation
 
-- Once a session is bound, it should prefer the bound account instead of entering normal rotation.
-- Automatic account switching should also switch the upstream thread generation.
-- Legacy compatibility switches should completely leave the main path and stop being recommended settings.
-
-## Account routing rules
-- In `ordered` mode, the gateway builds candidates by ascending account `sort` and tries them one by one, for example `0 -> 1 -> 2 -> 3`.
-- This means `try in order`, not `always hit account 0`. If earlier accounts are unavailable or fail, the gateway automatically moves to the next one.
-
-### Common reasons why earlier accounts are skipped
-- The account status is not `active`
-- The account has no token
-- Usage evaluation marks the account unavailable, for example the main quota window is exhausted or usage fields are missing
-- The account is in cooldown, or a soft concurrency limit caused it to be skipped
-
-### `balanced` mode
-- By default, `balanced` rotates strictly across available accounts on the `Key + Model` dimension, so it does not guarantee starting from the smallest `sort`.
-- Only when you explicitly increase `BOOST_ROUTE_HEALTH_P2C_BALANCED_WINDOW` will it add health-based reshuffling on top of balanced rotation.
-
-## Trace logs
-You can inspect `gateway-trace.log` in the same directory as the database:
-- `CANDIDATE_POOL`: candidate order for the current request
-- `CANDIDATE_START` / `CANDIDATE_SKIP`: actual attempts and skip reasons
-- `REQUEST_FINAL`: the final matched account
-
-## Related documents
-- Environment and runtime configuration: [Environment and Runtime Configuration](environment-and-runtime-config.md)
-- Minimal troubleshooting guide: [Minimal Troubleshooting Guide](minimal-troubleshooting-guide.md)
+Candidate-pool, candidate-start/skip and final-result events explain eligibility and attempts. Distinguish queue wait, connection time, first byte and total duration. No sample means unknown, not zero. See [gateway](../../../backend/service/src/gateway/README.md) and [anchor policy](native-thread-anchor-priority.md).

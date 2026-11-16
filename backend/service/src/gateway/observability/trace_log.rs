@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-const DEFAULT_TRACE_QUEUE_CAPACITY: usize = 0;
+const DEFAULT_TRACE_QUEUE_CAPACITY: usize = 4096;
 const TRACE_FLUSH_WAIT_TIMEOUT_MS: u64 = 200;
 const ENV_TRACE_QUEUE_CAPACITY: &str = "BOOST_TRACE_QUEUE_CAPACITY";
 const ENV_GEMINI_TRACE_DIAGNOSTICS: &str = "BOOST_GEMINI_TRACE_DIAGNOSTICS";
@@ -740,6 +740,7 @@ fn trace_queue_capacity() -> usize {
         .filter(|value| !value.is_empty())
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(DEFAULT_TRACE_QUEUE_CAPACITY)
+        .clamp(1, 65_536)
 }
 
 /// 函数 `reload_from_env`
@@ -774,7 +775,9 @@ pub(crate) fn next_trace_id() -> String {
         .map(|v| v.as_millis())
         .unwrap_or(0);
     let seq = TRACE_SEQ.fetch_add(1, Ordering::Relaxed);
-    format!("trc_{millis}_{seq:x}")
+    static PROCESS_NONCE: OnceLock<u128> = OnceLock::new();
+    let nonce = PROCESS_NONCE.get_or_init(rand::random);
+    format!("trc_{nonce:032x}_{millis}_{seq:x}")
 }
 
 /// 函数 `log_request_start`
@@ -1456,11 +1459,15 @@ mod tests {
     }
 
     #[test]
-    fn trace_queue_capacity_zero_means_unbounded() {
+    fn trace_queue_capacity_is_always_bounded() {
         let _guard = crate::test_env_guard();
         std::env::set_var("BOOST_TRACE_QUEUE_CAPACITY", "0");
 
-        assert_eq!(trace_queue_capacity(), 0);
+        assert_eq!(trace_queue_capacity(), 1);
+        std::env::set_var("BOOST_TRACE_QUEUE_CAPACITY", "999999999");
+        assert_eq!(trace_queue_capacity(), 65_536);
+        std::env::remove_var("BOOST_TRACE_QUEUE_CAPACITY");
+        assert_eq!(trace_queue_capacity(), 4096);
     }
 
     #[test]

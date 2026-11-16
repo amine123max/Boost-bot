@@ -135,6 +135,8 @@ export interface OfficialView {
 export type OfficialConnectResult = { ok: true; models: string[] } | { ok: false; code: OfficialFailure; message: string };
 
 export interface AppOptions {
+  databaseKey?: Buffer;
+  onDatabaseMigration?: () => void;
   dataStorage?: BotDataStorage;
   dataDirLock?: DataDirLock;
   sourceBroker?: SourceBroker;
@@ -245,7 +247,7 @@ export class App {
       agent: config.agent.mode,
       log: logFilePath(),
     });
-    this.store = new Store(path.join(config.dataDir, "boost-bot.db"));
+    this.store = new Store(path.join(config.dataDir, "boost-bot.db"), opts.databaseKey, opts.onDatabaseMigration);
     this.collaboration = new CollaborationService(this.store);
     this.botManagement = new BotManagement(this.store, id => this.startBot(id));
     this.workspaceStorage = new WorkspaceStorage(config);

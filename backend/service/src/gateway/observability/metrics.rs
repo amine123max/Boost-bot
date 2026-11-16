@@ -446,7 +446,13 @@ pub(crate) fn gateway_metrics_snapshot() -> GatewayMetricsSnapshot {
 /// 返回函数执行结果
 pub(crate) fn gateway_metrics_prometheus() -> String {
     let m = gateway_metrics_snapshot();
-    let labeled = gateway_labeled_metrics_prometheus();
+    let mut labeled = gateway_labeled_metrics_prometheus();
+    let queue = crate::http::rpc_queue::global().snapshot();
+    use std::fmt::Write;
+    let _ = writeln!(labeled,
+        "boost_rpc_writes_active {}\nboost_rpc_reads_active {}\nboost_rpc_writes_waiting {}\nboost_rpc_queue_rejected_total {}\nboost_rpc_queue_timeouts_total {}\nboost_rpc_queue_wait_microseconds_total {}\nboost_rpc_queue_admitted_total {}",
+        queue.active_writes, queue.active_reads, queue.waiting_writes, queue.rejected_total,
+        queue.timed_out_total, queue.wait_microseconds_total, queue.admitted_total);
     format!(
         "boost_gateway_requests_total {}\n\
 boost_gateway_requests_active {}\n\

@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "scope": "Public project documentation; runtime/vendor Markdown and historical working records retain their entry semantics.",
+  "excludedPrefixes": [
+    "bot/bots/",
+    "bot/assets/bot-template/",
+    "docs/ru/",
+    "docs/ko/"
+  ],
+  "excludedFiles": [
+    "task.md"
+  ],
+  "pairs": [
+    {
+      "en": "AGENTS.md",
+      "zh": "AGENTS.zh-CN.md"
+    },
+    {
+      "en": "ARCHITECTURE.md",
+      "zh": "ARCHITECTURE.zh-CN.md"
+    },
+    {
+      "en": "backend/AGENTS.md",
+      "zh": "backend/AGENTS.zh-CN.md"
+    },
+    {
+      "en": "backend/README.md",
+      "zh": "backend/README.zh-CN.md"
+    },
+    {
+      "en": "backend/service/src/gateway/README.md",
+      "zh": "backend/service/src/gateway/README.zh-CN.md"
+    },
+    {
+      "en": "bot/backend/api/README.md",
+      "zh": "bot/backend/api/README.zh-CN.md"
+    },
+    {
+      "en": "bot/CUSTOM_CHANNEL.md",
+      "zh": "bot/CUSTOM_CHANNEL.zh-CN.md"
+    },
+    {
+      "en": "bot/frontend/src/assets/channels/LICENSES.md",
+      "zh": "bot/frontend/src/assets/channels/LICENSES.zh-CN.md"
+    },
+    {
+      "en": "bot/frontend/src/assets/channels/README.md",
+      "zh": "bot/frontend/src/assets/channels/README.zh-CN.md"
+    },
+    {
+      "en": "bot/frontend/styles/design/README.md",
+      "zh": "bot/frontend/styles/design/README.zh-CN.md"
+    },
+    {
+      "en": "bot/INTEGRATION.md",
+      "zh": "bot/INTEGRATION.zh-CN.md"
+    },
+    {
+      "en": "bot/README.md",
+      "zh": "bot/README.zh-CN.md"
+    },
+    {
+      "en": "bot/THIRD_PARTY_NOTICES_en.md",
+      "zh": "bot/THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "en": "CHANGELOG.md",
+      "zh": "CHANGELOG.zh-CN.md"
+    },
+    {
+      "en": "CONTRIBUTING.md",
+      "zh": "CONTRIBUTING.zh-CN.md"
+    },
+    {
+      "en": "docker/README.md",
+      "zh": "docker/README.zh-CN.md"
+    },
+    {
+      "en": "docs/BUILDING.md",
+      "zh": "docs/BUILDING.zh-CN.md"
+    },
+    {
+      "en": "docs/CONFIGURATION.md",
+      "zh": "docs/CONFIGURATION.zh-CN.md"
+    },
+    {
+      "en": "docs/DOCUMENTATION.md",
+      "zh": "docs/DOCUMENTATION.zh-CN.md"
+    },
+    {
+      "en": "docs/en/ARCHITECTURE.md",
+      "zh": "docs/zh-CN/ARCHITECTURE.md"
+    },
+    {
+      "en": "docs/en/CHANGELOG.md",
+      "zh": "docs/zh-CN/CHANGELOG.md"
+    },
+    {
+      "en": "docs/en/CONTRIBUTING.md",
+      "zh": "docs/zh-CN/CONTRIBUTING.md"
+    },
+    {
+      "en": "docs/en/README.md",
+      "zh": "docs/zh-CN/README.md"
+    },
+    {
+      "en": "docs/en/report/account-billing-mode-locks.md",
+      "zh": "docs/zh-CN/report/账号模式与额度分发锁定策略.md"
+    },
+    {
+      "en": "docs/en/report/aggregate-upstream-routing.md",
+      "zh": "docs/zh-CN/report/聚合API请求规则与配置说明.md"
+    },
+    {
+      "en": "docs/en/report/app-updates-and-releases.md",
+      "zh": "docs/zh-CN/release/自动更新与GitHub发布.md"
+    },
+    {
+      "en": "docs/en/report/background-task-account-skip-notes.md",
+      "zh": "docs/zh-CN/report/后台任务账号跳过说明.md"
+    },
+    {
+      "en": "docs/en/report/boost-client-configuration.md",
+      "zh": "docs/zh-CN/report/Boost客户端配置.md"
+    },
+    {
+      "en": "docs/en/report/bot-storage-and-workspaces.md",
+      "zh": "docs/zh-CN/report/Bot沙箱与目录管理.md"
+    },
+    {
+      "en": "docs/en/report/environment-and-runtime-config.md",
+      "zh": "docs/zh-CN/report/环境变量与运行配置说明.md"
+    },
+    {
+      "en": "docs/en/report/faq-and-account-routing-rules.md",
+      "zh": "docs/zh-CN/report/FAQ与账号命中规则.md"
+    },
+    {
+      "en": "docs/en/report/floating-monitor-and-local-tasks.md",
+      "zh": "docs/zh-CN/report/悬浮窗与本机任务监测.md"
+    },
+    {
+      "en": "docs/en/report/gateway-vs-codex-headers-and-params.md",
+      "zh": "docs/zh-CN/report/当前网关与Codex请求头和参数差异表.md"
+    },
+    {
+      "en": "docs/en/report/gateway-vs-codex-official-params.md",
+      "zh": "docs/zh-CN/report/当前网关与Codex官方请求参数对照表.md"
+    },
+    {
+      "en": "docs/en/report/minimal-troubleshooting-guide.md",
+      "zh": "docs/zh-CN/report/最小排障手册.md"
+    },
+    {
+      "en": "docs/en/report/native-thread-anchor-priority.md",
+      "zh": "docs/zh-CN/report/原生Codex线程锚点优先级说明.md"
+    },
+    {
+      "en": "docs/en/report/nginx-reverse-proxy-cache-hit-issue.md",
+      "zh": "docs/zh-CN/report/Nginx反向代理导致缓存命中偏低说明.md"
+    },
+    {
+      "en": "docs/en/report/plugin-center-integration-and-interfaces.md",
+      "zh": "docs/zh-CN/report/插件中心对接与接口清单.md"
+    },
+    {
+      "en": "docs/en/report/plugin-center-minimal-integration.md",
+      "zh": "docs/zh-CN/report/插件中心最小接入说明.md"
+    },
+    {
+      "en": "docs/en/report/quota-management-design.md",
+      "zh": "docs/zh-CN/report/额度管理中心设计方案.md"
+    },
+    {
+      "en": "docs/en/report/runtime-and-deployment-guide.md",
+      "zh": "docs/zh-CN/report/运行与部署指南.md"
+    },
+    {
+      "en": "docs/en/report/service-provider-challenge-diagnosis.md",
+      "zh": "docs/zh-CN/report/service部署出现Cloudflare 403错误修复说明.md"
+    },
+    {
+      "en": "docs/en/report/session-json-import.md",
+      "zh": "docs/zh-CN/report/不登陆Codex使用ChatGPT-auth-session导入账号.md"
+    },
+    {
+      "en": "docs/en/report/system-internal-interface-inventory.md",
+      "zh": "docs/zh-CN/report/系统内部接口总表.md"
+    },
+    {
+      "en": "docs/en/SECURITY.md",
+      "zh": "docs/zh-CN/SECURITY.md"
+    },
+    {
+      "en": "docs/en/TESTING.md",
+      "zh": "docs/zh-CN/TESTING.md"
+    },
+    {
+      "en": "docs/PERFORMANCE.md",
+      "zh": "docs/PERFORMANCE.zh-CN.md"
+    },
+    {
+      "en": "docs/README.md",
+      "zh": "docs/README.zh-CN.md"
+    },
+    {
+      "en": "docs/REPOSITORY-AUDIT.md",
+      "zh": "docs/REPOSITORY-AUDIT.zh-CN.md"
+    },
+    {
+      "en": "docs/SCREENSHOTS.md",
+      "zh": "docs/SCREENSHOTS.zh-CN.md"
+    },
+    {
+      "en": "docs/USAGE.md",
+      "zh": "docs/USAGE.zh-CN.md"
+    },
+    {
+      "en": "frontend/AGENTS.md",
+      "zh": "frontend/AGENTS.zh-CN.md"
+    },
+    {
+      "en": "frontend/README.md",
+      "zh": "frontend/README.zh-CN.md"
+    },
+    {
+      "en": "frontend/src/styles/README.md",
+      "zh": "frontend/src/styles/README.zh-CN.md"
+    },
+    {
+      "en": "nginx/README.md",
+      "zh": "nginx/README.zh-CN.md"
+    },
+    {
+      "en": "README.md",
+      "zh": "README.zh-CN.md"
+    },
+    {
+      "en": "scripts/README.md",
+      "zh": "scripts/README.zh-CN.md"
+    },
+    {
+      "en": "SECURITY.md",
+      "zh": "SECURITY.zh-CN.md"
+    },
+    {
+      "en": "TESTING.md",
+      "zh": "TESTING.zh-CN.md"
+    },
+    {
+      "en": "update.en.md",
+      "zh": "update.md"
+    },
+    {
+      "en": "docs/releases/v0.5.0.md",
+      "zh": "docs/releases/v0.5.0.zh-CN.md"
+    },
+    {
+      "en": "docs/releases/v0.5.1.md",
+      "zh": "docs/releases/v0.5.1.zh-CN.md"
+    }
+  ]
+}

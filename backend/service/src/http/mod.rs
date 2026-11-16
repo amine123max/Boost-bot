@@ -1,7 +1,8 @@
 pub mod callback_endpoint;
 pub mod gateway_endpoint;
 pub mod rpc_endpoint;
-mod rpc_queue;
+mod rpc_policy;
+pub(crate) mod rpc_queue;
 pub mod server;
 pub(crate) mod usage_events;
 

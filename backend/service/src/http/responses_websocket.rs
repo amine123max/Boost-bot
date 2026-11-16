@@ -182,6 +182,19 @@ pub(super) fn is_websocket_upgrade_request(headers: &HeaderMap) -> bool {
 }
 
 pub(super) async fn upgrade_responses_websocket(request: HttpRequest<Body>) -> Response<Body> {
+    let admission = match crate::gateway::request_limits::global()
+        .enter(crate::storage_helpers::storage_max_connections())
+    {
+        Ok(admission) => admission,
+        Err(error) => {
+            let mut response = text_error_response(StatusCode::TOO_MANY_REQUESTS, error.reason);
+            response.headers_mut().insert(
+                header::RETRY_AFTER,
+                error.retry_after.to_string().parse().unwrap(),
+            );
+            return response;
+        }
+    };
     let (mut parts, _) = request.into_parts();
 
     let context = match authorize_websocket_request(&parts.headers) {
@@ -205,21 +218,36 @@ pub(super) async fn upgrade_responses_websocket(request: HttpRequest<Body>) -> R
         }
     };
 
-    ws.on_upgrade(move |socket| async move {
-        run_responses_websocket_session(socket, context).await;
-    })
+    ws.max_message_size(admission.max_body_bytes())
+        .max_frame_size(admission.max_body_bytes())
+        .on_upgrade(move |socket| async move {
+            run_responses_websocket_session(socket, context, admission).await;
+        })
 }
 
-async fn run_responses_websocket_session(socket: WebSocket, context: WsRequestContext) {
+async fn run_responses_websocket_session(
+    socket: WebSocket,
+    context: WsRequestContext,
+    mut admission: crate::gateway::request_limits::Admission,
+) {
     let mut socket = MeteredWebSocket {
         inner: socket,
         _active: crate::telemetry::ActiveTransfer::new(),
     };
-    let first_text = match receive_initial_request(&mut socket).await {
-        Ok(Some(text)) => text,
-        Ok(None) => return,
-        Err(err) => {
+    let first_text = match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        receive_initial_request(&mut socket),
+    )
+    .await
+    {
+        Ok(Ok(Some(text))) => text,
+        Ok(Ok(None)) => return,
+        Ok(Err(err)) => {
             send_ws_error_and_close(&mut socket, err, context.prefer_raw_errors).await;
+            return;
+        }
+        Err(_) => {
+            let _ = socket.close().await;
             return;
         }
     };
@@ -232,6 +260,16 @@ async fn run_responses_websocket_session(socket: WebSocket, context: WsRequestCo
         }
     };
 
+    if let Err(error) = admission.authenticate(&context.api_key.id, prepared_first.model.as_deref())
+    {
+        send_ws_error_and_close(
+            &mut socket,
+            WsSessionError::new(429, error.reason, error.reason),
+            context.prefer_raw_errors,
+        )
+        .await;
+        return;
+    }
     let mut upstream =
         match connect_upstream_websocket(&context, prepared_first.model.as_deref()).await {
             Ok(stream) => stream,
@@ -289,6 +327,11 @@ async fn run_responses_websocket_session(socket: WebSocket, context: WsRequestCo
                     Ok(Message::Text(text)) => {
                         match rewrite_client_frame(text.as_str(), &context) {
                             Ok(prepared) => {
+                                admission.release_model();
+                                if let Err(error) = admission.authenticate(&context.api_key.id, prepared.model.as_deref()) {
+                                    send_ws_error_and_close(&mut socket, WsSessionError::new(429, error.reason, error.reason), context.prefer_raw_errors).await;
+                                    break;
+                                }
                                 if let Some(previous_pending) = pending_request.take() {
                                     finalize_ws_request_log(
                                         &context,
@@ -405,6 +448,7 @@ async fn run_responses_websocket_session(socket: WebSocket, context: WsRequestCo
                             }
 
                             if let Some(mut pending) = pending_request.take() {
+                                admission.release_model();
                                 mark_ws_first_response(&mut pending);
                                 finalize_ws_request_log(
                                     &context,

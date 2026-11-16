@@ -35,9 +35,8 @@ impl ServerHandle {
 pub fn start_one_shot_server() -> std::io::Result<ServerHandle> {
     crate::portable::bootstrap_current_process();
     crate::gateway::reload_runtime_config_from_env();
-    if let Err(err) = crate::storage_helpers::initialize_storage() {
-        log::warn!("storage startup init skipped: {}", err);
-    }
+    crate::storage_helpers::initialize_storage()
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
     crate::sync_runtime_settings_from_storage();
     let server = tiny_http::Server::http("127.0.0.1:0")
         .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
@@ -67,9 +66,8 @@ pub fn start_one_shot_server() -> std::io::Result<ServerHandle> {
 pub fn start_server(addr: &str) -> std::io::Result<()> {
     crate::portable::bootstrap_current_process();
     crate::gateway::reload_runtime_config_from_env();
-    if let Err(err) = crate::storage_helpers::initialize_storage() {
-        log::warn!("storage startup init skipped: {}", err);
-    }
+    crate::storage_helpers::initialize_storage()
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
     crate::sync_runtime_settings_from_storage();
     match crate::app_settings::sync_gateway_user_agent_version_from_codex_latest() {
         Ok(version) => {

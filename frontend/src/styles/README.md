@@ -1,5 +1,7 @@
 # Shared dialog and surface styling
 
+[简体中文](README.zh-CN.md)
+
 Boost and the hosted Bot both import [surfaces.css](surfaces.css). Keep dialog
 density changes here so normal dialogs, wide Bot editors and confirmations use
 the same header geometry.

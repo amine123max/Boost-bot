@@ -1,24 +1,34 @@
-# App Updates and GitHub Releases
+# Desktop updates and releases
 
-The public repository is `amine123max/Boost-bot`. Desktop clients read its GitHub Releases without a token. The release workflow embeds the actual `github.repository` through `BOOST_UPDATE_REPO`; runtime environment variables and saved settings cannot override it. The update dialog displays the actual repository. The updater never falls back to another project's repository.
+[简体中文](../../zh-CN/release/自动更新与GitHub发布.md)
 
-Automatic checking defaults to enabled through the existing persisted `app.update.auto_check` setting. The main desktop window checks after initialization and every 24 hours. Disabling the setting stops polling. Tray previews and Web/Docker clients do not run desktop update checks.
+## Sources and user control
 
-Checking only announces a new version. Downloading requires the user's **Download update** action; applying it requires a separate **Install update** or **Restart and update** action. Users can dismiss the prompt and return to Settings. The same version is automatically announced once per application run. Automatic check failures remain available in Settings without error notifications.
+The update repository is fixed at build time (`BOOST_UPDATE_REPO` in release builds, otherwise the bundled default). Runtime variables and historical settings cannot redirect it to another project. Web/Docker deployments are updated by their operator, not desktop IPC.
 
-## Publish
+Automatic checks use the persisted preference, run after the main window is ready and on the existing periodic schedule, and do not download/install/restart without the user's action. Manual checks show the actual source and errors. A stable client normally selects stable releases; prerelease behavior is explicitly configured.
 
-1. Keep the version equal in root `Cargo.toml`, `backend/desktop/Cargo.toml`, `backend/desktop/tauri.conf.json`, and `frontend/package.json`.
-2. Run `node scripts/check-release-version.mjs v0.5.0`, substituting the intended version.
-3. Commit and push the source, then push the matching version tag. Alternatively, manually run `.github/workflows/release-all.yml` with an existing tag.
-4. All desktop jobs must succeed before the workflow publishes the Release. Ordinary branch pushes do not announce updates.
+## Authenticity
 
-The workflow produces Windows x64 NSIS installers, macOS Intel/Apple Silicon DMGs, and Linux x64 DEB/AppImage packages. It does not produce service archives or portable packages. macOS signing and notarization require publisher configuration.
+A release contains the platform artifacts, SHA256SUMS.txt and update-manifest.json. The manifest is Ed25519-signed and binds repository, tag, immutable source commit, asset name, target, size and SHA-256. The client bundles the public verification key; the private key exists only as the release workflow Secret.
 
-Release tags must exceed the installed semantic version. Tags such as `v0.5.1-beta.1` become prereleases; clients use stable versions unless started with `BOOST_UPDATE_PRERELEASE=true`.
+Preparation rejects missing/invalid signatures and verifies the downloaded payload before extraction or execution. Apply verifies the stored payload again and refuses a non-newer version. Old unsigned pending updates must be prepared again. SHA-256 alone is an integrity check, not publisher authentication.
 
-If the repository is later made private, clients require a runtime `BOOST_GITHUB_TOKEN` with repository contents read permission (`GITHUB_TOKEN` / `GH_TOKEN` also work). Private asset downloads use the authenticated asset API. Never embed tokens in installers.
+## Publishing
 
-Run frontend build, `build:desktop`, runtime tests, browser update tests and `cargo test --manifest-path backend/desktop/Cargo.toml --lib commands::updater` before release. After the first release, verify real GitHub checking, downloading and installation using an older installed client.
+| Gate | Requirement |
+| --- | --- |
+| Versions | Root/desktop Cargo, Tauri, frontend and Bot metadata match the tag |
+| Build | Windows x64 portable EXE and NSIS; macOS arm64 DMG |
+| Source | Artifacts correspond to one immutable commit |
+| Validation | Frontend/Bot builds, retained Rust tests, desktop update regressions and runtime acceptance |
+| Signing | Secret matches the bundled public key; all three artifacts are signed together |
+| Publication | Update paired notes, upload assets/checksums/manifest, verify the published result |
 
-See the [Chinese guide](../../zh-CN/release/自动更新与GitHub发布.md) for commands.
+Run scripts/check-release-version.mjs with the intended tag. The workflow supports version tags and manual dispatch for an existing tag. Partial portable-only refresh is not a complete signed release and must not mix source commits. Published tag/asset replacement requires explicit authorization.
+
+## Compatibility and recovery
+
+A new binary can require a newer database schema. Signature verification does not make downgrade safe, and switching executables does not restore data. Previous-version retention, schema rollback and key rotation require explicit policies; no automatic backup or one-click data rollback is claimed.
+
+Current packaging targets are defined by the [workflow](../../../.github/workflows/release-all.yml), not historical platform lists. Real download/install acceptance uses an older authorized client and a matching signed release.

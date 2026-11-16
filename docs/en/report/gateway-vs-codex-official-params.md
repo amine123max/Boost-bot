@@ -1,31 +1,25 @@
-# Current Differences from Official Codex
+# Gateway protocol compatibility boundaries
 
-This document keeps only the remaining request-header differences that are still worth tracking.
+[简体中文](../../zh-CN/report/当前网关与Codex官方请求参数对照表.md)
 
-## `/v1/responses` request headers
+## Compatibility matrix
 
-| Field | Official Codex | Current gateway | Difference |
-| --- | --- | --- | --- |
-| `Authorization` | `Bearer <official account token>` | `Bearer <current account token>` | The gateway replaces the account token |
-| `User-Agent` | `codex_cli_rs/<compile-time version> (<os/version; <arch>) <terminal>` | `codex_cli_rs/<database-configured version> (<os/version; <arch>) <terminal>` | Official Codex uses `env!("CARGO_PKG_VERSION")`; the gateway currently reads this from a configurable database field |
-| `x-client-request-id` | Always equals `conversation_id` | Prefer the thread anchor | When switching accounts or threads, it becomes the new thread anchor |
-| `session_id` | Always equals `conversation_id` | Prefer the thread anchor | Not sent for normal `/responses` traffic when there is no thread anchor |
-| `x-codex-turn-state` | Replayed within the same turn | Replayed while the same thread remains stable | Dropped proactively when switching accounts or replacing the thread |
+| Area | Gateway responsibility | Limit |
+| --- | --- | --- |
+| Responses | Request normalization and supported response/stream adaptation | Upstream model/provider must support the operation |
+| Chat Completions | Message and tool-call conversion where configured | Not every Responses feature has an equivalent |
+| Native Anthropic/Gemini | Provider-specific paths, auth and payload handling | Native capabilities remain provider-dependent |
+| SSE | Preserve event framing, terminal state and reported usage | Mid-stream failure cannot become a transparent full retry |
+| Tools | Preserve names, arguments, call IDs and result association | Already-executed effects are not safe to replay |
+| Session identity | Preserve native anchors and configured affinity | Switching sources can change upstream conversation state |
+| Usage | Extract observed tokens and estimate local price | Not a substitute for provider invoices |
 
-## Current conclusion
+Compatibility does not mean exact behavioral identity with every official client or server version. Unknown upstream fields and adapter-specific overrides must be reviewed against actual source and regression cases.
 
-1. These five request-header / transport-layer behaviors are still the main gaps worth tracking.
-2. The `gatewayOriginator` setting is still stored locally, but it no longer affects the actual outbound `originator`. Outbound traffic now always uses the official default value: `codex_cli_rs`.
-3. For `User-Agent`, official Codex uses the compile-time package version, while the current gateway allows the version segment to be configured from the database.
+## Change contract
 
-## Source references
+Cover both supported OpenAI-style endpoints, JSON/SSE and tools/tool_calls. Verify missing/extra fields, terminal events, cancellation, error bodies, stream usage and model-source mapping. For a passthrough route, avoid unnecessary JSON rewrites and preserve body bytes where required.
 
-- Official `codex`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\core\src\client.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\codex-api\src\endpoint\responses.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\codex-api\src\requests\headers.rs`
-  - `D:\MyComputer\own\GPTTeam相关\Boost\codex\codex-rs\core\src\default_client.rs`
-- Current gateway
-  - [transport.rs](../../../backend/service/src/gateway/upstream/attempt_flow/transport.rs)
-  - [codex_headers.rs](../../../backend/service/src/gateway/upstream/headers/codex_headers.rs)
-  - [runtime_config.rs](../../../backend/service/src/gateway/core/runtime_config.rs)
+Implementation sources: [protocol adapters](../../../backend/service/src/gateway/protocol_adapter/), [request validation](../../../backend/service/src/gateway/local_validation/), [upstream executors](../../../backend/service/src/gateway/upstream/) and [HTTP bridge](../../../backend/service/src/gateway/observability/http_bridge/).
+
+See [header/parameter policy](gateway-vs-codex-headers-and-params.md) for transport boundaries. Do not maintain an unverified list of future model parameters in README.

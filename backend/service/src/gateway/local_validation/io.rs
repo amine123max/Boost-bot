@@ -12,10 +12,16 @@ use tiny_http::Request;
 /// 返回函数执行结果
 pub(super) fn read_request_body(
     request: &mut Request,
+    admission: &mut super::super::request_limits::Admission,
 ) -> Result<Vec<u8>, super::LocalValidationError> {
     // 中文注释：先把请求体读完再进入鉴权判断，避免客户端写流还在进行时被提前断开。
     let mut body = Vec::new();
-    let max_body_bytes = crate::gateway::front_proxy_max_body_bytes();
+    let configured = crate::gateway::front_proxy_max_body_bytes();
+    let max_body_bytes = if configured == 0 {
+        admission.max_body_bytes()
+    } else {
+        configured.min(admission.max_body_bytes())
+    };
     let reader = request.as_reader();
     let mut chunk = [0_u8; 8192];
 
@@ -23,10 +29,14 @@ pub(super) fn read_request_body(
         let read = match reader.read(&mut chunk) {
             Ok(0) => break,
             Ok(read) => read,
-            Err(_) => break,
+            Err(_) => {
+                return Err(super::LocalValidationError::new(
+                    400,
+                    "incomplete request body",
+                ))
+            }
         };
-        body.extend_from_slice(&chunk[..read]);
-        if max_body_bytes > 0 && body.len() > max_body_bytes {
+        if read > max_body_bytes.saturating_sub(body.len()) {
             return Err(super::LocalValidationError::new(
                 413,
                 crate::gateway::bilingual_error(
@@ -35,6 +45,8 @@ pub(super) fn read_request_body(
                 ),
             ));
         }
+        admission.reserve_body(read)?;
+        body.extend_from_slice(&chunk[..read]);
     }
 
     Ok(body)

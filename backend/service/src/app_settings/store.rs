@@ -1,5 +1,7 @@
 use boost_core::storage::{now_ts, Storage};
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::{Mutex, MutexGuard};
 
 use super::normalize_optional_text;
 
@@ -13,12 +15,31 @@ use super::normalize_optional_text;
 ///
 /// # 返回
 /// 返回函数执行结果
-pub(crate) fn open_app_settings_storage() -> Option<Storage> {
+static SETTINGS_STORAGE: Mutex<Option<(String, Storage)>> = Mutex::new(None);
+
+pub(crate) struct SettingsStorageHandle(MutexGuard<'static, Option<(String, Storage)>>);
+impl Deref for SettingsStorageHandle {
+    type Target = Storage;
+    fn deref(&self) -> &Self::Target {
+        &self.0.as_ref().expect("initialized settings connection").1
+    }
+}
+
+pub(crate) fn open_app_settings_storage() -> Option<SettingsStorageHandle> {
     crate::process_env::ensure_default_db_path();
     let path = std::env::var("BOOST_DB_PATH").ok()?;
-    let storage = Storage::open(&path).ok()?;
-    let _ = storage.init();
-    Some(storage)
+    let mut state = SETTINGS_STORAGE.lock().unwrap_or_else(|e| e.into_inner());
+    if state.as_ref().map(|(current, _)| current) != Some(&path) {
+        let storage = Storage::open(&path).ok()?;
+        // Authentication may precede normal startup, but never migrate on every lookup.
+        if storage.get_app_setting("__boost_schema_probe__").is_err() {
+            storage.init().ok()?;
+        }
+        *state = Some((path, storage));
+    }
+    // A dedicated short-lived settings lock avoids nested acquisition from a saturated
+    // inference pool. No caller may retain it across network I/O or another settings call.
+    Some(SettingsStorageHandle(state))
 }
 
 /// 函数 `list_app_settings_map`

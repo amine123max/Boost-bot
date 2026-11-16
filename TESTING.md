@@ -1,44 +1,49 @@
-# Validation / 验证说明
+# Validation
 
-Standalone test directories, dedicated test runners and their package commands
-have been removed across the repository at the user's request. Rust unit tests
-contained directly in product source files remain available. Product features
-such as account testing and network diagnostics are unchanged.
+[简体中文](TESTING.zh-CN.md) · [Build](docs/BUILDING.md) · [Engineering plan](update.en.md)
 
-## Build checks
+The repository retains inline Rust unit tests. Standalone test directories and dedicated test package commands were removed at the user's request. Compilation establishes type/build compatibility in the tested environment, not acceptance of every provider, operating system or release package.
 
-Run from the repository root with Node.js 22.13+, pnpm 10.30.3 and Rust stable:
+## Commands by scope
 
-```sh
-node scripts/check-repository.mjs
-npm --prefix bot run build
-pnpm -C frontend run build
-pnpm -C frontend run build:desktop
-cargo test --workspace --locked
-cargo check --manifest-path backend/desktop/Cargo.toml --locked
-```
+| Scope | Command or requirement |
+| --- | --- |
+| Documents, layout and assets | node scripts/check-repository.mjs; node scripts/check-documentation.mjs |
+| Frontend | pnpm -C frontend run build |
+| Desktop static output | pnpm -C frontend run build:desktop |
+| Bot | npm --prefix bot run build |
+| Rust workspace | cargo test --workspace --locked |
+| Web transport | cargo test -p boost-web --locked |
+| Native Rust | cargo check --manifest-path backend/desktop/Cargo.toml --locked |
+| Release version | node scripts/check-release-version.mjs v0.5.1; use the intended tag |
+| Target deployment | Compose configuration, image build, nginx -t, TLS, SSE and WebSocket |
 
-The frontend commands perform TypeScript checks and static production builds.
-Cargo runs the retained inline unit tests; deleted integration suites are no
-longer part of these results. A successful build is not a substitute for runtime
-acceptance. For service deployments, also validate the Compose overlay and run
-`nginx -t` on the target host before reloading its configuration.
+Default SQLCipher builds use vendored OpenSSL. Windows requires native Strawberry Perl and a C++ toolchain; MSYS Perl is unsuitable. Prepare the native Bot driver for the target operating system, architecture and Node ABI.
 
 ## Runtime acceptance
 
-Use an isolated account and task-specific data in a running Boost instance:
+Use isolated accounts, databases and ports. Do not terminate a user's running instance.
 
-- Verify login, roles, direct navigation and desktop/Web transports.
-- Verify Bot creation, streaming chat, stop/cancellation, saved history, channel
-  conversations and expandable processing details.
-- Verify specialist sandbox previews and Bot group handoffs, including exact
-  message/file delivery and explicit overload failures.
-- Check light/dark transitions, keyboard access and narrow layouts.
-- For gateway changes, cover streaming and JSON, tools/tool calls, Responses and
-  Chat Completions. Use real authorized upstream credentials for production claims.
+1. Check Web sign-in, roles, direct navigation and Tauri/Web transports.
+2. Exercise Bot creation, streamed conversation, cancellation, history, channels and approvals.
+3. Cover Responses and Chat Completions, JSON/SSE, tools/tool_calls, upstream errors, cancellation and duplicate settlement.
+4. Exercise mixed WAL readers/writers, real read-only constraints, wrong keys, legacy conversion, damage and concurrent debit idempotency.
+5. Check RPC resource ordering, cross-domain isolation, exclusive barriers, bounded admission and cancellation cleanup.
+6. Verify current screenshots, dark/light themes, keyboard access and narrow layouts.
 
-Keep temporary fixtures, databases, screenshots and subprocess TEMP/TMP/TMPDIR
-under a task-specific project `tmp/` directory. Preserve required screenshots in
-`docs/images/`, then clean only that task's temporary output after processes exit.
-Report checks that passed, skipped or were blocked, and distinguish local mock
-validation from real provider/channel acceptance.
+## Latency and capacity
+
+Build the current debug binaries, then run the isolated mock probe:
+
+```sh
+cargo build --locked -p boost-service -p boost-web
+node scripts/probe-resource-limits.mjs
+```
+
+The probe owns its processes and disposable project-local tmp directory. It checks RPC load, inference saturation, JSON/SSE with tools, cancellation, circuits and encrypted reopen. It uses no real-provider credentials. The [performance record](docs/PERFORMANCE.md) explains measurements and scope.
+
+Record hardware, revision, build mode, payload size, concurrency, duration and mock/real source. Report throughput, P50/P95/P99, successes/rejections/timeouts, peak memory and resource cleanup. Measure management and inference separately; saturation must produce bounded waiting or explicit rejection. Local mock results are not a real-provider first-byte SLA. Process budgets are independent; rate, cumulative quota, concurrency and memory need separate checks.
+
+## Outputs and cleanup
+
+Use task-specific project tmp directories for scripts, databases, logs and subprocess TEMP/TMP/TMPDIR. Save final screenshots under docs/images. Before cleanup, verify process exit and deletion ownership; remove only this task's temporary files. Record passed, skipped and blocked steps distinctly, including exact unexecuted commands and reasons.

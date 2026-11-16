@@ -1,5 +1,7 @@
 # Repository Engineering Standards
 
+[简体中文](AGENTS.zh-CN.md)
+
 This file applies to the whole Boost repository. Read `frontend/AGENTS.md`
 for frontend work and `backend/AGENTS.md` for service and desktop work.
 

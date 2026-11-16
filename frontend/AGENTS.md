@@ -1,5 +1,7 @@
 # Frontend and Desktop Engineering Standards
 
+[简体中文](AGENTS.zh-CN.md)
+
 Applies to the Vue frontend and build configuration under `frontend/`.
 Native desktop ownership and validation are documented in `../backend/AGENTS.md`.
 

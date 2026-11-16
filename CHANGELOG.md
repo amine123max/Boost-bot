@@ -1,8 +1,14 @@
-# Version history / 版本记录
+# Version history
+
+[简体中文](CHANGELOG.zh-CN.md)
 
 Published versions and downloadable assets are maintained in [GitHub Releases](https://github.com/amine123max/Boost-bot/releases). The README Release badge reads that published source automatically.
 
-正式版本与下载产物以 GitHub Releases 为准。历史变更记录保留在语言目录：
+## 0.5.1 reliability refresh
+
+Verified WAL and explicit main/Bot encryption, resource-domain RPC scheduling, bounded gateway admission, source circuits, idempotent settlement and signed-update verification. Gateway controls now open from Boost advanced settings; detailed explanations use SVG hints. See [release notes](docs/releases/v0.5.1.md), [measured capacity](docs/PERFORMANCE.md) and [remaining scope](update.en.md).
+
+## Historical records
 
 - [简体中文](docs/zh-CN/CHANGELOG.md)
 - [English](docs/en/CHANGELOG.md)

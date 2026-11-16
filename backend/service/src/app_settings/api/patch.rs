@@ -47,6 +47,8 @@ pub(super) struct AppSettingsPatch {
     upstream_total_timeout_ms: Option<u64>,
     sse_keepalive_interval_ms: Option<u64>,
     quota_guard: Option<QuotaGuardInput>,
+    resource_limits: Option<crate::gateway::request_limits::ResourceLimits>,
+    storage_encryption_enabled: Option<bool>,
     background_tasks: Option<BackgroundTasksInput>,
     env_overrides: Option<HashMap<String, String>>,
     web_access_password: Option<String>,
@@ -83,6 +85,18 @@ pub(super) fn parse_app_settings_patch(params: Option<&Value>) -> Result<AppSett
 /// # 返回
 /// 返回函数执行结果
 pub(super) fn apply_app_settings_patch(patch: AppSettingsPatch) -> Result<(), String> {
+    if let Some(enabled) = patch.storage_encryption_enabled {
+        if !enabled {
+            return Err("database encryption cannot be disabled through a runtime setting".into());
+        }
+        let path = std::env::var_os("BOOST_DB_PATH")
+            .ok_or_else(|| "database path unavailable".to_string())?;
+        boost_core::storage::request_keyring_encryption(std::path::Path::new(&path))
+            .map_err(|e| e.to_string())?;
+    }
+    if let Some(limits) = patch.resource_limits {
+        crate::gateway::request_limits::persist(limits)?;
+    }
     if let Some(action) = patch.main_window_close_action {
         crate::app_settings::set_main_window_close_action(&action)?;
     }

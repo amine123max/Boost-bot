@@ -1,5 +1,7 @@
 # 原生 Codex 线程锚点优先级说明
 
+[English](../../en/report/native-thread-anchor-priority.md)
+
 ## 背景
 
 `Codex App` 与部分官方链路会同时携带两类“线程锚点”信息：
@@ -68,10 +70,7 @@ Anthropic 适配阶段可能生成临时 `prompt_cache_key`，因此不能把这
   `backend/service/src/gateway/local_validation/request.rs`
 - 会话锚点推导：
   `backend/service/src/gateway/request/session_affinity.rs`
-- 回归测试：
-  `backend/service/src/gateway/local_validation/tests/request_tests.rs`
-  协议验证（原独立测试目录已移除，参见根目录 `TESTING.md`）
-  `backend/service/src/http/tests/proxy_runtime_tests.rs`
+- 验证入口：根目录 [验证说明](../../../TESTING.zh-CN.md)。原独立测试目录已移除，不能将历史测试路径作为当前验证证据。
 
 ## 排障建议
 

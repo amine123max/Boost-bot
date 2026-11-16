@@ -1,5 +1,6 @@
 use rusqlite::{backup::Backup, Connection, OpenFlags};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -17,6 +18,15 @@ const QA_APP_IDENTIFIER: &str = "com.boost.desktop.qa";
 /// # 返回
 /// 无
 pub(super) fn maybe_migrate_legacy_db(current_db: &Path) {
+    // A legacy, unkeyed probe must never classify an encrypted/corrupt target as empty.
+    if current_db.is_file() {
+        if let Ok(mut file) = fs::File::open(current_db) {
+            let mut header = [0u8; 16];
+            if file.read_exact(&mut header).is_ok() && &header != b"SQLite format 3\0" {
+                return;
+            }
+        }
+    }
     let current_has_data = db_has_user_data(current_db);
     if current_has_data {
         return;
@@ -168,7 +178,12 @@ fn db_has_user_data(path: &Path) -> bool {
         Err(_) => return false,
     };
     ["accounts", "tokens", "api_keys"].iter().any(|table| {
-        connection.query_row(&format!("SELECT EXISTS(SELECT 1 FROM {table} LIMIT 1)"), [], |row| row.get::<_, bool>(0))
+        connection
+            .query_row(
+                &format!("SELECT EXISTS(SELECT 1 FROM {table} LIMIT 1)"),
+                [],
+                |row| row.get::<_, bool>(0),
+            )
             .unwrap_or(false)
     })
 }

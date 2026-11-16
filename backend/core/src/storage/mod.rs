@@ -1,10 +1,9 @@
 use rusqlite::{Connection, Result};
 use std::path::Path;
-use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-mod account_manager;
 mod account_agent_identities;
+mod account_manager;
 mod account_metadata;
 mod account_quota_limits;
 mod account_subscriptions;
@@ -12,7 +11,13 @@ mod accounts;
 mod aggregate_apis;
 mod api_key_quota_limits;
 mod api_keys;
+mod connection;
 mod conversation_bindings;
+pub use connection::StorageStatus;
+mod encryption;
+pub use encryption::{
+    derive_bot_database_key, request_keyring_encryption, security_status, SecurityStatus,
+};
 mod events;
 mod gateway_error_logs;
 mod model_groups;
@@ -704,6 +709,8 @@ pub struct ModelCatalogStringItemRecord {
 #[derive(Debug)]
 pub struct Storage {
     conn: Connection,
+    encrypted: bool,
+    _access: Option<std::fs::File>,
 }
 
 impl Storage {
@@ -718,16 +725,37 @@ impl Storage {
     /// # 返回
     /// 返回函数执行结果
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        if path == Path::new(":memory:") {
+            return Self::open_in_memory();
+        }
+        let key = encryption::configured_key(path)?;
+        Self::open_file(path, key.as_ref().map(|value| value.bytes()))
+    }
+
+    /// Explicit-key entrypoint for controlled import/export and isolated verification.
+    pub fn open_with_key(path: impl AsRef<Path>, key: &[u8; 32]) -> Result<Self> {
+        Self::open_file(path.as_ref(), Some(key))
+    }
+
+    fn open_file(path: &Path, key: Option<&[u8; 32]>) -> Result<Self> {
+        let migration = key.is_some() && encryption::plain_file(path)?;
+        let mut access = encryption::access_lock(path, migration)?;
+        if migration {
+            encryption::migrate_plaintext(path, key.unwrap())?;
+            drop(access);
+            access = encryption::access_lock(path, false)?;
+        }
         let conn = Connection::open(path)?;
-        // 中文注释：并发写入时给 SQLite 一点等待时间，避免瞬时 lock 导致请求直接失败。
-        conn.busy_timeout(Duration::from_millis(3000))?;
-        // 中文注释：文件库启用 WAL + NORMAL，可明显降低并发读写互斥开销；
-        // 仅在 open(path) 上设置，避免影响 open_in_memory 的行为预期。
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;",
-        )?;
-        Ok(Self { conn })
+        if let Some(key) = key {
+            encryption::apply_key(&conn, key)?;
+        }
+        connection::configure_file_connection(&conn)?;
+        Ok(Self {
+            conn,
+            encrypted: key.is_some(),
+            _access: Some(access),
+        })
     }
 
     /// 函数 `open_in_memory`
@@ -742,8 +770,12 @@ impl Storage {
     /// 返回函数执行结果
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
-        conn.busy_timeout(Duration::from_millis(3000))?;
-        Ok(Self { conn })
+        conn.busy_timeout(connection::BUSY_TIMEOUT)?;
+        Ok(Self {
+            conn,
+            encrypted: false,
+            _access: None,
+        })
     }
 
     /// 函数 `init`
@@ -1121,6 +1153,10 @@ impl Storage {
         self.ensure_model_source_tables()?;
         self.ensure_aggregate_api_supplier_model_tables()?;
         self.ensure_model_group_tables()?;
+        self.apply_atomic_sql_migration(
+            "075_request_settlement_identity",
+            include_str!("../../migrations/075_request_settlement_identity.sql"),
+        )?;
         Ok(())
     }
 
@@ -1143,9 +1179,8 @@ impl Storage {
         );
 
         if touched > 0 {
-            let _ = self
-                .conn
-                .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
+            // Startup maintenance must not wait for every reader or rewrite the entire file.
+            self.passive_checkpoint()?;
         }
         Ok(())
     }
@@ -1453,6 +1488,20 @@ impl Storage {
         self.mark_migration(version)
     }
 
+    /// For new migrations without transaction-control statements: schema and marker commit together.
+    fn apply_atomic_sql_migration(&self, version: &str, sql: &str) -> Result<()> {
+        let tx = rusqlite::Transaction::new_unchecked(
+            &self.conn,
+            rusqlite::TransactionBehavior::Immediate,
+        )?;
+        if self.has_migration(version)? {
+            return Ok(());
+        }
+        tx.execute_batch(sql)?;
+        self.mark_migration(version)?;
+        tx.commit()
+    }
+
     /// 函数 `apply_sql_or_compat_migration`
     ///
     ///
@@ -1531,7 +1580,6 @@ impl Storage {
         }
     }
 }
-
 
 /// 函数 `now_ts`
 ///

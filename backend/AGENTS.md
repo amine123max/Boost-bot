@@ -1,5 +1,7 @@
 # Backend Engineering Standards
 
+[简体中文](AGENTS.zh-CN.md)
+
 Applies to `core/`, `service/`, `web/`, `start/` and `desktop/` under this directory.
 
 - Keep SQLite migrations and storage primitives in `core/`; service and gateway domains in `service/`; authenticated Web proxying and embedded UI serving in `web/`; process orchestration in `start/`; native desktop lifecycle and IPC in `desktop/`.

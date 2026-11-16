@@ -1,47 +1,34 @@
-# 自动更新与 GitHub 发布
+# 桌面更新与发布
 
-项目仓库为 `amine123max/Boost-bot`。桌面版默认从此仓库的 GitHub Releases 检查版本；GitHub Actions 打包时还会通过 `BOOST_UPDATE_REPO=${{ github.repository }}` 将实际仓库名写入客户端。更新源在构建时确定，运行时环境变量和历史设置不再覆盖；更新弹窗显示实际仓库。更新器不会回退到其他项目仓库。
+[English](../../en/report/app-updates-and-releases.md)
 
-## 用户决定是否更新
+## 来源与用户控制
 
-- 自动检查默认开启，沿用服务中持久化的 `app.update.auto_check` 设置。
-- 主窗口就绪后检查一次，此后每 24 小时检查一次；关闭设置即停止定时检查，托盘预览窗口不重复检查。
-- 发现新版本时显示提示。检查不会下载、安装或重启应用；用户可点击“稍后”。同一版本在本次运行中只自动提醒一次。
-- 用户点击“下载更新”后才下载；下载完成后再点击“安装更新”或“重启并更新”才应用。下载中可关闭提示，稍后在设置页继续。
-- 设置页可手动检查，查看更新仓库、可用版本及错误。自动检查失败不会弹出错误通知。
-- Web / Docker 模式不调用桌面更新命令，部署者自行更新服务。
+更新仓库在构建时固定：发布任务使用 BOOST_UPDATE_REPO，否则使用内置默认值。运行变量和旧设置不能重定向到其他项目。Web/Docker 由部署者更新，不调用桌面 IPC。
 
-## 首次发布
+自动检查沿用持久偏好，在主窗口就绪后及既有周期执行，不自动下载、安装或重启；这些动作由用户触发。手动检查显示实际来源和错误。稳定客户端默认选择稳定版，预发布策略显式配置。
 
-1. 将源码推送到 `https://github.com/amine123max/Boost-bot.git`。
-2. 确认仓库启用了 GitHub Actions。`.github/workflows/release-all.yml` 支持推送 `v*` 标签或从 Actions 页面选择已有标签手动运行。
-3. 保持以下四处版本一致：根 `Cargo.toml`、`backend/desktop/Cargo.toml`、`backend/desktop/tauri.conf.json` 和 `frontend/package.json`。
-4. 推送匹配的标签。例如首个版本为 `0.5.0`：
+## 真实性
 
-   ```powershell
-   node scripts/check-release-version.mjs v0.5.0
-   git tag v0.5.0
-   git push origin main
-   git push origin v0.5.0
-   ```
+发行版包含平台产物、SHA256SUMS.txt 和 update-manifest.json。Ed25519 清单绑定仓库、tag、不可变源提交、名称、目标、大小和 SHA-256。客户端内置公钥，私钥只存在发布工作流 Secret。
 
-5. 工作流构建 Windows x64 安装器、macOS Intel / Apple Silicon DMG、Linux x64 DEB / AppImage，全部成功后才发布 Release。
-6. 下次发布先递增四处版本，例如 `0.5.1`，再提交并推送 `v0.5.1` 标签。仅推送源码不会让旧客户端发现更新，必须有更高版本的已发布 Release。
+准备更新时拒绝缺失/错误签名，在解压或执行前校验载荷；应用前再次校验并拒绝非更新版本。历史无签名 pending 需重新准备。SHA-256 只提供完整性，不等于发布者认证。
 
-标签版本不一致会让构建失败。带 `-beta.1` 等后缀的标签发布为预发布版，默认检查只接收稳定版；需要测试预发布更新时，在启动客户端前设置 `BOOST_UPDATE_PRERELEASE=true`。
+## 发布门槛
 
-当前工作流仅发布桌面安装包。便携版已有更新命令，但此工作流不生成便携分发包。macOS 分发需要自行配置签名/公证才能改善首次启动体验。
+| 门槛 | 要求 |
+| --- | --- |
+| 版本 | 根/桌面 Cargo、Tauri、前端和 Bot 元数据与 tag 一致 |
+| 构建 | Windows x64 便携 EXE/NSIS、macOS arm64 DMG |
+| 来源 | 全部产物来自一个不可变提交 |
+| 验证 | 前端/Bot、保留 Rust 测试、桌面更新回归与运行验收 |
+| 签名 | Secret 匹配内置公钥，三个产物共同签名 |
+| 发布 | 双语说明、资产/校验和/清单上传并核对最终发布 |
 
-## 仓库可见性与令牌
+对待发布 tag 执行版本检查。工作流支持推送版本标签及手动选择既有 tag。只更新便携版不构成完整签名发行，不混用源提交。替换已发布标签/资产须明确授权。
 
-`amine123max/Boost-bot` 使用公开仓库，用户无需令牌即可检查和下载更新。如果将来改为私有，客户端启动前需要在本机设置 `BOOST_GITHUB_TOKEN`（也支持 `GITHUB_TOKEN` / `GH_TOKEN`），令牌需要该仓库的内容读取权限。令牌只从运行环境读取，不能写入源码或嵌入安装包。
+## 兼容与恢复
 
-## 本地打包
+新程序可能要求新 schema，验签不保证降级安全，切换程序也不恢复数据。旧版本保留、schema 回退和密钥轮换需明确策略，本次不承诺自动备份或一键数据回滚。
 
-```powershell
-$env:BOOST_UPDATE_REPO = 'amine123max/Boost-bot'
-Set-Location backend/desktop
-cargo tauri build --bundles nsis
-```
-
-构建时的仓库地址会写入可执行文件；用户运行安装版无需额外设置仓库环境变量。发布后仍需用旧版本客户端验证真实 GitHub 检查、下载及安装链路。
+平台以[工作流](../../../.github/workflows/release-all.yml)为准，不能沿用历史平台清单。真实下载/安装验收使用较旧且有权限的客户端及匹配签名发行。

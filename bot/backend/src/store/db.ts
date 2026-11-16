@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import { openDatabase, type DatabaseSync } from "./database-driver.js";
 import { normalizeSettings, type BotSettings } from "../agent/settings.js";
 import { normalizeAppRef, type BotAppRef } from "../botkit/format.js";
 import type { Schedule } from "../tasks/schedule.js";
 
 /**
- * SQLite 存储（node:sqlite，无原生模块，Electron 下也无需 rebuild）。
- * 敏感字段（飞书 app_secret、iLink bot_token、context_token）只存本地数据目录，文件权限 600。
+ * SQLite storage through a native encryption-capable binding.
+ * Hosted mode derives a per-actor key from the main storage key; plain standalone mode stays compatible.
  */
 export interface Bot {
   id: string;
@@ -629,11 +629,11 @@ const COLUMNS: Array<[string, string, string]> = [
 export class Store {
   readonly db: DatabaseSync;
 
-  constructor(file: string) {
+  constructor(file: string, databaseKey?: Buffer, onMigration?: () => void) {
     if (file !== ":memory:") {
       fs.mkdirSync(path.dirname(file), { recursive: true });
     }
-    this.db = new DatabaseSync(file);
+    this.db = openDatabase(file, databaseKey, onMigration);
     if (file !== ":memory:") {
       try {
         fs.chmodSync(file, 0o600);

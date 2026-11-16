@@ -1,0 +1,142 @@
+{
+  "environment": {
+    "platform": "win32",
+    "node": "v24.12.0",
+    "mode": "debug",
+    "upstream": "local fixture",
+    "delayMs": 25,
+    "cpu": "AMD Ryzen 7 8745H w/ Radeon 780M Graphics",
+    "logicalCores": 16,
+    "systemMemoryBytes": 25009377280
+  },
+  "checks": [
+    "embedded Web settings route",
+    "model JSON through front and backend",
+    "Chat Completions SSE",
+    "Responses JSON and SSE with tool definitions",
+    "upstream circuit skips failed source without another network attempt",
+    "failover to separate healthy source",
+    "missing platform key rejected",
+    "headless key-file startup converts and reopens the complete main database"
+  ],
+  "loads": {
+    "rpc-1": {
+      "count": 256,
+      "statuses": {
+        "200": 256
+      },
+      "p50": 0.72,
+      "p95": 1.54,
+      "p99": 2,
+      "rps": 1173.7
+    },
+    "rpc-6": {
+      "count": 256,
+      "statuses": {
+        "200": 256
+      },
+      "p50": 2.94,
+      "p95": 6.55,
+      "p99": 9.58,
+      "rps": 1810.2
+    },
+    "rpc-16": {
+      "count": 256,
+      "statuses": {
+        "200": 256
+      },
+      "p50": 5.45,
+      "p95": 13.5,
+      "p99": 14.41,
+      "rps": 2412.4
+    },
+    "rpc-32": {
+      "count": 256,
+      "statuses": {
+        "200": 256
+      },
+      "p50": 9.56,
+      "p95": 15.02,
+      "p99": 16.32,
+      "rps": 3220.5
+    },
+    "rpc-64": {
+      "count": 256,
+      "statuses": {
+        "200": 256
+      },
+      "p50": 17.55,
+      "p95": 31.58,
+      "p99": 32.24,
+      "rps": 3331.8
+    },
+    "webRpc": {
+      "count": 60,
+      "statuses": {
+        "200": 60
+      },
+      "p50": 2.72,
+      "p95": 5.73,
+      "p99": 5.76,
+      "rps": 1878.1
+    },
+    "model": {
+      "count": 128,
+      "statuses": {
+        "200": 13,
+        "429": 115
+      },
+      "p50": 18.82,
+      "p95": 62.73,
+      "p99": 79.74,
+      "rps": 1057.5
+    },
+    "rpcDuringSlowModels": {
+      "count": 60,
+      "statuses": {
+        "200": 60
+      },
+      "p50": 2.06,
+      "p95": 11.99,
+      "p99": 12.02,
+      "rps": 1882.1
+    },
+    "soak": {
+      "count": 22640,
+      "statuses": {
+        "200": 179,
+        "429": 22461
+      },
+      "p50": 10,
+      "p95": 18.42,
+      "p99": 24.45,
+      "durationSeconds": 8,
+      "clientConcurrency": 32,
+      "peakMemoryBytes": 74862592,
+      "lastMemoryBytes": 74862592
+    }
+  },
+  "memoryBytes": 76771328,
+  "finalQueue": {
+    "activeReads": 1,
+    "activeWrites": 0,
+    "admittedTotal": 1451,
+    "perResourceWaitingLimit": 32,
+    "readConcurrency": 16,
+    "rejectedTotal": 0,
+    "timedOutTotal": 0,
+    "waitMicrosecondsTotal": 4794,
+    "waitingLimit": 256,
+    "waitingWrites": 0,
+    "writeConcurrency": 6
+  },
+  "mainEncryption": {
+    "botEncryptionPolicy": "derived_key_on_host_start",
+    "encrypted": true,
+    "encryptionRequested": true,
+    "integrity": "ok",
+    "provider": "key_file",
+    "requiresRestart": false,
+    "sqlcipherAvailable": true
+  }
+}

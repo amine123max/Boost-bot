@@ -1,5 +1,7 @@
 # Boost 客户端配置
 
+[English](../../en/report/boost-client-configuration.md)
+
 在「密钥」创建平台密钥。上游提供商密钥只用于「聚合 API」连接，客户端填写 Boost 生成的平台密钥。新平台密钥为无前缀的 64 位随机十六进制字符串；已有密钥仍可使用。
 
 ## Codex CLI

@@ -1,5 +1,13 @@
 # Third-Party Notices
 
+[简体中文](THIRD_PARTY_NOTICES.md)
+
+## SQLite encryption binding
+
+Hosted Boost Bot uses better-sqlite3-multiple-ciphers 13.1.1 (MIT), including SQLite3 Multiple Ciphers. Its original license/notices are distributed with node_modules. Main storage includes SQLCipher (Copyright 2008–2020 Zetetic LLC, BSD-style) and OpenSSL (Apache-2.0); their complete original terms are included in [SQLCipher](LICENSES/SQLCipher.txt) and [OpenSSL](LICENSES/OpenSSL.txt), distributed with desktop, service and container Bot resources. Changing the language binding does not change upstream licensing.
+
+Driver notices: Copyright (c) 2021–2026 Mahesh Bandara Wijerathna; Copyright (c) 2017 Joshua Wise; Copyright (c) 2019–2026 Ulrich Telle.
+
 [简体中文](./THIRD_PARTY_NOTICES.md) | English | [日本語](./THIRD_PARTY_NOTICES_ja.md) | [한국어](./THIRD_PARTY_NOTICES_ko.md) | [Русский](./THIRD_PARTY_NOTICES_ru.md)
 
 anymodel bot itself is released under the MIT License (see LICENSE). The components below are distributed with or ported into this program, and each keeps its original license.

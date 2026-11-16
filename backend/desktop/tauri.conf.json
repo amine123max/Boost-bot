@@ -38,6 +38,7 @@
       "../../bot/LICENSES/": "boost-bot/LICENSES/",
       "../../bot/LICENSE": "boost-bot/LICENSE",
       "../../bot/THIRD_PARTY_NOTICES.md": "boost-bot/THIRD_PARTY_NOTICES.md",
+      "../../bot/THIRD_PARTY_NOTICES_en.md": "boost-bot/THIRD_PARTY_NOTICES_en.md",
       "../../bot/package.json": "boost-bot/package.json"
     },
     "targets": "all",

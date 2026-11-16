@@ -41,6 +41,7 @@ jobs:
       TMP: ${{ github.workspace }}/tmp/boost-release
       TMPDIR: ${{ github.workspace }}/tmp/boost-release
       npm_config_cache: ${{ github.workspace }}/tmp/boost-release/npm-cache
+      OPENSSL_NO_ASM: '1'
     defaults:
       run:
         shell: bash
@@ -64,6 +65,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - name: Prepare native Perl for vendored SQLCipher crypto
+        if: runner.os == 'Windows'
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+          distribution: strawberry
       - name: Verify release version
         run: node scripts/check-release-version.mjs "$RELEASE_TAG"
       - name: Build and verify frontend
@@ -130,6 +137,17 @@ jobs:
           pattern: desktop-*
           path: tmp/boost-release/artifacts
           merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Sign release manifest
+        env:
+          BOOST_RELEASE_SIGNING_KEY: ${{ secrets.BOOST_RELEASE_SIGNING_KEY }}
+        run: |
+          export TEMP="$GITHUB_WORKSPACE/tmp/boost-release"
+          export TMP="$TEMP" TMPDIR="$TEMP"
+          export RELEASE_COMMIT="$(git rev-parse HEAD)"
+          node scripts/sign-release.mjs tmp/boost-release/artifacts
       - name: Publish complete release
         shell: bash
         run: |
@@ -166,8 +184,14 @@ jobs:
           (directory / "SHA256SUMS.txt").write_text("".join(lines), encoding="utf-8")
           PY_CHECKSUM
           gh release upload "$RELEASE_TAG" "$TEMP/SHA256SUMS.txt" --clobber
+          gh release upload "$RELEASE_TAG" tmp/boost-release/artifacts/update-manifest.json --clobber
           if [[ -f "docs/releases/$RELEASE_TAG.md" ]]; then
-            gh release edit "$RELEASE_TAG" --title "Boost ${RELEASE_TAG#v}" --notes-file "docs/releases/$RELEASE_TAG.md"
+            cat "docs/releases/$RELEASE_TAG.md" > "$TEMP/release-notes.md"
+            if [[ -f "docs/releases/$RELEASE_TAG.zh-CN.md" ]]; then
+              printf '\n---\n\n' >> "$TEMP/release-notes.md"
+              cat "docs/releases/$RELEASE_TAG.zh-CN.md" >> "$TEMP/release-notes.md"
+            fi
+            gh release edit "$RELEASE_TAG" --title "Boost ${RELEASE_TAG#v}" --notes-file "$TEMP/release-notes.md"
           fi
           if [[ "$RELEASE_TAG" == *-* ]]; then
             gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
