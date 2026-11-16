@@ -18,6 +18,7 @@ Run from the repository root. These scripts use `frontend/`, `backend/desktop/`,
 | `check-release-version.mjs` | Match source version fields to a release tag / 发布版本一致性 |
 | `generate-interface-docs.mjs` | Generate paired RPC method inventories from current dispatch sources |
 | `sign-release.mjs` | Sign source-bound release manifests using the CI secret |
+| `render-release-notes.mjs` | Combine both languages and resolve repository links for GitHub Release bodies |
 | `run-service-app.sh` | Build static UI and service binaries, then launch / 构建并启动服务 |
 | `run-curl-cffi-chatgpt-proxy.sh`, `curl_cffi_chatgpt_proxy.py` | Optional proxy troubleshooting helper / 可选代理排障 |
 | `setup-cloudflare-warp-proxy.sh` | Optional host proxy setup / 可选宿主代理配置 |

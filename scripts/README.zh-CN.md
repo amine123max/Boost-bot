@@ -17,6 +17,7 @@
 | `generate-interface-docs.mjs` | 从当前 RPC 分发生成两种语言的内部接口目录 |
 | `check-release-version.mjs` | 检查 tag 与源码版本一致 |
 | `sign-release.mjs` | 使用 CI Secret 签署绑定源提交的发行资产清单 |
+| `render-release-notes.mjs` | 合并双语说明，将仓库相对链接转换为 Release 正文中的提交链接 |
 | `run-service-app.sh` | 构建静态 UI/服务并启动 |
 
 普通 Web 入口为 12000，开发监听见构建指南。系统代理、网络或清理类脚本需先阅读，不属于默认启动动作。
