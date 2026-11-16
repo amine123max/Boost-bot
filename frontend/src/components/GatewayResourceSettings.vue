@@ -68,8 +68,21 @@ async function refresh() {
 </template>
 
 <style scoped>
-.resource-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
-.resource-status { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin-top: 16px; }
+.gateway-settings { font-size: 16px; font-weight: var(--ui-body-weight); }
+.gateway-settings .form-stack { gap: 6px; }
+.gateway-settings .setting-row { min-height: var(--boost-controls-height); font-size: inherit; gap: 12px; }
+.setting-row > span { display: inline-flex; align-items: center; min-width: 0; }
+.setting-row input[type="number"] {
+  width: 152px;
+  min-width: 120px;
+  max-width: 48%;
+  flex: 0 0 152px;
+  height: var(--boost-controls-height);
+  padding: 8px 12px;
+  font: inherit;
+}
+.resource-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.resource-actions button { font: inherit; }
+.resource-status { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin-top: var(--boost-section-gap); }
 .resource-status dd { margin: 0; font-variant-numeric: tabular-nums; }
-.setting-row input[type="number"] { width: 152px; min-width: 120px; max-width: 48%; flex: 0 0 152px; }
 </style>
