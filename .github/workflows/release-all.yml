@@ -77,6 +77,14 @@ jobs:
         with:
           perl-version: '5.40'
           distribution: strawberry
+      - name: Select native Perl explicitly for OpenSSL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $nativePerl = Get-Command perl.exe -All | Where-Object { $_.Source -like '*strawberry-perl*\perl\bin\perl.exe' } | Select-Object -First 1 -ExpandProperty Source
+          if (-not $nativePerl) { throw 'Native Strawberry Perl was not found' }
+          "OPENSSL_SRC_PERL=$nativePerl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          'PERL5LIB=' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Verify release version
         run: node scripts/check-release-version.mjs "$RELEASE_TAG"
       - name: Build and verify frontend
