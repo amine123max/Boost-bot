@@ -63,7 +63,7 @@ watch(() => props.bot.id, () => { tasks.value=[]; rules.value=[]; loaded.value=f
 onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearTimeout(timer); });
 </script>
 <template>
-  <PanelSection class="background-tasks" title="后台任务" @toggle="panelOpen = $event" help="普通任务与定时任务统一展示，点击箭头查看实际步骤。标题由当前智能体的辅助模型概括为20字以内，悬浮查看原名。绿色为已完成、黄色为进行中（含排队）、红色为失败；定时任务显示最近一次结果。暂停后不启动新任务，正在运行的继续完成。">
+  <PanelSection class="background-tasks" title="后台任务" @toggle="panelOpen = $event" help="普通任务与定时任务统一展示。展开后只显示该任务的大小节点与实际进度。悬浮标题查看原名，悬浮状态查看失败原因；定时任务显示最近一次结果。暂停后不启动新任务，正在运行的继续完成。">
     <template #actions><button v-if="configure" class="icon-btn task-create" aria-label="新建后台任务" :disabled="busy" @click="create"><Icon name="plus" :size="14" /></button></template>
     <div v-if="configure" class="background-controls">
       <button role="switch" :aria-checked="!paused" aria-label="启用后台任务" :disabled="busy" class="background-toggle" :class="{ enabled: !paused }" @click="settings({paused:!paused})">{{ paused ? '启用' : '已启用' }}</button>
@@ -72,7 +72,7 @@ onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearT
     <p v-if="error" class="notice" role="alert">{{ error }}<button @click="load">重试</button></p>
     <p v-if="titles.error.value" class="task-empty" role="status">标题概括暂不可用 <button :title="titles.error.value" @click="titles.retry">重试</button></p>
     <div class="background-task-list">
-      <BackgroundTaskItem v-for="work in visible" :key="work.key" :work="work" :title="titles.title(work)" @details="emit('open', $event)" />
+      <BackgroundTaskItem v-for="work in visible" :key="work.key" :work="work" :title="titles.title(work)" :active="panelOpen" />
       <p v-if="loaded && !sorted.length && !error" class="task-empty">暂无后台任务</p>
       <p v-else-if="!loaded && !error" class="task-empty" role="status">正在读取任务…</p>
     </div>

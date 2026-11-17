@@ -1,27 +1,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue';
-import type { Activity, Task } from '../types';
+import type { Activity } from '../types';
 import type { BackgroundWork } from '../lib/background-work';
 import { api, enc } from '../api';
-import { taskPlan } from '../lib/task-plan';
 import Icon from './Icon.vue';
 import SpringDisclosure from './SpringDisclosure.vue';
-import TaskPlanChecklist from './TaskPlanChecklist.vue';
+import ActivityTrace from './ActivityTrace.vue';
 import TaskStepStatus from './TaskStepStatus.vue';
 
-const props = defineProps<{ work: BackgroundWork; title: string }>();
-defineEmits<{ details: [task: Task] }>();
+const props = withDefaults(defineProps<{ work: BackgroundWork; title: string; active?: boolean }>(), { active: true });
 interface Run { id: string; state: string; outcome?: string; error?: string; startedAt?: number; endedAt?: number }
 const open = ref(false), visited = ref(false), loading = ref(false), error = ref('');
 const steps = ref<Activity[]>([]), run = ref<Run>(), id = useId();
-const plan = computed(() => taskPlan(steps.value));
 const status = computed(() => props.work.state === 'done' ? '已完成' : props.work.state === 'failed' ? '失败' : '进行中');
 const path = computed(() => `/${props.work.kind === 'rule' ? 'rules' : 'tasks'}/${enc(props.work.id)}`);
 let timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined, generation = 0, disposed = false, loadedRunId = '';
 function cancel() { generation++; controller?.abort(); clearTimeout(timer); loading.value = false; }
 async function load() {
   clearTimeout(timer);
-  if (!open.value || disposed) return;
+  if (!open.value || !props.active || disposed) return;
   if (document.hidden) { timer = setTimeout(load, 2000); return; }
   controller?.abort();
   const ticket = ++generation, abort = new AbortController(); controller = abort;
@@ -29,7 +26,8 @@ async function load() {
   try {
     const result = await api<{ runs: Run[] }>(props.work.kind === 'rule' ? `${path.value}/runs?limit=1` : path.value, { signal: abort.signal });
     if (ticket !== generation || disposed) return;
-    const latest = result.runs.find(item => item.id === props.work.runId) || result.runs[0];
+    const latest = result.runs.find(item => item.id === props.work.runId)
+      || (props.work.kind === 'rule' ? result.runs[0] : result.runs.at(-1));
     const cached = loadedRunId === latest?.id && run.value?.state === 'ended';
     if (run.value?.id !== latest?.id) steps.value = [];
     if (!cached) run.value = latest;
@@ -45,7 +43,7 @@ async function load() {
     }
   }
 }
-watch(open, value => { if (value) { visited.value = true; void load(); } else cancel(); });
+watch([open, () => props.active], ([value, active]) => { if (value && active) { visited.value = true; void load(); } else cancel(); });
 watch(() => props.work.runId, () => { if (open.value) void load(); });
 onBeforeUnmount(() => { disposed = true; cancel(); });
 </script>
@@ -55,15 +53,13 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
       <Icon name="chevron" :size="12" class="task-chevron" :class="{ expanded: open }" />
       <TaskStepStatus :state="work.state" />
       <span class="background-task-title" :title="work.title">{{ title }}</span>
-      <span class="task-label" :class="work.state === 'done' ? 'is-done' : work.state === 'failed' ? 'is-failed' : 'is-working'" :title="work.label">{{ status }}</span>
+      <span class="task-label" :class="work.state === 'done' ? 'is-done' : work.state === 'failed' ? 'is-failed' : 'is-working'" :title="run?.error || work.label">{{ status }}</span>
     </button>
     <SpringDisclosure :id="id" :open="open">
       <div v-if="visited" class="background-task-progress">
         <p v-if="error" class="notice" role="alert">{{ error }} <button @click="load">重试</button></p>
-        <TaskPlanChecklist :plan="plan" :loading="loading" :heading="false" :limit="5" />
-        <p v-if="run?.error" class="notice" role="alert">{{ run.error }}</p>
-        <p v-if="!run && !loading && !error" class="task-note">尚未执行，触发后展示实际步骤。</p>
-        <button v-if="work.task" class="task-details" @click="$emit('details', work.task)">查看任务详情</button>
+        <p v-if="loading" class="task-note" role="status">正在加载运行记录…</p>
+        <ActivityTrace v-else :key="run?.id || work.key" :steps="steps" :run-id="run?.id" :task-id="!run && work.kind === 'task' ? work.id : undefined" :rule-id="!run && work.kind === 'rule' ? work.id : undefined" :running="!!run && run.state !== 'ended'" :active="open && active" embedded />
       </div>
     </SpringDisclosure>
   </article>
@@ -81,7 +77,6 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
 .task-label.is-failed { color:var(--red); background:color-mix(in srgb, var(--red) 14%, transparent); }
 .background-task-progress { padding:2px 8px 12px 26px; min-width:0; }
 .task-note { color:var(--muted); font-size:11px; margin:5px 0; overflow-wrap:anywhere; }
-.task-details { padding:4px 0; font-size:11px; color:var(--fg-2); margin-top:5px; }
 @media(prefers-reduced-motion:reduce) { .task-chevron { transition:none; } }
 :global(html[data-motion="off"]) .task-chevron, :global(html[data-motion="reduce"]) .task-chevron { transition:none; }
 </style>

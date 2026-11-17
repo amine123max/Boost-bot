@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
       </article>
       <section v-if="turn" class="activity-panel">
         <span role="status">{{ stopping ? "正在停止" : "处理中" }}</span>
-        <ActivityTrace :steps="turn.steps" running />
+        <ActivityTrace :steps="turn.steps" :conversation-id="conversation.id" :started-at="turn.since" running />
         <MessageBubble v-if="turn.interim.length" :framed="conversation.channel !== 'web'" :text="turn.interim.join('\n\n')" />
         <div class="button-row">
           <button class="danger-button" :disabled="stopping" @click="stop">

@@ -127,8 +127,8 @@ export function loadConfig(overrides: { dataDir?: string; env?: NodeJS.ProcessEn
     },
     agent: {
       mode: (env.AMB_AGENT || file.agent?.mode || "dsh") === "off" ? "off" : "dsh",
-      turnTimeoutMs: num(env.AMB_AGENT_TURN_TIMEOUT_MS, file.agent?.turnTimeoutMs ?? 30 * 60_000),
-      idleTimeoutMs: num(env.AMB_AGENT_IDLE_TIMEOUT_MS, file.agent?.idleTimeoutMs ?? 10 * 60_000),
+      turnTimeoutMs: num(env.AMB_AGENT_TURN_TIMEOUT_MS, file.agent?.turnTimeoutMs ?? 0),
+      idleTimeoutMs: num(env.AMB_AGENT_IDLE_TIMEOUT_MS, file.agent?.idleTimeoutMs ?? 0),
       approvalTtlMs: num(env.AMB_APPROVAL_TTL_MS, file.agent?.approvalTtlMs ?? 10 * 60_000),
       pwsh: file.agent?.pwsh === "system" ? "system" : "auto",
       maxBackground: num(env.AMB_MAX_BACKGROUND, file.agent?.maxBackground ?? 4),

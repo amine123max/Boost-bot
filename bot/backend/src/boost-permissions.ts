@@ -13,9 +13,10 @@ export function memberRequestAllowed(method: string, path: string): boolean {
       || /^\/groups\/[^/]+\/(live|messages)$/.test(p);
   }
   return (method === 'POST' && /^\/(bots|groups)$/.test(p))
+    || (method === 'POST' && p === '/activity/nodes')
     || (['PUT', 'DELETE'].includes(method) && /^\/(bots|groups)\/[^/]+$/.test(p))
     || (method === 'PUT' && /^\/bots\/[^/]+\/chat\/model$/.test(p))
-    || (method === 'POST' && /^\/bots\/[^/]+\/(chat(\/stream)?|clear|stop)$/.test(p))
+    || (method === 'POST' && /^\/bots\/[^/]+\/(chat(\/(stream|messages))?|clear|stop)$/.test(p))
     || (method === 'POST' && /^\/conversations\/[^/]+\/(stop|clear|model)$/.test(p))
     || (method === 'POST' && /^\/groups\/[^/]+\/(messages|chat|stop|clear)$/.test(p));
 }

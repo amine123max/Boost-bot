@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import Markdown from "./Markdown.vue";
 import Icon from "./Icon.vue";
+import HelpTip from './HelpTip.vue';
 
 const props = withDefaults(defineProps<{
   text: string;
@@ -67,7 +68,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
   <div class="message-content" :class="{ 'user-content': role === 'user', 'system-content': role === 'system', 'framed-content': framed, 'is-editing': editing }">
     <form v-if="editing" class="message-bubble message-editor" @submit.prevent="submitEdit">
       <textarea ref="editor" v-model="editText" aria-label="编辑消息" rows="3" :disabled="sending" @keydown.esc.stop.prevent="!sending && (editing = false)" />
-      <div class="message-editor-actions"><button type="button" :disabled="sending" @click="editing = false">取消</button><button type="submit" class="message-edit-send" :disabled="sending || editDisabled || !editText.trim()">{{ sending ? '发送中…' : '发送' }}</button></div>
+      <div class="message-editor-actions"><HelpTip text="在原会话中修改这条消息并重新生成；此后的旧对话将从当前分支移除，已执行的工具操作不会撤销。" /><button type="button" :disabled="sending" @click="editing = false">取消</button><button type="submit" class="message-edit-send" :disabled="sending || editDisabled || !editText.trim()">{{ sending ? '正在更新…' : '重新生成' }}</button></div>
     </form>
     <div v-else class="message-bubble">
       <Markdown v-for="(value, index) in interim" :key="index" :text="value" />
@@ -83,7 +84,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
         :title="copied ? '已复制' : role === 'user' ? '复制消息' : '复制回复'"
         @click="copy"
       ><Icon :name="copied ? 'check' : 'copy'" :size="16" /></button>
-      <button v-if="text && role === 'user' && editable" type="button" class="message-copy" aria-label="重新编辑消息" title="重新编辑消息" @click="beginEdit"><Icon name="edit" :size="17" /></button>
+      <button v-if="text && role === 'user' && editable" type="button" class="message-copy" :disabled="editDisabled" aria-label="重新编辑消息" title="重新编辑消息" @click="beginEdit"><Icon name="edit" :size="17" /></button>
       <time v-if="date" :datetime="date.toISOString()" :title="date.toLocaleString('zh-CN', { hour12: false })">{{ date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) }}</time>
       <span class="sr-only" role="status">{{ copied ? '已复制' : '' }}</span>
       <span v-if="error" class="message-copy-error" role="alert">{{ error }}</span>

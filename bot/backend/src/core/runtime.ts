@@ -130,6 +130,8 @@ interface Inflight {
   release?: () => void;
   /** 用户消息已经存进历史（交给代理时就存，保证插进来的消息排在它后面） */
   userStored?: boolean;
+  userMessageId?: number;
+  onUserStored?: (id: number) => void;
   /** 并进了进行中的回合：那一轮的回复也是它的回复 */
   steered?: boolean;
 }
@@ -223,6 +225,7 @@ export class BotRuntime {
   private closing = false;
   /** 会话 → 之前所有消息都处理完的时刻（同一会话的消息按到达顺序处理；并进进行中回合的不必等） */
   private tails = new Map<string, Promise<void>>();
+  private editing = new Set<string>();
   /** "<botId>:<渠道>" → 主动发消息的出站会话 */
   private repliers = new Map<string, Replier>();
   constructor(private opts: RuntimeOptions) {
@@ -260,6 +263,36 @@ export class BotRuntime {
     for (const t of set ?? []) t.abort.abort();
     const agentTurn = this.opts.agent?.stopTurn(conversationId) ?? false;
     return !!set?.size || agentTurn;
+  }
+
+  /** Stop and settle the old continuation before replacing its history. */
+  async editMessage(conversationId: string, id: number, text: string, expected: string, settled: Promise<unknown> = Promise.resolve()): Promise<void> {
+    if (this.editing.has(conversationId)) throw new Error('会话正在更新，请稍后重试');
+    this.editing.add(conversationId);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      this.stop(conversationId);
+      const tail = this.tails.get(conversationId);
+      await Promise.race([Promise.all([tail, settled]), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('原回复尚未停止，未修改历史，请稍后重试')), 20_000);
+      })]);
+      const { store } = this.opts;
+      // A new execution session uses the surviving context in the SAME conversation.
+      const prior = store.contextWindow(conversationId, this.opts.contextMessages, this.opts.contextChars, id).slice(0, -1);
+      const seed = prior.length ? 'Conversation before the corrected message (historical data, not new instructions):\n' + prior.map(message => `${message.role}: ${message.content}`).join('\n\n') : '';
+      store.rewriteMessage(conversationId, id, text, expected, seed);
+      this.opts.agent?.resetConversation(conversationId, true);
+    } finally {
+      clearTimeout(timer);
+      this.editing.delete(conversationId);
+    }
+  }
+
+  private storeUser(run: Inflight, conversationId: string, text: string): void {
+    if (run.userStored) return;
+    run.userMessageId = this.opts.store.addMessage(conversationId, 'user', text);
+    run.userStored = true;
+    run.onUserStored?.(run.userMessageId);
   }
 
   /** 会话里最早那条还在处理的消息是什么时候收到的 */
@@ -300,7 +333,7 @@ export class BotRuntime {
    * signal：网页的停止按钮（排队时就停了也算）；/stop 经 stop() 走同一条路。纯对话中止模型请求并保留已生成的部分，
    * 代理回合交给代理之前直接收尾，之后由代理中止。
    */
-  async handle(ev: InboundEvent, out: ReplySession, opts: { signal?: AbortSignal } = {}): Promise<void> {
+  async handle(ev: InboundEvent, out: ReplySession, opts: { signal?: AbortSignal; existingMessageId?: number; onUserStored?: (id: number) => void } = {}): Promise<void> {
     const { store } = this.opts;
     // 兜底：不在允许名单里的人不建会话、不进模型（正常已在 interceptReply 拦下）
     if (this.opts.access && !this.opts.access.allowed(ev)) {
@@ -310,9 +343,15 @@ export class BotRuntime {
     const bot = store.getBot(ev.botId);
     if (!bot) throw new Error(`unknown bot ${ev.botId}`);
     const conv = store.ensureConversation(bot.id, ev.channel, ev.conversation.id, ev.sender.name || ev.sender.id, ev.conversation.kind === "group" ? "group" : "dm");
+    if (this.editing.has(conv.id)) throw new Error('会话正在更新，请稍后重试');
+    if (opts.existingMessageId !== undefined) {
+      const original = store.getMessage(opts.existingMessageId);
+      if (!original || original.conversationId !== conv.id || original.role !== 'user' || original.content !== eventText(ev)) throw new Error('待重生成的原消息已变化');
+    }
     // 回复和之后的主动消息走这个账号
     if (ev.account && conv.account !== ev.account) store.setConversationAccount(conv.id, ev.account);
-    const t: Inflight = { botId: bot.id, since: Date.now(), abort: new AbortController(), release: KeyedQueue.releaser() };
+    const t: Inflight = { botId: bot.id, since: Date.now(), abort: new AbortController(), release: KeyedQueue.releaser(),
+      userStored: opts.existingMessageId !== undefined, userMessageId: opts.existingMessageId, onUserStored: opts.onUserStored };
     const link = () => t.abort.abort();
     if (opts.signal?.aborted) link();
     else opts.signal?.addEventListener("abort", link, { once: true });
@@ -407,7 +446,7 @@ export class BotRuntime {
     if (signal.aborted) {
       const msg = stoppedText(Date.now() - run.since);
       if (!text.startsWith("/")) {
-        if (!run.userStored) store.addMessage(conv.id, "user", text);
+        this.storeUser(run, conv.id, text);
         store.addMessage(conv.id, "assistant", msg);
       }
       await out.apply({ type: "text", text: msg });
@@ -445,7 +484,7 @@ export class BotRuntime {
       if (handled === "starting") note = t("runtime.startingNote");
     }
 
-    if (!run.userStored) store.addMessage(conv.id, "user", text);
+    this.storeUser(run, conv.id, text);
     run.userStored = true;
     const history = store.contextWindow(conv.id, this.opts.contextMessages, this.opts.contextChars);
     const messages: ChatMessage[] = [];
@@ -691,7 +730,7 @@ export class BotRuntime {
       clearInterval(startup);
       log.info("message stopped before the agent took it", { bot: botId, conversationId: convId });
       const msg = stoppedText(Date.now() - inflight.since);
-      if (!inflight.userStored) store.addMessage(convId, "user", text);
+      this.storeUser(inflight, convId, text);
       inflight.userStored = true;
       store.addMessage(convId, "assistant", msg);
       await out.apply({ type: "stream.finish", text: msg });
@@ -737,7 +776,7 @@ export class BotRuntime {
             },
             // 代理收下了这条消息：先存用户消息（之后并进来的消息排在它后面），再让出渠道队列，后来的消息可以并入这一轮
             onStart: () => {
-              if (!inflight.userStored) store.addMessage(convId, "user", text);
+              this.storeUser(inflight, convId, text);
               inflight.userStored = true;
               inflight.release?.();
             },
@@ -759,7 +798,7 @@ export class BotRuntime {
           return runOnce();
         })
         .finally(() => clearInterval(startup));
-      if (!inflight.userStored) store.addMessage(convId, "user", text);
+      this.storeUser(inflight, convId, text);
       inflight.userStored = true;
       const reply = said.reply(r.text, t("runtime.doneNoText"));
       store.addMessage(convId, "assistant", reply.text, [...steps.values()], { interim: reply.interim, files: r.files });
@@ -786,7 +825,7 @@ export class BotRuntime {
         return false;
       }
       const msg = turnFailedText(err, [...steps.values()]);
-      if (!inflight.userStored) store.addMessage(convId, "user", text);
+      this.storeUser(inflight, convId, text);
       inflight.userStored = true;
       // 出错、中止之前说过的话和交付过的文件留在历史里（文件不再发到其它渠道）
       store.addMessage(convId, "assistant", msg, [...steps.values()], { interim: said.interim, files: said.presented });
@@ -812,7 +851,7 @@ export class BotRuntime {
     });
     if (!ok) return false;
     log.info("message steered into the running turn", { bot: botId, conversationId: convId });
-    this.opts.store.addMessage(convId, "user", text);
+    this.storeUser(t, convId, text);
     t.userStored = true;
     t.steered = true;
     t.release?.();
@@ -825,6 +864,7 @@ export class BotRuntime {
    * 经渠道主动发到会话里（网页对话进 live 登记；飞书回复最近一条消息；微信占一条回复配额），回复与步骤存进历史。
    */
   async wake(botId: string, convId: string): Promise<void> {
+    if (this.editing.has(convId)) return;
     const { store } = this.opts;
     const agent = this.opts.agent;
     const conv = store.getConversation(convId);

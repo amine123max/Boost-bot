@@ -246,7 +246,7 @@ export default defineComponent({
               :conversation-id="m.conversationId || chat.conversationId"
               :message-id="m.id"
             />
-            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="m.role === 'user'" :edit-disabled="chat.running || chat.loading" :send-edit="chat.send">
+            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="!group && m.role === 'user' && typeof m.id === 'number'" :edit-disabled="chat.submitting || chat.loading" :send-edit="text => chat.edit(m, text)">
             <button
               v-for="f in m.files"
               :key="f.path"
@@ -261,11 +261,6 @@ export default defineComponent({
           </div>
         </article>
         <template v-if="chat.live">
-          <article v-if="chat.live.userText && !group" class="message is-user">
-            <div class="message-body">
-              <MessageBubble :text="chat.live.userText" role="user" editable :edit-disabled="chat.running || chat.loading" :send-edit="chat.send" />
-            </div>
-          </article>
           <article class="message is-live">
             <BotAvatar
               v-if="group"
@@ -285,9 +280,12 @@ export default defineComponent({
                 }}</span>
               </div>
               <ActivityTrace
-                v-if="chat.live.steps?.length"
-                :steps="chat.live.steps"
+                v-if="chat.live.id || chat.live.steps?.length"
+                :steps="chat.live.steps || []"
+                :conversation-id="chat.live.conversationId || chat.conversationId"
+                :turn-id="chat.live.id"
                 :running="chat.running"
+                :started-at="chat.live.startedAt"
               />
               <MessageBubble v-if="chat.live.text || chat.live.interim?.length || chat.live.files?.length" :text="chat.live.text" :interim="chat.live.interim">
               <button
@@ -385,11 +383,11 @@ export default defineComponent({
           >
             <span class="stop-square" aria-hidden="true" /><span class="sr-only">停止</span></button
           ><button
-            v-else
+            v-if="!chat.running || chat.draft.trim()"
             type="submit"
             class="send"
             aria-label="发送消息"
-            :disabled="chat.loading || !chat.draft.trim()"
+            :disabled="chat.loading || chat.submitting || chat.stopping || !chat.draft.trim()"
           >
             <Icon name="arrow" />
           </button>

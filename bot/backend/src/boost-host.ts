@@ -57,6 +57,10 @@ const dataDirLock = (() => {
   }
 })();
 const config = loadConfig({ dataDir: host.dataDir, env: {} });
+// Interactive hosted conversations end on completion, cancellation or a real failure.
+// Old standalone timeout values must not impose a wall-clock deadline on Boost chat.
+config.agent.turnTimeoutMs = 0;
+config.agent.idleTimeoutMs = 0;
 config.ui = { ...config.ui, host: '127.0.0.1', port: 0, token: host.token, lang: config.ui.lang === 'system' ? 'zh-CN' : config.ui.lang };
 config.magpie = { mode: 'external', binPath: '', externalBaseUrl: host.baseUrl, externalApiKey: host.apiKey };
 config.agent.mode = host.allowTools ? 'dsh' : 'off';

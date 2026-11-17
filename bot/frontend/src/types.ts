@@ -79,6 +79,8 @@ export interface LiveTurn {
   botId?: string;
   conversationId?: string;
   userText?: string;
+  userMessageId?: number;
+  startedAt?: number;
   text: string;
   interim?: string[];
   steps?: Activity[];

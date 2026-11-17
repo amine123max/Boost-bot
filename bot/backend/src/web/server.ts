@@ -30,6 +30,8 @@ import { officialProvider } from "../official-providers.js";
 import { testModelflareDomains } from "../modelflare-domains.js";
 import { SseReply } from "./sse-reply.js";
 import { LiveTurns, type LiveTurn } from "./live.js";
+import { ConsoleMessages, ConsoleMessageError } from './console-messages.js';
+import { analyzeTaskNodes, TaskNodeError } from './task-nodes.js';
 import { botWorkspace, describeFile, resolveFile, runnable, sendFile } from "./files.js";
 import { connectionFromPids } from "../agent/peer-guard.js";
 import { groupPeer, type ApprovalRow, type BotGroup, type Message, type Store } from "../store/db.js";
@@ -248,8 +250,10 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
 
   // —— 网页控制台进行中的消息：切走再切回、刷新后能接上，停止按钮不依赖发消息的那个请求 ——
   const live = new LiveTurns();
+  const editingConversations = new Set<string>();
   function startLive(botId: string, text: string): LiveTurn {
     const convId = consoleConvId(botId);
+    if (editingConversations.has(convId)) throw new HttpError(409, '会话正在更新，请稍后重试');
     const last = app.store.getConversation(convId) ? (app.store.listMessages(convId, 1).at(-1)?.id ?? 0) : 0;
     return live.start(convId, botId, text, last);
   }
@@ -261,11 +265,16 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
   });
 
   /** 排进会话队列交给运行时；结束时先移出登记，再通知发消息的请求和所有接上的界面。不抛错 */
-  async function runLive(t: LiveTurn, ev: InboundEvent, out: ReplySession = t): Promise<void> {
+  async function runLive(t: LiveTurn, ev: InboundEvent, out: ReplySession = t, existingMessageId?: number): Promise<void> {
     let err: Error | undefined;
     await app.queue.run(t.conversationId === consoleConvId(t.botId) ? `web:${t.botId}:console` : `web:${t.conversationId}`, async () => {
       try {
-        await app.runtime.handle(ev, out, { signal: t.abort.signal });
+        await app.runtime.handle(ev, out, { signal: t.abort.signal, existingMessageId,
+          onUserStored: id => {
+            t.userMessageId = id;
+            live.userStored(t, publicMessage(app.store.getMessage(id)!));
+          },
+        });
       } catch (e) {
         err = e as Error;
       }
@@ -275,6 +284,10 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       live.end(t, "error", { message: err.message });
     } else live.end(t, "done", { conversationId: t.conversationId });
   }
+  const consoleMessages = new ConsoleMessages({ app, live, editing: editingConversations, start: startLive,
+    run: (turn, messageId) => runLive(turn, webEvent(turn.botId, turn.userText), turn, messageId),
+    intercept: (botId, text) => interceptWeb(webEvent(botId, text)),
+  });
 
   // —— 应用内群聊（core/groups.ts）：一轮就是成员会话里的一条网页消息，事件转给接着这个群的界面 ——
   const groupTurns = new Map<string, LiveTurn>();
@@ -415,6 +428,13 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     // 写操作要求 JSON（触发 CORS 预检，阻止跨站表单 CSRF）
     if ((m === "POST" || m === "PUT" || m === "PATCH") && !/^application\/json\s*(;|$)/i.test(String(req.headers["content-type"] || "").trim())) {
       throw new HttpError(415, t("web.needJson"));
+    }
+    if (p === '/activity/nodes' && m === 'POST') {
+      try { return send(res, 200, await analyzeTaskNodes(app, live, await readJson(req))); }
+      catch (error) {
+        if (error instanceof TaskNodeError) throw new HttpError(error.status, error.message);
+        throw error;
+      }
     }
 
     if (seg[0] === "catalog" || (seg[0] === "bots" && seg[2] === "app")) {
@@ -1485,12 +1505,12 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       if (sub === "chat" && m === "GET") {
         const conv = app.store.getConversation(consoleConvId(id));
         // 进行中的消息由 live 显示（用户消息、到目前为止的回复与步骤）；它开始之后存下的消息先不列，免得重复
-        const turns = live.list(consoleConvId(id));
+        const turns = live.list(consoleConvId(id)).filter(turn => !turn.steered);
         const cut = turns[0]?.afterMessageId ?? Infinity;
         return send(res, 200, {
           conversationId: consoleConvId(id),
           model: conv?.model ?? "",
-          messages: conv ? app.store.listMessages(conv.id, 200).filter((x) => x.id <= cut).map(publicMessage) : [],
+          messages: conv ? app.store.listMessages(conv.id, 200).filter((x) => x.role === 'user' || x.id <= cut).map(publicMessage) : [],
           pending: app.store.listApprovals({ status: "pending", conversationId: consoleConvId(id), limit: 50 }).map((r) => publicApproval(r, app.store)),
           live: turns.map((t) => t.snapshot()),
           // 桌面版：交付的文件用系统程序打开；网页里在新标签页打开
@@ -1516,6 +1536,13 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const conv = app.store.ensureConversation(id, "web", "console", "控制台");
         app.store.setConversationModel(conv.id, String(b.model ?? ""));
         return send(res, 200, { conversationId: conv.id, model: String(b.model ?? "") });
+      }
+      if (sub === 'chat/messages' && m === 'POST') {
+        try { return send(res, 202, await consoleMessages.submit(id, await readJson(req))); }
+        catch (error) {
+          if (error instanceof ConsoleMessageError) throw new HttpError(error.status, error.message);
+          throw error;
+        }
       }
       if (sub === "chat" && m === "POST") {
         const b = await readJson(req);

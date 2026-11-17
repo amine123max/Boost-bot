@@ -205,7 +205,7 @@ export interface AgentHostOptions {
   store: Store;
   /** 当前机器人设置（权限预设、记忆开关）；变化后空闲时重启子进程 */
   settings?: () => BotSettings;
-  /** 单回合上限，超时则重启子进程（SDK 无中断接口） */
+  /** 单回合上限；0 或未配置表示不限时。用户停止仍会中止对应会话。 */
   turnTimeoutMs?: number;
   /** 需要让用户看到的提示（界面通知） */
   onNotice?: (text: string) => void;
@@ -1579,7 +1579,19 @@ exec "$REAL" "$@"
     }
     // 代理自己醒着的一轮（后台命令结束）还没完：等它完了再发这条（它的回复由跟踪它的那一轮发出）
     const woke = this.wakes.get(s.id);
-    if (woke && !woke.ended) await withTimeoutOr(woke.done.catch(() => undefined), this.o.turnTimeoutMs ?? 30 * 60_000, undefined);
+    if (woke && !woke.ended) {
+      const waiting = woke.done.catch(() => undefined);
+      const bounded = (this.o.turnTimeoutMs ?? 0) > 0 ? withTimeoutOr(waiting, this.o.turnTimeoutMs!, undefined) : waiting;
+      let onAbort: (() => void) | undefined;
+      try {
+        await Promise.race([bounded, new Promise<never>((_, reject) => {
+          if (!input.signal) return;
+          onAbort = () => reject(stopReason(input.signal!));
+          if (input.signal.aborted) onAbort();
+          else input.signal.addEventListener('abort', onAbort, { once: true });
+        })]);
+      } finally { if (onAbort) input.signal?.removeEventListener('abort', onAbort); }
+    }
     if (input.signal?.aborted) throw stopReason(input.signal);
     this.active++;
     this.known.add(input.model);
@@ -1696,7 +1708,7 @@ exec "$REAL" "$@"
   private async awaitTurn<T>(turn: HostTurn, run: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
     // 宽限期内没停下、子进程被关掉时，run 随后以"runtime closed"失败，已经没人等它
     run.catch(() => undefined);
-    const timeoutMs = this.o.turnTimeoutMs ?? 30 * 60_000;
+    const timeoutMs = this.o.turnTimeoutMs ?? 0;
     let stopping: Promise<TurnStopped> | undefined;
     let wake!: () => void;
     const stopRequested = new Promise<void>((r) => (wake = r));
@@ -1706,7 +1718,7 @@ exec "$REAL" "$@"
       stopping = this.stopSession(turn, why, run);
       wake();
     };
-    const timer = setTimeout(() => stop(new TurnStopped("timeout", timeoutMs)), timeoutMs);
+    const timer = timeoutMs > 0 ? setTimeout(() => stop(new TurnStopped("timeout", timeoutMs)), timeoutMs) : undefined;
     const onAbort = () => stop(stopReason(signal!));
     if (signal?.aborted) onAbort();
     else signal?.addEventListener("abort", onAbort, { once: true });

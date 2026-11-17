@@ -16,6 +16,7 @@ export interface LiveSnapshot {
   id: string;
   startedAt: number;
   userText: string;
+  userMessageId?: number;
   /** 模型在回合中间说的话（按说的顺序），显示在 text 前面 */
   interim: string[];
   text: string;
@@ -48,6 +49,9 @@ export class LiveTurn implements ReplySession {
   /** 并进了正在进行的处理（见 LiveSnapshot.steered） */
   steered = false;
   done = false;
+  userMessageId?: number;
+  readonly settled: Promise<void>;
+  private resolveSettled!: () => void;
   /** 停止按钮：交给 runtime.handle 的 signal（排队中的也能停） */
   readonly abort = new AbortController();
   private subs = new Set<Listener>();
@@ -59,7 +63,7 @@ export class LiveTurn implements ReplySession {
     readonly userText: string,
     /** 收到时会话里最后一条消息的 id：之后存下的消息属于进行中的回合，由 live 代替显示 */
     readonly afterMessageId: number,
-  ) {}
+  ) { this.settled = new Promise(resolve => { this.resolveSettled = resolve; }); }
 
   async apply(op: OutboundOp): Promise<void> {
     if (this.done) return;
@@ -91,6 +95,7 @@ export class LiveTurn implements ReplySession {
       id: this.id,
       startedAt: this.startedAt,
       userText: this.userText,
+      userMessageId: this.userMessageId,
       interim: [...this.interim],
       text: this.text,
       steps: [...this.steps.values()],
@@ -132,6 +137,7 @@ export class LiveTurn implements ReplySession {
     clearTimeout(this.textTimer); this.textTimer = undefined;
     this.emit(event, data);
     this.subs.clear();
+    this.resolveSettled();
   }
 }
 
@@ -153,6 +159,10 @@ export class LiveTurns {
   get(conversationId: string, id?: string | null): LiveTurn | undefined {
     const l = this.list(conversationId);
     return id ? l.find((t) => t.id === id) : l[0];
+  }
+
+  userStored(turn: LiveTurn, message: unknown): void {
+    for (const active of this.list(turn.conversationId)) active.emit('user', { turnId: turn.id, message });
   }
 
   /** 回合结束：先移出登记（界面收到 done 后重新读历史时，它已经不算进行中），再通知订阅者 */

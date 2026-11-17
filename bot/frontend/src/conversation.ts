@@ -25,6 +25,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     loading = ref(false),
     refreshing = ref(false),
     modelChanging = ref(false),
+    submitting = ref(false),
     error = ref("");
   const running = ref(false),
     stopping = ref(false),
@@ -37,6 +38,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       : `/bots/${enc(route.value.id)}/chat`,
   );
   const drafts = new Map<string, string>();
+  const intents = new Map<string, { key: string; requestId: string }>();
   let generation = 0,
     historyRequest = 0,
     loadRequest = 0;
@@ -51,6 +53,12 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     const data = await api<History>(path.value);
     if (ticket !== generation || request !== historyRequest) return null;
     messages.value = data.messages || [];
+    if (route.value.kind !== 'group' && Array.isArray(data.live)) {
+      for (const turn of data.live) {
+        if (!turn.userText || (turn.userMessageId && messages.value.some(message => message.id === turn.userMessageId))) continue;
+        messages.value.push({ id: `live-user:${turn.id}`, role: 'user', content: turn.userText, createdAt: turn.startedAt });
+      }
+    }
     if (live.value && Array.isArray(data.live) && data.live[0]?.userText) live.value.userText = data.live[0].userText;
     pending.value = data.pending || [];
     model.value = data.model || "";
@@ -59,6 +67,14 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   }
   function event(name: string, raw: unknown, ticket: number) {
     if (ticket !== generation || !raw || typeof raw !== "object") return;
+    if (name === 'user') {
+      const data = raw as { turnId: string; message: Message };
+      if (!data.message || data.message.role !== 'user' || typeof data.message.id !== 'number') return;
+      messages.value = messages.value.filter(message => message.id !== `live-user:${data.turnId}` && message.id !== data.message.id);
+      messages.value.push(data.message);
+      if (live.value?.id === data.turnId) live.value.userMessageId = Number(data.message.id);
+      return;
+    }
     const data = raw as LiveTurn &
       Activity &
       FileItem & { message?: string; error?: string };
@@ -110,6 +126,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
         body,
         signal: ac.signal,
         onEvent: (name, data) => {
+          if (ac.signal.aborted || ticket !== generation) return;
           if (name === "done" || name === "error") completed = true;
           event(name, data, ticket);
         },
@@ -193,55 +210,50 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       }
     }
   }
-  async function send(editedText?: string): Promise<boolean> {
-    const text = (editedText ?? draft.value).trim();
-    if (!text || loading.value || modelChanging.value || running.value || !active()) return false;
-    error.value = "";
+  async function submit(text: string, original?: Message): Promise<boolean> {
+    text = text.trim();
+    if (!text || submitting.value || loading.value || modelChanging.value || stopping.value || !active()) return false;
+    if (original && (route.value.kind === 'group' || typeof original.id !== 'number')) return false;
+    const ticket = generation, endpoint = path.value;
+    const key = JSON.stringify([text, original?.id, original?.content]);
+    const previous = intents.get(endpoint);
+    const intent = previous?.key === key ? previous : { key, requestId: crypto.randomUUID() };
+    intents.set(endpoint, intent);
+    error.value = '';
+    submitting.value = true;
     clearTimeout(timer);
-    const ticket = generation;
-    const submittedAt = Date.now();
-    if (editedText === undefined) draft.value = "";
-    if (route.value.kind === "group") {
-      running.value = true;
-      try {
-        await api(`${path.value}/messages`, {
-          method: "POST",
-          body: { text, requestId: crypto.randomUUID() },
-        });
-        if (ticket === generation) {
-          await history(ticket);
-          void follow(`${path.value}/live`);
-        }
-      } catch (e) {
-        if (ticket === generation) {
-          error.value = (e as Error).message;
-          if (editedText === undefined) draft.value = text;
-          running.value = false;
-        }
+    if (original) { historyRequest++; controller?.abort(); controller = undefined; }
+    try {
+      if (route.value.kind === 'group') {
+        await api(endpoint + '/messages', { method: 'POST', body: { text, requestId: intent.requestId } });
+      } else {
+        await api(endpoint + '/messages', { method: 'POST', body: { text, requestId: intent.requestId,
+          ...(original ? { editMessageId: original.id, expectedContent: original.content } : {}) } });
       }
-    } else {
-      // Display the submitted text until the authoritative timeline is fetched.
-      messages.value.push({
-        id: `pending-${Date.now()}`,
-        role: "user",
-        content: text,
-        createdAt: Date.now(),
+      intents.delete(endpoint);
+      if (ticket !== generation) return false;
+      if (!original && draft.value.trim() === text) draft.value = '';
+      const data = await history(ticket).catch((e: Error) => {
+        if (ticket === generation) { error.value = e.message; schedule(500); }
+        return null;
       });
-      await follow(
-        `${path.value}/stream`,
-        { text },
-        { text: "", botId: route.value.id, files: [], steps: [] },
-      );
-      if (
-        ticket === generation &&
-        error.value &&
-        !messages.value.some((m) => typeof m.id === 'number' && m.role === "user" && m.content === text && (m.createdAt || 0) >= submittedAt) &&
-        live.value?.userText !== text
-      )
-        if (editedText === undefined) draft.value = text;
-    }
-    return ticket === generation && !error.value;
+      if (data) {
+        const turns = Array.isArray(data.live) ? data.live : [];
+        running.value = route.value.kind === 'group' ? !!data.group?.running : turns.length > 0;
+        if (!controller && running.value) {
+          live.value = Array.isArray(data.live) ? data.live[0] || null : data.live;
+          void follow(endpoint + '/live' + (route.value.kind === 'group' ? '' : '?turn=' + enc(turns[0]?.id || '')), undefined, live.value);
+        } else if (!running.value) { live.value = null; schedule(); }
+      }
+      changed();
+      return true;
+    } catch (e) {
+      if (ticket === generation) { error.value = (e as Error).message; schedule(500); }
+      return false;
+    } finally { if (ticket === generation) submitting.value = false; }
   }
+  async function send(): Promise<boolean> { return submit(draft.value); }
+  async function edit(original: Message, text: string): Promise<boolean> { return submit(text, original); }
   async function stop() {
     if (stopping.value) return;
     stopping.value = true;
@@ -314,6 +326,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       loading.value = false;
       refreshing.value = false;
       modelChanging.value = false;
+      submitting.value = false;
       if (active()) void load();
     },
     { immediate: true },
@@ -331,6 +344,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     loading,
     refreshing,
     modelChanging,
+    submitting,
     error,
     running,
     stopping,
@@ -339,6 +353,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     draft,
     load,
     send,
+    edit,
     stop,
     changeModel,
     answer,

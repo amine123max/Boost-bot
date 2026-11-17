@@ -953,12 +953,26 @@ export class Store {
     const r = this.db.prepare("SELECT id, conversation_id, role, content, created_at FROM messages WHERE id = ?").get(id) as Row | undefined;
     return r ? { id: Number(r.id), conversationId: String(r.conversation_id), role: String(r.role) as Message["role"], content: String(r.content), createdAt: Number(r.created_at) } : undefined;
   }
-  listMessages(conversationId: string, limit = 500): Message[] {
+  /** Edit the existing user row and discard the obsolete continuation atomically. */
+  rewriteMessage(conversationId: string, id: number, content: string, expected: string, seed = ''): Message {
+    return this.db.transaction(() => {
+      const message = this.getMessage(id);
+      if (!message || message.conversationId !== conversationId || message.role !== 'user') throw new Error('原消息不存在或不属于当前会话');
+      if (message.content !== expected) throw new Error('原消息已被修改，请刷新后重试');
+      this.db.prepare('UPDATE messages SET content = ? WHERE id = ? AND conversation_id = ?').run(content, id, conversationId);
+      this.db.prepare('DELETE FROM messages WHERE conversation_id = ? AND id > ?').run(conversationId, id);
+      this.clearAgentSession(conversationId);
+      this.setKV(`seed:${conversationId}`, seed);
+      this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(Date.now(), conversationId);
+      return { ...message, content };
+    })();
+  }
+  listMessages(conversationId: string, limit = 500, throughId = Number.MAX_SAFE_INTEGER): Message[] {
     const rows = this.db
       .prepare(
-        "SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, CASE WHEN json_valid(activity) THEN json_array_length(activity) ELSE 0 END AS steps FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC",
+        "SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, CASE WHEN json_valid(activity) THEN json_array_length(activity) ELSE 0 END AS steps FROM messages WHERE conversation_id = ? AND id <= ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC",
       )
-      .all(conversationId, limit) as Row[];
+      .all(conversationId, throughId, limit) as Row[];
     return rows.map((r) => this.toMessage(r));
   }
   private toMessage(r: Row): Message {
@@ -996,8 +1010,8 @@ export class Store {
   /**
    * 滑动窗口上下文：从最新往回取，直到条数或字符数超限；保证以 user 消息开头。
    */
-  contextWindow(conversationId: string, maxMessages: number, maxChars: number): Array<Pick<Message, "role" | "content">> {
-    const recent = this.listMessages(conversationId, maxMessages);
+  contextWindow(conversationId: string, maxMessages: number, maxChars: number, throughId = Number.MAX_SAFE_INTEGER): Array<Pick<Message, "role" | "content">> {
+    const recent = this.listMessages(conversationId, maxMessages, throughId);
     const picked: Array<Pick<Message, "role" | "content">> = [];
     let chars = 0;
     for (let i = recent.length - 1; i >= 0; i--) {

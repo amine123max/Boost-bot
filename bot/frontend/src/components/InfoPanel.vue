@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
-import type { Bot, Approval, Task, LiveTurn, Message } from "../types";
+import type { Bot, Approval, Task } from "../types";
 import { api, enc } from "../api";
 import Icon from "./Icon.vue";
 import SettingsButton from './SettingsButton.vue';
@@ -9,7 +9,6 @@ import ConversationLabel from "./ConversationLabel.vue";
 import ConversationHistory from "./ConversationHistory.vue";
 import BackgroundTasks from "./BackgroundTasks.vue";
 import BotMemory from "./BotMemory.vue";
-import ConversationPlanCard from "./ConversationPlanCard.vue";
 import ChannelSettings from './ChannelSettings.vue';
 import { type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
 import BotChannels from './BotChannels.vue';
@@ -20,9 +19,6 @@ const props = defineProps<{
   bots: Bot[];
   configure: boolean;
   pending: Approval[];
-  conversationId: string;
-  messages: Message[];
-  live: LiveTurn | null;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -122,7 +118,6 @@ onBeforeUnmount(() => {
     </div>
     <div class="panel-body">
       <p v-if="error" class="notice" role="alert">{{ error }}</p>
-      <div class="panel-task-cards"><ConversationPlanCard :key="conversationId" :conversation-id="conversationId" :messages="messages" :live="live" :pending="pending" /></div>
       <BackgroundTasks :key="bot.id" :bot="bot" :configure="configure" @open="emit('task', $event)" @saved="emit('saved')" />
       <template v-if="configure">
       <BotChannels :key="bot.id" :accounts="accounts" :busy="channelBusy" @connect="connect" @edit="channelDialog?.editAccount($event)" @more="channelDialog?.begin(undefined, undefined, bot.id)" />
@@ -171,7 +166,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .panel-body { scrollbar-width: none; -ms-overflow-style: none; }
 .panel-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
-.panel-task-cards:empty { display: none; }
 .panel-body > :deep(.background-tasks > .list-head) { margin-top: 4px; }
 .channel-manage-label { display:inline-flex; align-items:center; gap:5px; }
 .channel-manage {
@@ -181,12 +175,6 @@ onBeforeUnmount(() => {
 .conversation-row {
   width: 100%;
   text-align: left;
-}
-.panel-task-cards {
-  display: grid;
-  gap: 14px;
-  padding-block: 4px 10px;
-  min-width: 0;
 }
 .task-empty {
   margin: 0;

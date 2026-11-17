@@ -432,15 +432,15 @@ export class AgentManager {
     this.turnsInProgress.set(conv, t);
     // 看门狗：代理已经在处理，却长时间没有进展（模型不回、只在重试），又不是在等用户批准或回答、
     // 也没有工具、命令或生成任务在跑（生视频、转到后台的长命令、子代理里的工具）→ 中止
-    const idleMs = this.o.idleTimeoutMs ?? 10 * 60_000;
-    const watchdog = setInterval(() => {
+    const idleMs = this.o.idleTimeoutMs ?? 0;
+    const watchdog = idleMs > 0 ? setInterval(() => {
       if (!t.lastProgress || t.abort.signal.aborted) return;
       if (this.approvals.pendingChat(conv).length || t.tools.size || t.jobs.size || t.media) t.lastProgress = Date.now();
       else if (Date.now() - t.lastProgress > idleMs) {
         log.warn("agent turn idle, stopping", { bot: botId, conversationId: conv, idleMs, lastStep: t.activity.last });
         this.halt(conv, t, new TurnStopped("idle", idleMs));
       }
-    }, Math.max(250, Math.min(15_000, idleMs / 4)));
+    }, Math.max(250, Math.min(15_000, idleMs / 4))) : undefined;
     const observer: TurnObserver = {
       ...input.observer,
       onStart: () => {
@@ -965,11 +965,11 @@ export class AgentManager {
     return { compact };
   }
 
-  resetConversation(conversationId: string): void {
+  resetConversation(conversationId: string, preserveSeed = false): void {
     // 会话换掉了：它上面还没回报的压缩不用再等
     this.endCompaction((c) => c.conv === conversationId);
     this.o.store.clearAgentSession(conversationId);
-    this.o.store.setKV(`seed:${conversationId}`, "");
+    if (!preserveSeed) this.o.store.setKV(`seed:${conversationId}`, "");
     this.mediaGrants.delete(conversationId);
     for (const r of this.approvals.pendingChat(conversationId)) this.approvals.cancel(r.id, "reset");
   }

@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import type { Activity, Task } from "../types";
 import { api, enc, download } from "../api";
 import Modal from "./Modal.vue";
 import Markdown from "./Markdown.vue";
 import ActivityTrace from "./ActivityTrace.vue";
-import TaskPlanChecklist from "./TaskPlanChecklist.vue";
-import { taskPlan } from "../lib/task-plan";
 import Icon from './Icon.vue';
 const props = defineProps<{ task: Task; configure: boolean }>();
 defineEmits<{ close: [] }>();
@@ -27,9 +25,6 @@ const detail = ref<{
   activity = ref<Record<string, Activity[]>>({});
 let disposed = false,
   timer: ReturnType<typeof setTimeout> | undefined;
-const plan = computed(() =>
-  taskPlan(activity.value[detail.value?.runs[0]?.id || ""] || []),
-);
 const loadingRuns = new Set<string>();
 const followup = ref('');
 async function action(kind: 'retry' | 'message') {
@@ -144,6 +139,9 @@ onBeforeUnmount(() => {
         <ActivityTrace
           v-if="activity[run.id]"
           :steps="activity[run.id]"
+          :run-id="run.id"
+          :running="run.state !== 'ended'"
+          :started-at="run.startedAt"
         />
       </details>
       <form v-if="configure && detail?.task.stage?.key !== 'stopped'" class="editor-form task-followup" @submit.prevent="action('message')"><label>补充要求<textarea v-model="followup" required maxlength="4000" rows="2" /></label><button class="quiet-button" :disabled="busy || !followup.trim()">发送补充</button></form>
