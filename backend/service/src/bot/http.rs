@@ -93,7 +93,7 @@ pub(crate) async fn proxy(request: Request) -> Response {
     }
     response.headers_mut().insert(
         header::CACHE_CONTROL,
-        header::HeaderValue::from_static("no-store"),
+        header::HeaderValue::from_static("no-store, no-transform"),
     );
     response
         .headers_mut()

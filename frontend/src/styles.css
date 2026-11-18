@@ -2807,7 +2807,7 @@ h3 {
 .modal-content {
   padding: 2px 25px 22px;
   overflow: auto;
-  flex: 1;
+  flex: 0 1 auto;
   overscroll-behavior: contain;
 }
 .modal-footer {

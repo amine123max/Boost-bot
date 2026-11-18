@@ -28,9 +28,10 @@ export interface TrayPreferences {
   showRingValues: boolean;
   pages: TrayPanel[];
   activePage: string;
-  position: { x: number; y: number } | null;
+  position: TrayPosition | null;
   palette: { x: number; y: number };
 }
+export interface TrayPosition { x: number; y: number; monitor?: string; scale?: number }
 export function newTrayWidget(kind: TrayItemKey): TrayWidget {
   return {
     kind,
@@ -132,7 +133,9 @@ export function normalizeTrayPreferences(value: unknown): TrayPreferences {
           ?.id || pages[0].id,
     position:
       finite(position.x) && finite(position.y)
-        ? { x: Math.round(position.x), y: Math.round(position.y) }
+        ? { x: Math.round(position.x), y: Math.round(position.y),
+            ...(typeof position.monitor === 'string' && position.monitor.length <= 256 ? { monitor: position.monitor } : {}),
+            ...(finite(position.scale) && position.scale > 0 ? { scale: position.scale } : {}) }
         : null,
     palette: {
       x: finite(palette.x) ? Math.max(0, Math.min(1, palette.x)) : 0.5,

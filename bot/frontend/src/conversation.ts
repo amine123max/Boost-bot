@@ -6,6 +6,9 @@ import type {
   History,
   Activity,
   FileItem,
+  QueuedMessage,
+  QuestionAnswer,
+  Task,
 } from "./types";
 import {
   computed,
@@ -15,7 +18,7 @@ import {
   type Ref,
   type UnwrapNestedRefs,
 } from "vue";
-import { api, enc, stream } from "./api";
+import { api, ApiError, enc, stream } from "./api";
 
 /** A subscription belongs to one route. Aborting it never cancels server work. */
 export function useConversation(route: Ref<Route>, changed: () => void) {
@@ -26,32 +29,73 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     refreshing = ref(false),
     modelChanging = ref(false),
     submitting = ref(false),
+    recovering = ref(false),
+    readError = ref(""),
     error = ref("");
   const running = ref(false),
     stopping = ref(false),
     model = ref(""),
     conversationId = ref(""),
     draft = ref("");
+  const queued = ref<QueuedMessage[]>([]), tasks = ref<Task[]>([]), queueBusy = ref('');
   const path = computed(() =>
     route.value.kind === "group"
       ? `/groups/${enc(route.value.id)}`
       : `/bots/${enc(route.value.id)}/chat`,
   );
+  const liveUrl = (endpoint: string, turnId?: string) =>
+    `${endpoint}/live?format=delta${turnId ? '&turn=' + enc(turnId) : ''}`;
   const drafts = new Map<string, string>();
   const intents = new Map<string, { key: string; requestId: string }>();
   let generation = 0,
     historyRequest = 0,
-    loadRequest = 0;
+    loadRequest = 0,
+    streamFailures = 0,
+    historyFailures = 0;
+  let historyAbort: AbortController | undefined;
   let controller: AbortController | undefined;
+  let updates: AbortController | undefined, updateRetry: ReturnType<typeof setTimeout> | undefined;
+  let updateRefresh: ReturnType<typeof setTimeout> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let indicatorEnd: ReturnType<typeof setTimeout> | undefined;
   const active = () =>
     ["chat", "group"].includes(route.value.kind) && !!route.value.id;
 
+  function watchUpdates(ticket = generation, delay = 600) {
+    if (route.value.kind !== 'chat' || !route.value.id || ticket !== generation) return;
+    const ac = new AbortController();
+    updates = ac;
+    void stream(path.value + '/updates', { signal: ac.signal, onEvent: name => {
+      if (name !== 'history' || ac.signal.aborted || ticket !== generation) return;
+      clearTimeout(updateRefresh);
+      updateRefresh = setTimeout(() => {
+        if (ticket !== generation) return;
+        if (controller) void syncHistory(ticket);
+        else void load(false);
+      }, 40);
+    } }).catch(error => {
+      if (denied(error)) ac.abort();
+    }).finally(() => {
+      if (!ac.signal.aborted && ticket === generation) {
+        updateRetry = setTimeout(() => watchUpdates(ticket, Math.min(delay * 2, 15_000)), delay);
+      }
+    });
+  }
+
+  function stopUpdates() {
+    updates?.abort();
+    updates = undefined;
+    clearTimeout(updateRetry);
+    clearTimeout(updateRefresh);
+  }
+
   async function history(ticket = generation) {
     const request = ++historyRequest;
-    const data = await api<History>(path.value);
-    if (ticket !== generation || request !== historyRequest) return null;
+    const data = await api<History>(path.value, { signal: historyAbort?.signal }).catch(error => {
+      if (ticket !== generation || request !== historyRequest) return null;
+      throw error;
+    });
+    if (!data || ticket !== generation || request !== historyRequest) return null;
     messages.value = data.messages || [];
     if (route.value.kind !== 'group' && Array.isArray(data.live)) {
       for (const turn of data.live) {
@@ -61,9 +105,35 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     }
     if (live.value && Array.isArray(data.live) && data.live[0]?.userText) live.value.userText = data.live[0].userText;
     pending.value = data.pending || [];
+    queued.value = data.queued || [];
+    tasks.value = data.tasks || [];
     model.value = data.model || "";
     conversationId.value = data.conversationId || "";
     return data;
+  }
+  const denied = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status);
+  const retryDelay = (failures: number) => Math.min(350 * 2 ** Math.min(failures - 1, 6), 15_000);
+  async function syncHistory(ticket = generation) {
+    try {
+      const data = await history(ticket);
+      if (data) {
+        historyFailures = 0;
+        readError.value = "";
+      }
+      return data;
+    } catch (e) {
+      if (ticket === generation) {
+        if (denied(e) || (e instanceof ApiError && e.status === 404)) {
+          readError.value = (e as Error).message;
+          recovering.value = false;
+          clearTimeout(timer);
+        } else {
+          recovering.value = true;
+          schedule(retryDelay(++historyFailures));
+        }
+      }
+      return null;
+    }
   }
   function event(name: string, raw: unknown, ticket: number) {
     if (ticket !== generation || !raw || typeof raw !== "object") return;
@@ -81,9 +151,17 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     if (name === "snapshot" || name === "turn") {
       live.value = { ...data, botId: data.botId || route.value.id };
       stopping.value = !!data.stopping;
+      recovering.value = false;
     } else if (name === "text") {
       if (!live.value) live.value = { botId: route.value.id, text: "" };
       live.value.text = data.text;
+    } else if (name === 'textDelta') {
+      if (!live.value) live.value = { botId: route.value.id, text: '' };
+      const { offset, append } = raw as { offset: number; append: string };
+      if (offset !== live.value.text.length || typeof append !== 'string') {
+        throw new Error('回复流增量与当前快照不匹配。');
+      }
+      live.value.text += append;
     } else if (name === "interim" && live.value)
       (live.value.interim ||= []).push(data.text);
     else if (name === "activity" && live.value) {
@@ -94,36 +172,26 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     } else if (name === "file" && live.value) {
       const files = (live.value.files ||= []);
       if (!files.some((f) => f.path === data.path)) files.push(data);
-    } else if (name === "prompt")
-      void history(ticket).catch((e) => {
-        if (ticket === generation) error.value = (e as Error).message;
-      });
+    } else if (name === "prompt" || name === "queue")
+      void syncHistory(ticket);
     else if (name === "stopping") stopping.value = true;
     else if (name === "error")
       error.value = data.message || data.error || "处理失败，请重试。";
     else if (name === "turnEnd") {
       live.value = null;
-      void history(ticket).catch((e) => {
-        if (ticket === generation) error.value = (e as Error).message;
-      });
+      void syncHistory(ticket);
     }
   }
-  async function follow(
-    url: string,
-    body?: unknown,
-    initial?: LiveTurn | null,
-  ) {
+  async function follow(url: string) {
     if (controller) return;
     const ticket = generation,
       ac = new AbortController();
     controller = ac;
     running.value = true;
-    if (initial) live.value = initial;
     let completed = false,
       failed = false;
     try {
       await stream(url, {
-        body,
         signal: ac.signal,
         onEvent: (name, data) => {
           if (ac.signal.aborted || ticket !== generation) return;
@@ -132,33 +200,25 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
         },
       });
       if (!completed && !ac.signal.aborted)
-        throw new Error(
-          "消息连接已断开。点击重新连接可继续查看，任务仍在服务端运行。",
-        );
+        throw new Error("消息连接已断开。");
     } catch (e) {
-      if (ticket === generation && (e as Error).name !== "AbortError") {
-        error.value = (e as Error).message;
+      if (ticket === generation && !ac.signal.aborted) {
         failed = true;
+        if (denied(e)) {
+          readError.value = (e as Error).message;
+          recovering.value = false;
+          clearTimeout(timer);
+          return;
+        }
+        recovering.value = true;
+        streamFailures++;
       }
     } finally {
       if (controller === ac) controller = undefined;
-      if (ticket === generation && !ac.signal.aborted) {
+      if (ticket === generation && !ac.signal.aborted && !readError.value) {
+        if (completed && !failed) streamFailures = 0;
         stopping.value = false;
-        try {
-          const data = await history(ticket);
-          if (data) {
-            running.value =
-              route.value.kind === "group"
-                ? !!data.group?.running
-                : Array.isArray(data.live) && data.live.length > 0;
-            live.value = Array.isArray(data.live)
-              ? data.live[0] || null
-              : data.live;
-            if (running.value && !failed) schedule(500);
-          }
-        } catch (e) {
-          if (ticket === generation) error.value = (e as Error).message;
-        }
+        schedule(failed ? retryDelay(streamFailures) : 0);
         changed();
       }
     }
@@ -166,8 +226,10 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   function schedule(delay = 5000) {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      if (document.hidden) schedule();
-      else void load(false);
+      if (document.hidden && !recovering.value && !running.value) schedule();
+      else if (controller) {
+        void syncHistory().then(data => { if (data && controller) recovering.value = false; });
+      } else void load(false);
     }, delay);
   }
   async function load(showLoading = true) {
@@ -184,23 +246,21 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       }
     }, 180);
     try {
-      const data = await history(ticket);
+      const data = await syncHistory(ticket);
       if (!data) return;
-      if (showLoading) error.value = "";
       running.value =
         route.value.kind === "group"
           ? !!data.group?.running
           : Array.isArray(data.live) && data.live.length > 0;
       live.value = Array.isArray(data.live) ? data.live[0] || null : data.live;
       if (running.value) {
-        const url =
-          route.value.kind === "group"
-            ? `${path.value}/live`
-            : `${path.value}/live?turn=${enc(Array.isArray(data.live) ? data.live[0].id || "" : "")}`;
-        void follow(url, undefined, live.value);
-      } else schedule();
-    } catch (e) {
-      if (ticket === generation) error.value = (e as Error).message;
+        const url = liveUrl(path.value, Array.isArray(data.live) ? data.live[0]?.id : undefined);
+        void follow(url);
+      } else {
+        streamFailures = 0;
+        recovering.value = false;
+        schedule();
+      }
     } finally {
       clearTimeout(indicator);
       if (ticket === generation && request === loadRequest) {
@@ -233,16 +293,13 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       intents.delete(endpoint);
       if (ticket !== generation) return false;
       if (!original && draft.value.trim() === text) draft.value = '';
-      const data = await history(ticket).catch((e: Error) => {
-        if (ticket === generation) { error.value = e.message; schedule(500); }
-        return null;
-      });
+      const data = await syncHistory(ticket);
       if (data) {
         const turns = Array.isArray(data.live) ? data.live : [];
         running.value = route.value.kind === 'group' ? !!data.group?.running : turns.length > 0;
         if (!controller && running.value) {
           live.value = Array.isArray(data.live) ? data.live[0] || null : data.live;
-          void follow(endpoint + '/live' + (route.value.kind === 'group' ? '' : '?turn=' + enc(turns[0]?.id || '')), undefined, live.value);
+          void follow(liveUrl(endpoint, turns[0]?.id));
         } else if (!running.value) { live.value = null; schedule(); }
       }
       changed();
@@ -254,6 +311,23 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   }
   async function send(): Promise<boolean> { return submit(draft.value); }
   async function edit(original: Message, text: string): Promise<boolean> { return submit(text, original); }
+  async function changeQueue(id: string, action: 'edit' | 'remove' | 'guide' | 'retry', text?: string) {
+    if (queueBusy.value) return false;
+    const ticket = generation;
+    queueBusy.value = id;
+    try {
+      await api(`${path.value}/queue/${enc(id)}`, { method: 'POST', body: { action, text } });
+      if (ticket === generation) {
+        await syncHistory(ticket);
+        if (!controller) void load(false);
+      }
+      return ticket === generation;
+    } catch (e) {
+      if (ticket === generation) error.value = (e as Error).message;
+      return false;
+    } finally { if (ticket === generation) queueBusy.value = ''; }
+  }
+  async function refreshHistory() { await syncHistory(); }
   async function stop() {
     if (stopping.value) return;
     stopping.value = true;
@@ -292,16 +366,22 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   async function answer(
     item: Approval,
     action: "approve" | "deny" | "answer",
-    text = "",
+    text: string | QuestionAnswer[] = "",
   ) {
+    const ticket = generation;
     try {
       await api(`/approvals/${enc(item.id)}/${action}`, {
         method: "POST",
-        body: action === "answer" ? { text } : {},
+        body: action === "answer" ? (Array.isArray(text) ? { answers: text } : { text }) : {},
       });
-      await history();
+      if (ticket === generation) {
+        pending.value = pending.value.filter(row => row.id !== item.id);
+        void syncHistory(ticket);
+      }
+      return true;
     } catch (e) {
-      error.value = (e as Error).message;
+      if (ticket === generation) error.value = (e as Error).message;
+      return false;
     }
   }
   watch(
@@ -310,8 +390,12 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       if (old) drafts.set(old, draft.value);
       draft.value = drafts.get(key) || "";
       generation++;
+      streamFailures = historyFailures = 0;
+      historyAbort?.abort();
+      historyAbort = new AbortController();
       historyRequest++;
       controller?.abort();
+      stopUpdates();
       controller = undefined;
       clearTimeout(timer);
       clearTimeout(indicatorEnd);
@@ -320,20 +404,30 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       conversationId.value = "";
       live.value = null;
       pending.value = [];
+      queued.value = [];
+      tasks.value = [];
+      queueBusy.value = '';
       error.value = "";
+      readError.value = "";
+      recovering.value = false;
       running.value = false;
       stopping.value = false;
       loading.value = false;
       refreshing.value = false;
       modelChanging.value = false;
       submitting.value = false;
-      if (active()) void load();
+      if (active()) {
+        void load();
+        watchUpdates();
+      }
     },
     { immediate: true },
   );
   onBeforeUnmount(() => {
     generation++;
+    historyAbort?.abort();
     controller?.abort();
+    stopUpdates();
     clearTimeout(timer);
     clearTimeout(indicatorEnd);
   });
@@ -341,11 +435,16 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     messages,
     live,
     pending,
+    queued,
+    tasks,
+    queueBusy,
     loading,
     refreshing,
     modelChanging,
     submitting,
     error,
+    readError,
+    recovering,
     running,
     stopping,
     model,
@@ -354,6 +453,8 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     load,
     send,
     edit,
+    changeQueue,
+    refreshHistory,
     stop,
     changeModel,
     answer,

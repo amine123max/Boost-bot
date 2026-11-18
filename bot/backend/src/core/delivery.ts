@@ -60,6 +60,7 @@ export interface PushInput {
   /** 确定的 id（同一 id 只发一次），如 task:<任务>:result:<run> */
   id: string;
   botId: string;
+  account?: string;
   channel: PushChannel;
   /** 微信：用户 id；飞书和其他平台：chat id */
   peerId: string;
@@ -255,7 +256,7 @@ export class Delivery {
     const peer = peerOf(p.botId, p.channel, p.peerId);
     const now = this.now();
     const { due, reason } = this.plan(peer, p.purpose, !!p.anytime, now);
-    const common = { botId: p.botId, channel: p.channel, peerId: p.peerId, replyTo: p.replyTo ?? "", purpose: p.purpose, subject: clip(oneLine(p.subject), 60), ref: p.ref ?? "", due, reason };
+    const common = { botId: p.botId, account: p.account, channel: p.channel, peerId: p.peerId, replyTo: p.replyTo ?? "", purpose: p.purpose, subject: clip(oneLine(p.subject), 60), ref: p.ref ?? "", due, reason };
     const flag = p.anytime ? { anytime: true } : {};
     const extra = { ...(p.card ? { card: p.card } : {}), ...(p.raw ? { raw: true } : {}), ...(p.hint ? { hint: p.hint } : {}) };
     void this.o.outbox.send({ ...common, id: p.id, kind: p.card ? "card" : (p.kind ?? "text"), body: { text: p.text, ...extra, ...flag } });

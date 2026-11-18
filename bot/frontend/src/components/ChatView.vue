@@ -7,15 +7,18 @@ import SettingsButton from './SettingsButton.vue';
 import ComposerModelMenu from './ComposerModelMenu.vue';
 import BotPermissionControl from './BotPermissionControl.vue';
 import Markdown from "./Markdown.vue";
-import ActivityTrace from "./ActivityTrace.vue";
+import ConversationProgress from "./ConversationProgress.vue";
+import ComposerQuestion from "./ComposerQuestion.vue";
+import QueuedMessages from "./QueuedMessages.vue";
+import ChatTasks from "./ChatTasks.vue";
 import MessageBubble from "./MessageBubble.vue";
-import type { Bot, Group, Approval, FileItem } from "../types";
+import type { Bot, Group, FileItem, Task } from "../types";
 import type { Conversation } from "../conversation";
 import { defineComponent, type PropType } from "vue";
 import { downloadFile } from "../api";
 
 export default defineComponent({
-  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ActivityTrace, MessageBubble },
+  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ConversationProgress, ComposerQuestion, QueuedMessages, ChatTasks, MessageBubble },
   props: {
     chat: { type: Object as PropType<Conversation>, required: true },
     bot: Object as PropType<Bot>,
@@ -26,11 +29,46 @@ export default defineComponent({
     infoOpen: Boolean,
   },
   emits: ["edit", "collaborate", "menu", "info", "refresh"],
-  setup(props) {
+  setup(props, { emit }) {
     const scroller = ref<HTMLElement>(),
       composer = ref<HTMLTextAreaElement>(),
-      answers = ref<Record<string, string>>({}),
       nearBottom = ref(true);
+    const taskDock = ref<InstanceType<typeof ChatTasks>>();
+    const commandsDismissed = ref(false);
+    const taskIntent = ref('');
+    const question = computed(() => props.chat.pending.find(item => item.kind === 'question'));
+    const approvals = computed(() => props.chat.pending.filter(item => item.kind !== 'question'));
+    const commands = computed(() => {
+      const query = props.chat.draft.trim();
+      if (props.group || commandsDismissed.value || !/^\/[a-z]*$/i.test(query)) return [];
+      return [
+        ...(props.configure ? [{ command: '/task', label: '创建任务', description: '在本会话上方跟踪进展' }] : []),
+        { command: '/tasks', label: '列出任务', description: '查看当前智能体的任务' },
+        { command: '/status', label: '查看状态', description: '显示当前会话状态' },
+        { command: '/help', label: '查看帮助', description: '显示可用命令' },
+      ].filter(item => item.command.startsWith(query.toLowerCase()));
+    });
+    watch(() => props.chat.draft, () => { commandsDismissed.value = false; });
+    function chooseCommand(command: string) {
+      props.chat.draft = command === '/task' ? '/task ' : command;
+      commandsDismissed.value = true;
+      composer.value?.focus();
+    }
+    function submit() {
+      const text = props.chat.draft.trim();
+      const task = /^\/task(?:\s+([\s\S]*))?$/i.exec(text);
+      if (task && props.configure && !props.group) {
+        commandsDismissed.value = true;
+        taskIntent.value = text;
+        taskDock.value?.create(task[1] || '');
+      } else if (text !== '/') void props.chat.send();
+    }
+    function taskCreated(task: Task) {
+      props.chat.tasks = [task, ...props.chat.tasks.filter(row => row.id !== task.id)];
+      if (taskIntent.value && props.chat.draft.trim() === taskIntent.value) props.chat.draft = '';
+      taskIntent.value = '';
+      emit('refresh');
+    }
     const members = computed(() =>
       props.bots.filter((b) => props.group?.members.includes(b.id)),
     );
@@ -58,7 +96,6 @@ export default defineComponent({
       () => {
         nearBottom.value = true;
         void scroll();
-        answers.value = {};
       },
     );
     onMounted(scroll);
@@ -67,6 +104,11 @@ export default defineComponent({
       composer.value?.focus();
     }
     function keydown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && commands.value.length) {
+        commandsDismissed.value = true;
+        event.preventDefault();
+        return;
+      }
       if (
         event.key === "Enter" &&
         !event.shiftKey &&
@@ -74,7 +116,8 @@ export default defineComponent({
         event.keyCode !== 229
       ) {
         event.preventDefault();
-        void props.chat.send();
+        if (props.chat.draft.trim() === '/' && commands.value[0]) chooseCommand(commands.value[0].command);
+        else submit();
       }
     }
     async function file(conversation: string, value: FileItem) {
@@ -83,12 +126,6 @@ export default defineComponent({
       } catch (e) {
         props.chat.error = (e as Error).message;
       }
-    }
-    async function answer(
-      item: Approval,
-      action: "approve" | "deny" | "answer",
-    ) {
-      await props.chat.answer(item, action, answers.value[item.id] || "");
     }
     return {
       scroller,
@@ -99,8 +136,7 @@ export default defineComponent({
       mention,
       keydown,
       file,
-      answers,
-      answer,
+      question, approvals, commands, chooseCommand, submit, taskDock, taskCreated,
       nearBottom,
     };
   },
@@ -162,9 +198,8 @@ export default defineComponent({
         text="点击成员插入稳定 ID 点名。未点名时由上次回复的成员继续；成员可点名其他成员接力，每条用户消息最多自动接力 6 次。"
       />
     </div>
-    <div v-if="chat.error" class="error-banner" role="alert">
-      <Icon name="info" /><span>{{ chat.error }}</span
-      ><button class="quiet-button" @click="chat.load()">重新连接</button>
+    <div v-if="chat.error || chat.readError" class="error-banner" role="alert">
+      <Icon name="info" /><span>{{ chat.error || chat.readError }}</span>
     </div>
     <div
       ref="scroller"
@@ -177,8 +212,8 @@ export default defineComponent({
           100
       "
     >
-      <div v-if="chat.loading && !chat.messages.length && !chat.live" class="empty-state" role="status">
-        <span class="loading-ring" />正在加载会话
+      <div v-if="(chat.loading || chat.recovering) && !chat.messages.length && !chat.live" class="empty-state" role="status">
+        <span class="loading-ring" />{{ chat.recovering ? '正在同步会话' : '正在加载会话' }}
       </div>
       <div
         v-else-if="!chat.messages.length && !chat.live && !chat.error"
@@ -240,7 +275,7 @@ export default defineComponent({
                     : botOf(m.botId)?.name || "智能体"
               }}</strong>
             </div>
-            <ActivityTrace
+            <ConversationProgress
               v-if="m.steps"
               :count="m.steps"
               :conversation-id="m.conversationId || chat.conversationId"
@@ -279,15 +314,12 @@ export default defineComponent({
                       : "连接已断开"
                 }}</span>
               </div>
-              <ActivityTrace
-                v-if="chat.live.id || chat.live.steps?.length"
+              <ConversationProgress
+                v-if="chat.live.steps?.length"
                 :steps="chat.live.steps || []"
-                :conversation-id="chat.live.conversationId || chat.conversationId"
-                :turn-id="chat.live.id"
                 :running="chat.running"
-                :started-at="chat.live.startedAt"
               />
-              <MessageBubble v-if="chat.live.text || chat.live.interim?.length || chat.live.files?.length" :text="chat.live.text" :interim="chat.live.interim">
+              <MessageBubble v-if="chat.live.text || chat.live.interim?.length || chat.live.files?.length" :text="chat.live.text" :interim="chat.live.interim" :streaming="chat.running">
               <button
                 v-for="f in chat.live.files"
                 :key="f.path"
@@ -303,50 +335,40 @@ export default defineComponent({
           </article>
         </template>
         <section
-          v-for="item in chat.pending"
+          v-for="item in approvals"
           :key="item.id"
           class="approval-card"
         >
           <h3>
-            {{ item.kind === "question" ? "需要你的回答" : "需要你的授权" }}
+            需要你的授权
           </h3>
           <Markdown
             :text="item.prompt || item.summary || item.title || item.detail"
           />
           <Markdown v-if="item.reason" :text="item.reason" />
-          <div v-for="(question, index) in item.questions" :key="index">
-            <Markdown :text="question.question" />
-            <ol v-if="question.options?.length">
-              <li v-for="option in question.options" :key="option.label">
-                {{ option.label }}
-              </li>
-            </ol>
-          </div>
-          <template v-if="configure"
-            ><template v-if="item.kind === 'question'"
-              ><label
-                >回答<textarea v-model="answers[item.id]" rows="2" /></label
-              ><button
-                class="primary-button"
-                :disabled="!answers[item.id]?.trim()"
-                @click="answer(item, 'answer')"
-              >
-                提交回答
-              </button></template
-            >
-            <div v-else class="button-row">
-              <button class="primary-button" @click="answer(item, 'approve')">
+            <div v-if="configure" class="button-row">
+              <button class="primary-button" @click="chat.answer(item, 'approve')">
                 允许</button
-              ><button class="quiet-button" @click="answer(item, 'deny')">
+              ><button class="quiet-button" @click="chat.answer(item, 'deny')">
                 拒绝
               </button>
-            </div></template
-          >
+            </div>
           <p v-else>请联系管理员处理此请求。</p>
         </section>
       </div>
     </div>
-    <form class="composer-dock" @submit.prevent="chat.send()">
+    <div class="conversation-dock">
+      <ChatTasks v-if="bot && !group" :key="bot.id" ref="taskDock" :bot-id="bot.id" :tasks="chat.tasks" :configure="configure" @created="taskCreated" @updated="chat.tasks = $event" />
+      <QueuedMessages :key="chat.conversationId || bot?.id || group?.id" :chat="chat" />
+      <ComposerQuestion v-if="question && configure" :key="question.id" :item="question" :submit="answer => chat.answer(question!, 'answer', answer)" />
+      <p v-else-if="question" class="hint" role="status">有待回答的问题，请联系管理员处理。</p>
+      <div v-if="commands.length" class="composer-commands" aria-label="可用命令">
+        <button v-for="entry in commands" :key="entry.command" type="button" @click="chooseCommand(entry.command)">
+          <Icon :name="entry.command.startsWith('/task') ? 'tasks' : 'info'" :size="15" />
+          <span>{{ entry.label }} <small>{{ entry.description }}</small></span><code>{{ entry.command }}</code>
+        </button>
+      </div>
+    <form class="composer-dock" @submit.prevent="submit">
       <div class="composer">
         <textarea
           ref="composer"
@@ -386,7 +408,7 @@ export default defineComponent({
             v-if="!chat.running || chat.draft.trim()"
             type="submit"
             class="send"
-            aria-label="发送消息"
+            :aria-label="chat.running ? '加入消息队列' : '发送消息'"
             :disabled="chat.loading || chat.submitting || chat.stopping || !chat.draft.trim()"
           >
             <Icon name="arrow" />
@@ -394,10 +416,23 @@ export default defineComponent({
         </div>
       </div>
     </form>
+    </div>
   </section>
 </template>
 <style scoped>
 .stop-button { display:inline-grid; place-items:center; width:30px; height:30px; min-width:30px; padding:0; border:0; border-radius:50%; background:var(--fg); color:var(--bg); }
 .stop-square { width:10px; height:10px; border-radius:2px; background:currentColor; }
 .stop-button:disabled { opacity:.5; }
+.conversation-dock { display:grid; flex:none; width:var(--col); margin:0 auto; gap:6px; padding:4px 0 var(--dock-pb); z-index:var(--z-float); }
+.conversation-dock .composer-dock { position:static; padding:0; overflow:visible; scrollbar-gutter:auto; }
+.conversation-dock .composer { width:100%; }
+.conversation-view .chat-scroll { mask-image:none; }
+.conversation-view .chat-col { padding-bottom:var(--space-5); }
+.conversation-view > .error-banner { margin-top:var(--head-h); }
+.conversation-view:has(> .member-strip) > .error-banner { margin-top:0; }
+.composer-commands { display:grid; gap:2px; padding:4px; border:1px solid var(--line); border-radius:12px; background:var(--surface-solid); }
+.composer-commands button { display:flex; align-items:center; gap:8px; min-height:32px; padding:4px 8px; border-radius:7px; text-align:left; }
+.composer-commands button:hover, .composer-commands button:focus-visible { background:var(--pill-hover); }
+.composer-commands code { margin-inline-start:auto; }
+.composer-commands :is(code, small) { color:var(--muted); font-size:11px; }
 </style>

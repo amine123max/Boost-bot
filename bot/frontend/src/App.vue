@@ -89,6 +89,12 @@ const workItems = computed(() => backgroundWork(tasks.value, rules.value));
 const previews = ref<Record<string, { text: string; at: number }>>({});
 const panelError = ref(""),
   notice = ref("");
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+function showNotice(message: string) {
+  clearTimeout(noticeTimer);
+  notice.value = message;
+  if (message) noticeTimer = setTimeout(() => { notice.value = ''; }, 4200);
+}
 let disposed = false,
   refreshTimer: ReturnType<typeof setTimeout> | undefined;
 const configure = computed(
@@ -358,7 +364,7 @@ async function saveBot(confirmed = false) {
     await refresh();
     modal.value = null;
     go("chat", d.bot.id);
-    notice.value = "智能体已保存";
+    showNotice("智能体已保存");
   } catch (e) {
     formError.value = (identitySaved ? '资料已保存，运行选项尚未保存。请重试：' : '') + (e as Error).message;
   } finally {
@@ -380,7 +386,7 @@ async function saveGroup() {
     await refresh();
     modal.value = null;
     go("group", d.group.id);
-    notice.value = "协作群已保存";
+    showNotice("协作群已保存");
   } catch (e) {
     formError.value = (e as Error).message;
   } finally {
@@ -438,7 +444,7 @@ function browseCatalog(entry: CatalogEntry) {
 async function testModel() {
   panelBusy.value = true;
   panelError.value = "";
-  notice.value = "";
+  showNotice("");
   try {
     const d = await api<{
       gateway: { ok: boolean; skipped?: boolean };
@@ -450,7 +456,7 @@ async function testModel() {
     });
     if (!(d.gateway.skipped ? d.direct.ok : d.gateway.ok))
       throw new Error(d.verdict || "模型测试未通过，请检查 Boost 配置。");
-    notice.value = d.verdict;
+    showNotice(d.verdict);
   } catch (e) {
     panelError.value = (e as Error).message;
   } finally {
@@ -470,6 +476,7 @@ onBeforeUnmount(() => {
   removeEventListener('keydown', settingsShortcut);
   disposed = true;
   clearTimeout(refreshTimer);
+  clearTimeout(noticeTimer);
   removeEventListener("hashchange", changedRoute);
 });
 </script>
@@ -609,7 +616,7 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="notice" class="notice-banner" role="status">
         <Icon name="check" :size="16" /><span>{{ notice }}</span
-        ><button class="icon-button" aria-label="关闭提示" @click="notice = ''">
+        ><button class="icon-button" aria-label="关闭提示" @click="showNotice('')">
           <Icon name="close" :size="14" />
         </button>
       </div>
@@ -767,6 +774,7 @@ onBeforeUnmount(() => {
     />
     <InfoPanel
       v-if="infoOpen && route.kind === 'chat' && bot"
+      :key="bot.id"
       :bot="bot"
       :bots="bots"
       :configure="configure"

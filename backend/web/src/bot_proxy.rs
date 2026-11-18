@@ -49,9 +49,10 @@ pub(super) async fn proxy(State(state): State<Arc<AppState>>, request: Request) 
                 .insert(header::HeaderName::from_static(name), value.clone());
         }
     }
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-transform"),
+    );
     response
         .headers_mut()
         .insert("x-accel-buffering", HeaderValue::from_static("no"));

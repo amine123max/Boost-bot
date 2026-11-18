@@ -9,6 +9,7 @@ import {
 import type { UsageHistory } from "@/types";
 import { dashboardClient } from "@/lib/api/dashboard-client";
 import { getAppErrorMessage } from "@/lib/api/transport";
+import { isManagementReadBusy } from "@/lib/api/transport-errors";
 import { boost } from "./useBoost";
 
 export function useUsageHistory(keysOnly: boolean) {
@@ -16,15 +17,23 @@ export function useUsageHistory(keysOnly: boolean) {
     loading = ref(false),
     error = ref("");
   let active = false;
+  let attempts = 0;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   async function reload() {
-    if (!boost.ready || loading.value) return;
+    if (!active || !boost.ready || loading.value) return;
+    clearTimeout(retry);
     loading.value = true;
     try {
       history.value = await dashboardClient.getUsageHistory(keysOnly);
       error.value = "";
+      attempts = 0;
     } catch (e) {
-      history.value = null;
-      error.value = getAppErrorMessage(e);
+      if (isManagementReadBusy(e)) {
+        if (active) retry = setTimeout(() => void reload(), Math.min(320 * 2 ** attempts++, 15_000));
+      } else {
+        attempts = 0;
+        error.value = getAppErrorMessage(e);
+      }
     } finally {
       loading.value = false;
     }
@@ -45,10 +54,16 @@ export function useUsageHistory(keysOnly: boolean) {
   });
   onDeactivated(() => {
     active = false;
+    clearTimeout(retry);
+    attempts = 0;
   });
-  onBeforeUnmount(() => clearInterval(timer));
+  onBeforeUnmount(() => {
+    active = false;
+    clearTimeout(retry);
+    clearInterval(timer);
+  });
   watch(
-    () => boost.updatedAt,
+    () => [boost.ready, boost.refreshVersion],
     () => {
       if (active) void reload();
     },

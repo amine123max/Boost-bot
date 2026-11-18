@@ -5,7 +5,7 @@ import { api, enc, downloadFile } from "../api";
 import Modal from "./Modal.vue";
 import ConversationLabel from "./ConversationLabel.vue";
 import MessageBubble from "./MessageBubble.vue";
-import ActivityTrace from "./ActivityTrace.vue";
+import ConversationProgress from "./ConversationProgress.vue";
 import Icon from "./Icon.vue";
 const props = defineProps<{
   conversation: { id: string; channel: string; createdAt: number };
@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
         class="history-message"
         :class="{ user: message.role === 'user' }"
       >
-        <ActivityTrace
+        <ConversationProgress
           v-if="message.steps"
           :count="message.steps"
           :conversation-id="conversation.id"
@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
       </article>
       <section v-if="turn" class="activity-panel">
         <span role="status">{{ stopping ? "正在停止" : "处理中" }}</span>
-        <ActivityTrace :steps="turn.steps" :conversation-id="conversation.id" :started-at="turn.since" running />
+        <ConversationProgress :steps="turn.steps" running />
         <MessageBubble v-if="turn.interim.length" :framed="conversation.channel !== 'web'" :text="turn.interim.join('\n\n')" />
         <div class="button-row">
           <button class="danger-button" :disabled="stopping" @click="stop">

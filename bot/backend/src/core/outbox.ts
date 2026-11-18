@@ -18,6 +18,7 @@ import type { OutboxBody, OutboxKind, OutboxPurpose, OutboxRow, Store } from "..
 import type { PushChannel } from "./types.js";
 import { logger } from "../log.js";
 import { t as tr } from "../i18n/index.js";
+import { botBoundChannel } from "./routes.js";
 
 const log = logger("outbox");
 
@@ -257,11 +258,12 @@ export class Outbox {
    * 对方又发消息了：留着给他的消息和排着的主动消息放回队列，按原来的顺序排在这次回复的前面。
    * combine 决定哪几条合成一条发（每组第一条换成合并后的内容，其余标记 merged）；不给就一条一条发。过期的不再发。
    */
-  release(botId: string, channel: string, peerId: string, combine?: (rows: OutboxRow[]) => HeldGroup[]): number {
+  release(botId: string, channel: string, peerId: string, combine?: (rows: OutboxRow[]) => HeldGroup[], account?: string): number {
     const conv = `${botId}:${channel}:${peerId}`;
+    const sameAccount = (r: OutboxRow) => !account || (r.account || r.botId) === account;
     // 还没发出去的续期提醒：对方已经发消息了，不用再提醒
-    for (const r of this.store.pendingOutbox().filter((x) => x.conversationId === conv && x.purpose === "nudge")) if (!this.inflight.has(conv)) this.gone(r, tr("delivery.goneReplied"));
-    const waiting = this.store.waitingOutbox(conv);
+    for (const r of this.store.pendingOutbox().filter((x) => x.conversationId === conv && x.purpose === "nudge" && sameAccount(x))) if (!this.inflight.has(conv)) this.gone(r, tr("delivery.goneReplied"));
+    const waiting = this.store.waitingOutbox(conv).filter(sameAccount);
     if (!waiting.length) return 0;
     const now = this.now();
     const live = waiting.filter((r) => (r.expiresAt > now || (this.gone(r, tr("delivery.goneTooLong")), false)) && !this.planner?.waits?.(r));
@@ -274,8 +276,10 @@ export class Outbox {
 
   /** 对方发消息了：他和所有机器人的留言都放回队列（用 /bot 切换过的话，留言可能属于别的机器人）。account 也试一遍：单元测试里可能没有机器人 */
   releasePeer(channel: string, peerId: string, combine: ((rows: OutboxRow[]) => HeldGroup[]) | undefined, account: string): number {
+    const bound = botBoundChannel(channel) ? this.store.getChannelAccount(account, channel) : undefined;
+    if (bound) return bound.defaultBot ? this.release(bound.defaultBot, channel, peerId, combine, account) : 0;
     let n = 0;
-    for (const id of new Set([...this.store.listBots().map((b) => b.id), account])) n += this.release(id, channel, peerId, combine);
+    for (const id of new Set([...this.store.listBots().map((b) => b.id), account])) n += this.release(id, channel, peerId, combine, account);
     return n;
   }
 
@@ -308,7 +312,10 @@ export class Outbox {
     const due = this.store.dueScheduledOutbox(now);
     if (!due.length) return;
     const byConv = new Map<string, OutboxRow[]>();
-    for (const r of due) byConv.set(r.conversationId, [...(byConv.get(r.conversationId) ?? []), r]);
+    for (const r of due) {
+      const key = JSON.stringify([r.conversationId, r.account || r.botId]);
+      byConv.set(key, [...(byConv.get(key) ?? []), r]);
+    }
     for (const rows of byConv.values()) {
       const live = rows.filter((r) => r.expiresAt > now || (this.gone(r, tr("delivery.goneTooLong")), false));
       if (!live.length) continue;
@@ -349,6 +356,12 @@ export class Outbox {
       if (heads.has(row.conversationId)) continue;
       heads.add(row.conversationId);
       if (this.inflight.has(row.conversationId)) continue;
+      const bound = botBoundChannel(row.channel) ? this.store.getChannelAccount(row.account || row.botId, row.channel) : undefined;
+      if (bound && bound.defaultBot !== row.botId) {
+        this.gone(row, '渠道账号已改绑，停止发送原智能体的消息。');
+        this.kick();
+        continue;
+      }
       // 主动消息现在不能发（机器人的后台工作暂停了）：改成排着，不挡这个会话后面的回复
       const wait = row.purpose ? this.planner?.waits?.(row) : undefined;
       if (wait) {

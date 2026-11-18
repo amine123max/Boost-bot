@@ -9,6 +9,9 @@ import { conversationMetrics } from "../core/conversation-metrics.js";
 import { workspaceRoot } from "../core/workspace-storage.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../../shared/context-window.js";
 import { progressSnapshot, type TaskProgress } from "../agent/progress.js";
+import type { ActivityStep } from "../agent/activity.js";
+import { chatProtocol, supportsChatEffort } from "../llm/capabilities.js";
+import { ChannelBindingError } from "../core/routes.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -28,7 +31,7 @@ import { OAuthError } from "../account/oauth.js";
 import { normalizeLine } from "../modelflare.js";
 import { officialProvider } from "../official-providers.js";
 import { testModelflareDomains } from "../modelflare-domains.js";
-import { SseReply } from "./sse-reply.js";
+import { SseReply, publicActivity } from "./sse-reply.js";
 import { LiveTurns, type LiveTurn } from "./live.js";
 import { ConsoleMessages, ConsoleMessageError } from './console-messages.js';
 import { analyzeTaskNodes, TaskNodeError } from './task-nodes.js';
@@ -265,11 +268,12 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
   });
 
   /** 排进会话队列交给运行时；结束时先移出登记，再通知发消息的请求和所有接上的界面。不抛错 */
-  async function runLive(t: LiveTurn, ev: InboundEvent, out: ReplySession = t, existingMessageId?: number): Promise<void> {
+  async function runLive(t: LiveTurn, ev: InboundEvent, out: ReplySession = t, existingMessageId?: number): Promise<boolean> {
     let err: Error | undefined;
     await app.queue.run(t.conversationId === consoleConvId(t.botId) ? `web:${t.botId}:console` : `web:${t.conversationId}`, async () => {
       try {
         await app.runtime.handle(ev, out, { signal: t.abort.signal, existingMessageId,
+          serial: t.conversationId === consoleConvId(t.botId),
           onUserStored: id => {
             t.userMessageId = id;
             live.userStored(t, publicMessage(app.store.getMessage(id)!));
@@ -283,11 +287,14 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       log.warn("web chat failed", { message: err.message.slice(0, 300) });
       live.end(t, "error", { message: err.message });
     } else live.end(t, "done", { conversationId: t.conversationId });
+    const model = [...t.steps.values()].findLast(step => step.kind === 'model');
+    return !err && (t.stopping || (model?.status !== 'error' && !t.text.startsWith('⚠️')));
   }
-  const consoleMessages = new ConsoleMessages({ app, live, editing: editingConversations, start: startLive,
-    run: (turn, messageId) => runLive(turn, webEvent(turn.botId, turn.userText), turn, messageId),
-    intercept: (botId, text) => interceptWeb(webEvent(botId, text)),
-  });
+  const consoleOptions = { app, live, editing: editingConversations, start: startLive,
+    run: (turn: LiveTurn, messageId?: number) => runLive(turn, webEvent(turn.botId, turn.userText), turn, messageId),
+    intercept: (botId: string, text: string) => interceptWeb(webEvent(botId, text)),
+  };
+  const consoleMessages = new ConsoleMessages(consoleOptions);
 
   // —— 应用内群聊（core/groups.ts）：一轮就是成员会话里的一条网页消息，事件转给接着这个群的界面 ——
   const groupTurns = new Map<string, LiveTurn>();
@@ -348,6 +355,31 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       last: last ? { id: last.id, botId: last.botId, text: last.content.slice(0, 120), at: last.createdAt } : null,
     };
   }
+  const groupMessages = new ConsoleMessages(consoleOptions, {
+    exists: id => !!app.store.getGroup(id),
+    changed: id => groups.emit(id, 'queue', {}),
+    idle: id => !groups.isRunning(id) ? Promise.resolve() : new Promise(resolve => {
+      const off = groups.subscribe(id, event => { if (event === 'idle') { off(); resolve(); } });
+    }),
+    run: (id, text) => new Promise((resolve, reject) => {
+      let failed = false;
+      const off = groups.subscribe(id, event => {
+        if (event === 'error') failed = true;
+        if (event === 'idle') { off(); resolve(!failed); }
+      });
+      try {
+        groups.send(id, text);
+        if (!groups.isRunning(id)) { off(); resolve(!failed); }
+      } catch (error) { off(); reject(error); }
+    }),
+    guide: async (id, text) => {
+      const botId = groups.current(id);
+      if (!botId || !await app.runtime.guideConversation(botId, `${botId}:web:${groupPeer(id)}`, text, false)) return false;
+      app.store.addMessage(groupPeer(id), 'user', text);
+      return true;
+    },
+  });
+
   /** 请求里的成员：去重、只留还在的机器人，至少两个 */
   function groupMembers(input: unknown): string[] {
     const ids = [...new Set(Array.isArray(input) ? input.map(String) : [])].filter((id) => app.store.getBot(id));
@@ -364,6 +396,25 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
   function interceptWeb(ev: InboundEvent): { handled: boolean; ack?: string } {
     if (eventText(ev).trim().toLowerCase() === "/stop") live.stop(consoleConvId(ev.botId));
     return app.runtime.interceptReply(ev);
+  }
+
+  async function changeMessageQueue(req: http.IncomingMessage, res: http.ServerResponse, queue: ConsoleMessages, scope: string, id: string) {
+    const input = await readJson(req);
+    const action = input.action;
+    if (action !== 'edit' && action !== 'remove' && action !== 'guide' && action !== 'retry') throw new HttpError(400, '队列操作无效');
+    try {
+      await queue.change(scope, id, action, input);
+      return send(res, 200, { queued: queue.list(scope) });
+    } catch (error) {
+      if (error instanceof ConsoleMessageError) throw new HttpError(error.status, error.message);
+      throw error;
+    }
+  }
+
+  function consoleTasks(id: string) {
+    return app.store.listTasks({ botId: id, conversationId: consoleConvId(id), limit: 24 })
+      .filter(task => task.originMessageId === 0)
+      .flatMap(task => { const view = app.tasks.get(task.id); return view ? [view] : []; });
   }
 
   function authorized(req: http.IncomingMessage, url: URL, res: http.ServerResponse): boolean {
@@ -430,7 +481,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       throw new HttpError(415, t("web.needJson"));
     }
     if (p === '/activity/nodes' && m === 'POST') {
-      try { return send(res, 200, await analyzeTaskNodes(app, live, await readJson(req))); }
+      try { return send(res, 200, await analyzeTaskNodes(app, await readJson(req))); }
       catch (error) {
         if (error instanceof TaskNodeError) throw new HttpError(error.status, error.message);
         throw error;
@@ -744,11 +795,23 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     // —— 需要你（3b）：所有机器人里在等人的事，和对它们的操作 ——
     // 全局渠道账号（设置 › 连接）：所有机器人共用，消息交给哪个机器人见 core/routes.ts。key 只是账号的命名空间
     if (seg[0] === "channel-accounts") {
-      if (seg.length === 1 && m === "GET") return send(res, 200, { accounts: app.channelAccounts() });
+      if (seg.length === 1 && m === "GET") {
+        const botId = url.searchParams.get('bot') || undefined;
+        if (botId && !app.store.getBot(botId)) throw new HttpError(404, t("web.botNotFound"));
+        return send(res, 200, { accounts: app.channelAccounts(botId) });
+      }
       if (p === "/channel-accounts/new-key" && m === "POST") return send(res, 200, { key: `acct_${crypto.randomBytes(6).toString("hex")}` });
       const id = decodeURIComponent(seg[1] ?? "");
       if (!/^[\w-]{1,80}$/.test(id)) throw new HttpError(404, "not found");
       const sub = seg.slice(2).join("/");
+      const connectionBot = (channel: string, body: Record<string, unknown>) => {
+        if (body.defaultBot === undefined) return undefined;
+        const botId = typeof body.defaultBot === 'string' ? body.defaultBot : '';
+        if (!app.store.getBot(botId)) throw new HttpError(404, t("web.botNotFound"));
+        const existing = app.store.getChannelAccount(id, channel);
+        if (existing && existing.defaultBot !== botId) throw new HttpError(409, '渠道账号归属已变更，请刷新后重试');
+        return botId;
+      };
       if (sub === 'custom/test' && m === 'POST') {
         const body = await readJson(req);
         const credentials = { endpoint:String(body.endpoint || '').trim(), secret:String(body.secret || '').trim(), token:String(body.token || '').trim() };
@@ -760,6 +823,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       if (sub === "channels" && m === "GET") return send(res, 200, app.channelStatus(id));
       if (seg.length === 4 && seg[3] === "settings" && m === "PUT") {
         const b = await readJson(req);
+        if (b.expectedBot !== undefined && app.store.getChannelAccount(id, seg[2])?.defaultBot !== b.expectedBot) throw new HttpError(409, '渠道账号归属已变更，请刷新后重试');
         const r = await app.updateChannelAccount(id, seg[2], {
           ...(b.label !== undefined ? { label: String(b.label) } : {}),
           ...(b.defaultBot !== undefined ? { defaultBot: String(b.defaultBot) } : {}),
@@ -767,6 +831,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         });
         if (r === "taken") throw new HttpError(400, tr("web.accountNameTaken"));
         if (r === "invalid") throw new HttpError(400, tr("web.badAccountName"));
+        if (r === 'no-bot') throw new HttpError(400, '请先绑定一个可用的智能体');
         if (r !== "ok") throw new HttpError(404, tr("web.recordNotFound"));
         return send(res, 200, { accounts: app.channelAccounts() });
       }
@@ -810,13 +875,21 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
       if (sub === "feishu" && m === "PUT") {
         const b = await readJson(req);
-        await app.connectFeishu(id, String(b.appId ?? "").trim(), String(b.appSecret ?? "").trim());
+        try {
+          await app.connectFeishu(id, String(b.appId ?? "").trim(), String(b.appSecret ?? "").trim(), undefined, connectionBot("feishu", b));
+        } catch (error) {
+          if (error instanceof ChannelBindingError) throw new HttpError(409, error.message);
+          throw error;
+        }
         return send(res, 200, app.channelStatus(id));
       }
       // 一键添加：扫码创建应用（流程状态在 /connections/flows/:id），连上后账号才出现
       if (sub === "feishu/one-click" && m === "POST") {
+        const b = await readJson(req);
+        const botId = connectionBot("feishu", b);
         const flow = app.connections.feishu.startAppFlow(async (created) => {
-          await app.connectFeishu(id, created.appId, created.appSecret, created.brand);
+          connectionBot("feishu", b);
+          await app.connectFeishu(id, created.appId, created.appSecret, created.brand, botId);
           return app.store.getChannelAccount(id, "feishu")?.label ?? "";
         });
         return send(res, 200, { flow });
@@ -826,8 +899,10 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         return send(res, 200, app.channelStatus(id));
       }
       if (isMessenger(sub) && m === "PUT") {
+        const body = await readJson(req);
+        connectionBot(sub, body);
         try {
-          await app.connectMessenger(id, sub, await readJson(req));
+          await app.connectMessenger(id, sub, body);
         } catch (e) {
           if ((e as PlatformError).rejected) throw new HttpError(400, (e as Error).message);
           throw e;
@@ -844,7 +919,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         return send(res, 200, app.channelStatus(id));
       }
       if (sub === "weixin/login" && m === "POST") {
-        const login = app.startWeixinLogin(id);
+        const login = app.startWeixinLogin(id, connectionBot("weixin", await readJson(req)));
         // 等待二维码就绪（最多 10 秒）
         const t0 = Date.now();
         while (login.snapshot.state === "idle" || login.snapshot.state === "fetching") {
@@ -1264,6 +1339,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
             messages: messages.map(publicMessage),
             live: turn ? { botId: turn.botId, conversationId: turn.conversationId, ...turn.snapshot() } : null,
             pending: app.store.groupConversations(groupId).flatMap((c) => app.store.listApprovals({ status: "pending", conversationId: c.id, limit: 50 }).map((r) => publicApproval(r, app.store))),
+            queued: groupMessages.list(groupId),
             canOpen: !!app.desktop?.openPath,
           });
         }
@@ -1276,6 +1352,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           return send(res, 200, { group: publicGroup(app.store.getGroup(groupId)!) });
         }
         if (m === "DELETE") {
+          groupMessages.clear(groupId);
           groups.stop(groupId);
           for (const c of app.store.groupConversations(groupId)) {
             stopConversation(c.id);
@@ -1293,13 +1370,19 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         if (!group.members.some((id) => app.store.getBot(id))) throw new HttpError(400, t("web.groupTooFew"));
         const requestId = b.requestId === undefined ? '' : String(b.requestId);
         if (requestId && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestId)) throw new HttpError(400, '请求编号无效');
-        try { groups.send(groupId, text, requestId); }
-        catch (error) { throw new HttpError(409, (error as Error).message); }
+        try { await groupMessages.submit(groupId, { text, requestId: requestId || crypto.randomUUID() }); }
+        catch (error) {
+          if (error instanceof ConsoleMessageError) throw new HttpError(error.status, error.message);
+          throw error;
+        }
         return send(res, 200, { ok: true });
+      }
+      if (seg.length === 4 && seg[2] === "queue" && m === "POST") {
+        return changeMessageQueue(req, res, groupMessages, groupId, seg[3]);
       }
       // 接着这个群：先发正在答的那一轮，之后转发事件（turn、同 chat/stream 的事件、turnEnd），都答完了发 idle 结束
       if (seg.length === 3 && seg[2] === "live" && m === "GET") {
-        const out = new SseReply(res);
+        const out = new SseReply(res, url.searchParams.get('format') === 'delta');
         if (!groups.isRunning(groupId)) return out.end("done", { idle: true });
         const turn = groupTurns.get(groupId);
         if (turn) out.send("turn", { botId: turn.botId, conversationId: turn.conversationId, ...turn.snapshot() });
@@ -1322,7 +1405,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
       // 一条回复的代理活动记录（展开时才取）
       if (seg.length === 5 && seg[2] === "messages" && seg[4] === "activity" && m === "GET") {
-        return send(res, 200, { steps: app.store.getActivity(decodeURIComponent(seg[1]), Number(seg[3])) });
+        const steps = app.store.getActivity(decodeURIComponent(seg[1]), Number(seg[3]));
+        return send(res, 200, { steps: url.searchParams.get('summary') === '1' ? (steps as ActivityStep[]).map(publicActivity) : steps });
       }
       // 正在处理的回合：处理了多久、最近一次进展、到目前为止的步骤（信息面板轮询）
       if (seg.length === 3 && seg[2] === "turn" && m === "GET") {
@@ -1391,6 +1475,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         }
         if (m === "DELETE") {
           await app.deleteBot(id, { keepData: url.searchParams.get("keepData") === "1" });
+          consoleMessages.clear(id);
           return send(res, 200, { ok: true });
         }
       }
@@ -1495,7 +1580,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const runtimeWindow = app.agent.contextWindow(id, model);
         return send(res, 200, {
           model,
-          reasoning: {value: bot.settings.reasoningEffort, supported: info?.effort ?? null},
+          reasoning: {value: bot.settings.reasoningEffort,
+            supported: info?.effort ?? supportsChatEffort(chatProtocol(bot.settings.modelProtocol, info?.endpoints), model, info?.reasoning) ?? null},
           windowTokens: info?.context ?? runtimeWindow ?? DEFAULT_CONTEXT_TOKENS,
           windowBasis: info?.context ? "catalog" : runtimeWindow ? "runtime" : "default",
           agentAvailable: app.agent.available,
@@ -1503,7 +1589,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         });
       }
       if (sub === "chat" && m === "GET") {
-        const conv = app.store.getConversation(consoleConvId(id));
+        const convId = consoleConvId(id);
+        const conv = app.store.getConversation(convId);
         // 进行中的消息由 live 显示（用户消息、到目前为止的回复与步骤）；它开始之后存下的消息先不列，免得重复
         const turns = live.list(consoleConvId(id)).filter(turn => !turn.steered);
         const cut = turns[0]?.afterMessageId ?? Infinity;
@@ -1513,15 +1600,25 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           messages: conv ? app.store.listMessages(conv.id, 200).filter((x) => x.role === 'user' || x.id <= cut).map(publicMessage) : [],
           pending: app.store.listApprovals({ status: "pending", conversationId: consoleConvId(id), limit: 50 }).map((r) => publicApproval(r, app.store)),
           live: turns.map((t) => t.snapshot()),
+          queued: consoleMessages.list(id),
+          tasks: consoleTasks(id),
           // 桌面版：交付的文件用系统程序打开；网页里在新标签页打开
           canOpen: !!app.desktop?.openPath,
         });
+      }
+      if (sub === 'chat/tasks' && m === 'GET') return send(res, 200, { tasks: consoleTasks(id) });
+      if (sub === 'chat/updates' && m === 'GET') {
+        const out = new SseReply(res);
+        const stop = app.chatHarness.subscribe(consoleConvId(id), () => out.send('history', {}));
+        res.on('close', stop);
+        out.send('ready', {});
+        return;
       }
       // 接上进行中的消息（切走再切回、刷新后）：先发 snapshot，再转发之后的事件（同 chat/stream），最后 done / error。
       // turn 不给就接正在处理的那条；已经结束了直接 done
       if (sub === "chat/live" && m === "GET") {
         const t = live.get(consoleConvId(id), url.searchParams.get("turn"));
-        const out = new SseReply(res);
+        const out = new SseReply(res, url.searchParams.get('format') === 'delta');
         if (!t) return out.end("done", { conversationId: consoleConvId(id), ended: true });
         out.send("snapshot", t.snapshot());
         const off = t.subscribe((e, d) => (e === "done" || e === "error" ? out.end(e, d) : out.send(e, d)));
@@ -1543,6 +1640,9 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           if (error instanceof ConsoleMessageError) throw new HttpError(error.status, error.message);
           throw error;
         }
+      }
+      if (seg[2] === 'chat' && seg[3] === 'queue' && seg.length === 5 && m === 'POST') {
+        return changeMessageQueue(req, res, consoleMessages, id, seg[4]);
       }
       if (sub === "chat" && m === "POST") {
         const b = await readJson(req);
@@ -1681,6 +1781,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     await listen(0);
   }
   boundPort = (server.address() as import("node:net").AddressInfo).port;
+  consoleMessages.resume();
+  groupMessages.resume();
   const shownHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
   const url = `http://${shownHost}:${boundPort}/`;
   log.info(`UI: ${url}`);
@@ -1690,6 +1792,8 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     token,
     close: () =>
       new Promise<void>((r) => {
+        consoleMessages.close();
+        groupMessages.close();
         groups.stopAll();
         server.closeAllConnections?.();
         server.close(() => r());

@@ -21,6 +21,12 @@ const headers = () => ({
   ...authHeaders(),
 });
 export const enc = encodeURIComponent;
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+function requestError(status: number, message: string) {
+  return new ApiError(status, status === 401 ? "连接已失效，请返回 Boost 重新打开工作台。" : message);
+}
 export async function api<T = Record<string, unknown>>(
   path: string,
   { method = "GET", body, signal }: RequestOptions = {},
@@ -37,12 +43,7 @@ export async function api<T = Record<string, unknown>>(
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok)
-    throw new Error(
-      data.error ||
-        (response.status === 401
-          ? "连接已失效，请返回 Boost 重新打开工作台。"
-          : `请求失败（${response.status}）`),
-    );
+    throw requestError(response.status, data.error || `请求失败（${response.status}）`);
   return data;
 }
 
@@ -99,27 +100,28 @@ export async function stream(
 ) {
   const timeout = new AbortController();
   const abort = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
-  let timer = setTimeout(() => timeout.abort(new Error('消息连接超时，请重新连接；不要重复提交同一消息。')), 30_000);
+  let timer = setTimeout(() => timeout.abort(new Error('消息连接超时。')), 30_000);
   let response: Response;
   try { response = await fetch(base + path, {
     method: body ? "POST" : "GET",
     signal: abort,
     headers: {
       ...headers(),
+      accept: "text/event-stream",
       ...(body ? { "content-type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   }); } finally { clearTimeout(timer); }
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `无法连接消息流（${response.status}）`);
+    throw requestError(response.status, data.error || `无法连接消息流（${response.status}）`);
   }
   const parser = eventParser(onEvent),
     decoder = new TextDecoder(),
     reader = response.body.getReader();
   try {
     for (;;) {
-      timer = setTimeout(() => timeout.abort(new Error('消息流长时间没有心跳，请重新连接。')), 60_000);
+      timer = setTimeout(() => timeout.abort(new Error('消息流长时间没有心跳。')), 60_000);
       const { done, value } = await reader.read();
       clearTimeout(timer);
       if (done) break;
@@ -127,6 +129,9 @@ export async function stream(
     }
     parser.push(decoder.decode());
     parser.end();
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
   } finally {
     clearTimeout(timer);
     reader.releaseLock();

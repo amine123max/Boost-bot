@@ -57,13 +57,13 @@ export interface BotGroup {
 /** 群在消息表里的位置：用户的话存在会话 group:<群>，各成员的会话是 <机器人>:web:group:<群> */
 export const groupPeer = (groupId: string) => `group:${groupId}`;
 
-/** 全局渠道账号（设置 › 连接），所有机器人共用；见 core/routes.ts */
+/** 设置中统一管理的渠道账号；微信与飞书按绑定智能体路由。 */
 export interface ChannelAccount {
   key: string;
   channel: string;
   /** 别名：同一个渠道里不重复 */
   label: string;
-  /** 没用 /bot 选过时，消息交给哪个机器人 */
+  /** 绑定的智能体；支持 /bot 的共享渠道将它用作默认路由。 */
   defaultBot: string;
   enabled: boolean;
   /** 飞书的 appId / appSecret；微信和其他平台的凭据在各自的表里 */
@@ -763,15 +763,19 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');
     try {
     const replacement = this.listBots().find(bot => bot.id !== id)?.id || '';
-    this.db.prepare('UPDATE channel_accounts SET default_bot = ? WHERE default_bot = ?').run(replacement, id);
+    this.db.prepare("UPDATE channel_accounts SET default_bot = '', enabled = 0 WHERE default_bot = ? AND channel IN ('weixin', 'feishu')").run(id);
+    this.db.prepare("UPDATE channel_accounts SET default_bot = ? WHERE default_bot = ? AND channel NOT IN ('weixin', 'feishu')").run(replacement, id);
     this.db.prepare("DELETE FROM kv WHERE key LIKE 'channel-route:%' AND value = ?").run(id);
     this.db.prepare('DELETE FROM approvals WHERE bot_id = ?').run(id);
     const convs = this.db.prepare("SELECT id FROM conversations WHERE bot_id = ?").all(id) as Row[];
-    for (const c of convs) this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(String(c.id));
+    for (const c of convs) {
+      this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(String(c.id));
+      this.deleteKV(`direct-context:${c.id}`);
+    }
     this.db.prepare("DELETE FROM agent_segments WHERE conversation_id IN (SELECT id FROM conversations WHERE bot_id = ?)").run(id);
     this.db.prepare("DELETE FROM conversations WHERE bot_id = ?").run(id);
     for (const g of this.listGroups()) if (g.members.includes(id)) this.updateGroup(g.id, { members: g.members.filter((m) => m !== id) });
-    // 渠道账号（登录态、名单）是全局的，不跟着机器人删；这个机器人原来的账号改由别的机器人回复（core/routes.ts）
+    // 渠道凭据不随机器人删除；原绑定的微信和飞书保留为停用账号，等待显式重新绑定。
     this.db.prepare("DELETE FROM agent_sessions WHERE bot_id = ?").run(id);
     this.db.prepare("DELETE FROM outbox WHERE bot_id = ?").run(id);
     this.db.prepare("DELETE FROM run_inputs WHERE task_id IN (SELECT id FROM tasks WHERE bot_id = ?)").run(id);

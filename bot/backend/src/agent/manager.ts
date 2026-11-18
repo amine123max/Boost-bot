@@ -443,6 +443,10 @@ export class AgentManager {
     }, Math.max(250, Math.min(15_000, idleMs / 4))) : undefined;
     const observer: TurnObserver = {
       ...input.observer,
+      onText: delta => {
+        if (delta) t.lastProgress = Date.now();
+        input.observer?.onText?.(delta);
+      },
       onStart: () => {
         t.lastProgress = Date.now();
         input.observer?.onStart?.();

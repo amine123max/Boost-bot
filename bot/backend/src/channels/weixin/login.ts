@@ -62,6 +62,10 @@ export class WeixinLogin {
     this.onUpdate = fn;
   }
 
+  rejectBinding(message: string): void {
+    this.set({ state: 'failed', message });
+  }
+
   private set(patch: Partial<LoginSnapshot>): void {
     this.snapshot = { ...this.snapshot, ...patch };
     this.onUpdate?.(this.snapshot);

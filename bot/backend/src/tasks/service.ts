@@ -165,6 +165,7 @@ export interface TaskServiceOptions {
   retryDelaysMs?: number[];
   /** 任务有变化（阶段、进展）；规则有变化时是规则 id */
   onChange?: (taskId: string) => void;
+  onConversationMessage?: (conversationId: string) => void;
   /** 规则：用主模型写那一句结果（检查用的是小模型）；没有就用检查时的草稿 */
   complete?: (botId: string, model: string, system: string, user: string) => Promise<string>;
   /** 新规则的时区（默认本机的） */
@@ -1208,9 +1209,12 @@ export class TaskService {
     const files = outcome === "done" ? this.files(task, report?.files ?? []) : [];
     if (pushed) this.post(conv, task, id, purpose, text, files, hint);
     // 交付的文件跟着这条消息存下：网页对话里是文件卡片（图片直接显示），点开就能看
-    this.store.addMessage(conv.id, "assistant", text, undefined, { files });
-    this.store.updateRun(runId, { delivery: id });
-    this.note(conv.id, outcome === "done" ? `[后台任务「${task.title}」已完成，已把结果发给用户] ${text}` : `[后台任务「${task.title}」失败了，已告诉用户] ${text}`);
+    this.store.db.transaction(() => {
+      this.store.addMessage(conv.id, "assistant", text, undefined, { files });
+      this.store.updateRun(runId, { delivery: id });
+      this.note(conv.id, outcome === "done" ? `[后台任务「${task.title}」已完成，结果已写入会话] ${text}` : `[后台任务「${task.title}」未完成，原因已写入会话] ${text}`);
+    })();
+    this.o.onConversationMessage?.(conv.id);
   }
 
   /** 聊天平台：按主动消息的规则写进出站队列（同步落库；渠道没上线时等它上线） */
@@ -1221,6 +1225,7 @@ export class TaskService {
     this.o.delivery!.push({
       id,
       botId: task.botId,
+      account: conv.account || undefined,
       channel,
       peerId: conv.peerId,
       purpose,
@@ -1549,7 +1554,7 @@ export class TaskService {
     const task = row ? this.store.getTask(row.taskId) : undefined;
     if (!row || !task || task.endReason === "stopped") return;
     const text = taskPromptText(row, task.title);
-    const base = { id: askId(row), botId: task.botId, channel: conv.channel, peerId: conv.peerId, purpose: "question" as const, subject: task.title, text, ref: `task:${task.id}` };
+    const base = { id: askId(row), botId: task.botId, account: conv.account || undefined, channel: conv.channel, peerId: conv.peerId, purpose: "question" as const, subject: task.title, text, ref: `task:${task.id}` };
     // 只有飞书有卡片按钮；其他平台发文字，回复编号
     if (conv.channel !== "feishu") delivery.push({ ...base, raw: true });
     else {
@@ -1561,7 +1566,10 @@ export class TaskService {
       if (replyTo && buttons) delivery.push({ ...base, replyTo, card: actionCardSpec(title, body, buttons) });
       else delivery.push({ ...base, replyTo, kind: replyTo ? "text" : "notice" });
     }
-    if (row.kind === "question") this.store.addMessage(conv.id, "assistant", text);
+    if (row.kind === "question") {
+      this.store.addMessage(conv.id, "assistant", text);
+      this.o.onConversationMessage?.(conv.id);
+    }
     log.info("pushed a background task's prompt", { task: task.id, kind: row.kind, channel: conv.channel });
   }
 
@@ -2626,6 +2634,7 @@ export class TaskService {
       this.o.delivery.push({
         id,
         botId: rule.botId,
+        account: conv.account || undefined,
         channel: conv.channel,
         peerId: conv.peerId,
         purpose,
@@ -2637,7 +2646,8 @@ export class TaskService {
       });
     }
     this.store.addMessage(conv.id, "assistant", text);
-    this.note(conv.id, purpose === "failure" ? `[规则「${rule.title}」暂停了，已告诉用户] ${text}` : `[规则「${rule.title}」发给了用户] ${text}`);
+    this.note(conv.id, purpose === "failure" ? `[规则「${rule.title}」已暂停，原因已写入会话] ${text}` : `[规则「${rule.title}」的结果已写入会话] ${text}`);
+    this.o.onConversationMessage?.(conv.id);
     log.info("rule message handed over", { rule: rule.id, id, purpose, channel: conv.channel });
     return true;
   }

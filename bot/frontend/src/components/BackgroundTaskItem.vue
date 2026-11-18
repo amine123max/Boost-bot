@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{ work: BackgroundWork; title: string; ac
 interface Run { id: string; state: string; outcome?: string; error?: string; startedAt?: number; endedAt?: number }
 const open = ref(false), visited = ref(false), loading = ref(false), error = ref('');
 const steps = ref<Activity[]>([]), run = ref<Run>(), id = useId();
-const status = computed(() => props.work.state === 'done' ? '已完成' : props.work.state === 'failed' ? '失败' : '进行中');
+const status = computed(() => props.work.label);
 const path = computed(() => `/${props.work.kind === 'rule' ? 'rules' : 'tasks'}/${enc(props.work.id)}`);
 let timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined, generation = 0, disposed = false, loadedRunId = '';
 function cancel() { generation++; controller?.abort(); clearTimeout(timer); loading.value = false; }
@@ -59,7 +59,7 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
       <div v-if="visited" class="background-task-progress">
         <p v-if="error" class="notice" role="alert">{{ error }} <button @click="load">重试</button></p>
         <p v-if="loading" class="task-note" role="status">正在加载运行记录…</p>
-        <ActivityTrace v-else :key="run?.id || work.key" :steps="steps" :run-id="run?.id" :task-id="!run && work.kind === 'task' ? work.id : undefined" :rule-id="!run && work.kind === 'rule' ? work.id : undefined" :running="!!run && run.state !== 'ended'" :active="open && active" embedded />
+        <ActivityTrace v-else :steps="steps" :run-id="work.kind === 'rule' ? run?.id : undefined" :task-id="work.kind === 'task' ? work.id : undefined" :rule-id="!run && work.kind === 'rule' ? work.id : undefined" :running="!!run && run.state !== 'ended'" :active="open && active" embedded />
       </div>
     </SpringDisclosure>
   </article>

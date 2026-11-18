@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import type { Activity, ChannelConversation, Message } from "../types";
 import { api, enc, downloadFile } from "../api";
 import ConversationLabel from "./ConversationLabel.vue";
-import ActivityTrace from "./ActivityTrace.vue";
+import ConversationProgress from "./ConversationProgress.vue";
 import MessageBubble from "./MessageBubble.vue";
 import HelpTip from "./HelpTip.vue";
 import Icon from "./Icon.vue";
@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
           :class="{ 'is-user': message.role === 'user' }"
         >
           <div class="message-body">
-            <ActivityTrace
+            <ConversationProgress
               v-if="message.steps"
               :count="message.steps"
               :conversation-id="conversation.id"
@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
           </div>
         </article>
         <section v-if="turn">
-          <ActivityTrace :steps="turn.steps" :conversation-id="conversation.id" :started-at="turn.since" running /><MessageBubble framed
+          <ConversationProgress :steps="turn.steps" running /><MessageBubble framed
             v-if="turn.interim.length" :text="turn.interim.join('\n\n')"
           /><button class="danger-button" :disabled="stopping" @click="stop">
             {{ stopping ? "正在停止" : "停止" }}

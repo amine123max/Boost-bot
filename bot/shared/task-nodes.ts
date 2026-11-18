@@ -11,9 +11,6 @@ export interface TaskNode {
   children?: TaskNode[];
 }
 export interface TaskNodeReference {
-  conversationId?: string;
-  messageId?: number;
-  turnId?: string;
   runId?: string;
   taskId?: string;
   ruleId?: string;

@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md)
 
+## 0.5.2 对话与刷新可靠性
+
+Bot 网页自动恢复中断的回复，消息队列和任务更新按会话隔离，渠道账号按 Bot 绑定。Boost 在本机服务繁忙时保留用量数据并自动重试。详见[发行说明](docs/releases/v0.5.2.zh-CN.md)。
+
 ## 0.5.1 可靠性刷新
 
 核验 WAL、显式主库/Bot 加密、资源域 RPC 调度、有界网关准入、来源熔断、幂等结算和签名更新校验。网关配置移入 Boost 高级设置，解释信息收进 SVG 提示。参阅[发行说明](docs/releases/v0.5.1.zh-CN.md)、[负载测量](docs/PERFORMANCE.zh-CN.md)与[技术边界](ARCHITECTURE.zh-CN.md)。

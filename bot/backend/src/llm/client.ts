@@ -3,6 +3,7 @@
  * 运行时只依赖 ModelClient，可替换为任意 OpenAI 兼容端点。
  */
 import { WorkGate } from '../core/work-gate.js';
+import { claudeAdaptive, type ChatProtocol } from './capabilities.js';
 /** OpenAI 兼容的多模态内容；只有用户刚发来的图片会用到（data URL） */
 export type ChatContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
@@ -27,7 +28,7 @@ export interface ChatRequest {
   signal?: AbortSignal;
   /** 推理强度；没有就不发，用模型默认 */
   reasoningEffort?: string;
-  protocol?: 'auto' | 'chat' | 'responses' | 'messages';
+  protocol?: 'auto' | ChatProtocol;
   stream?: boolean;
   onTrace?: (event: { summary?: string; inputTokens?: number; outputTokens?: number }) => void;
 }
@@ -79,7 +80,8 @@ export class OpenAICompatClient implements ModelClient {
     const body = protocol === 'responses'
       ? { model: req.model, input, stream: streaming, ...(req.reasoningEffort ? { reasoning: { effort: req.reasoningEffort, summary: 'auto' } } : {}) }
       : protocol === 'messages'
-        ? { model: req.model, system, messages: anthropic, max_tokens: 8192, stream: streaming }
+        ? { model: req.model, system, messages: anthropic, max_tokens: 8192, stream: streaming,
+            ...(req.reasoningEffort && claudeAdaptive(req.model) ? { thinking: { type: 'adaptive' }, output_config: { effort: req.reasoningEffort } } : {}) }
         : { model: req.model, messages: req.messages, stream: streaming, ...(streaming ? { stream_options: { include_usage: true } } : {}), ...(req.reasoningEffort ? { reasoning_effort: req.reasoningEffort } : {}) };
     const res = await this.fetchImpl(`${endpoint.baseUrl}/${protocol === 'chat' ? 'chat/completions' : protocol}`, {
       method: "POST",
@@ -116,6 +118,9 @@ export class OpenAICompatClient implements ModelClient {
         : protocol === 'responses' ? chunk.type === 'response.output_text.delta' && typeof chunk.delta === 'string' ? chunk.delta : ''
           : typeof chunk.delta === 'object' && chunk.delta.type === 'text_delta' ? chunk.delta.text || '' : '';
       if (json) delta = protocol === 'responses' ? (chunk.output || []).flatMap(item => item.content || []).filter(item => item.type === 'output_text').map(item => item.text || '').join('') : protocol === 'messages' ? (chunk.content || []).filter(item => item.type === 'text').map(item => item.text || '').join('') : delta;
+      if (!json && protocol === 'responses' && chunk.type === 'response.completed' && !full && chunk.response) {
+        accept(chunk.response, true);
+      }
       if (delta) { full += delta; onDelta(delta); }
     };
     if (!streaming || res.headers.get('content-type')?.includes('application/json')) {

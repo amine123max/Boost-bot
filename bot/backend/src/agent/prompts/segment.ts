@@ -14,7 +14,7 @@ export function placeLine(p: ChatPlace): string {
   const chat = p.kind === "group" ? "群聊" : "私聊";
   if (p.channel === "weixin") return `微信${chat}（手机上看，只显示纯文本）`;
   if (p.channel === "feishu") return `飞书${chat}（支持 Markdown）`;
-  if (p.channel === "web") return p.kind === "group" ? "应用里的群聊，有多个机器人一起聊（支持 Markdown）" : "本机网页对话（支持 Markdown）";
+  if (p.channel === "web") return p.kind === "group" ? "Boost 群聊（支持 Markdown）" : "Boost 网页或桌面私聊（支持 Markdown）";
   return `${p.channel}${chat}`;
 }
 
@@ -24,6 +24,7 @@ export interface SegmentInput {
   memory?: string;
   /** 上一段留下的交接便条（一次性） */
   handoff?: string;
+  recent?: Array<{ role: string; content: string }>;
   /** 用户这条消息 */
   text: string;
 }
@@ -34,6 +35,7 @@ export function segmentInput(o: SegmentInput): string {
   if (o.place) parts.push(`[对话渠道]\n${placeLine(o.place)}`);
   if (o.memory !== undefined) parts.push(`[长期记忆快照]（这段对话开始时的；之后的变化用 recall 查）\n${o.memory.trim() || "（目前为空）"}`);
   if (o.handoff) parts.push(`[交接]\n以下是上一段对话留下的交接便条，供你延续上下文：\n${o.handoff}`);
+  if (o.recent?.length) parts.push(`[同一会话较早的对话]\n以下是已经发生的问答，用来延续背景。当前需要处理的要求以末尾的用户消息为准。\n${JSON.stringify(o.recent)}`);
   if (!parts.length) return o.text;
   return `${parts.join("\n\n")}\n\n[用户消息]\n${o.text}`;
 }

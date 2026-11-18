@@ -150,7 +150,9 @@ export function throwIfBusinessError(payload: unknown): void {
 export function unwrapRpcPayload<T>(payload: unknown): T {
   const responseRecord = asRecord(payload);
   if (responseRecord && "error" in responseRecord) {
-    throw new Error(resolveRpcErrorMessage(responseRecord.error));
+    throw Object.assign(new Error(resolveRpcErrorMessage(responseRecord.error)), {
+      code: asRecord(responseRecord.error)?.code,
+    });
   }
   if (responseRecord && "result" in responseRecord) {
     const result = responseRecord.result as T;
@@ -191,6 +193,13 @@ export function getAppErrorMessage(
     return fallback;
   }
   return rpcMessage;
+}
+
+export function isManagementReadBusy(error: unknown): boolean {
+  const details = asRecord(error);
+  return Number(details?.status) === 429 || Number(details?.code) === 429 ||
+    /管理请求队列已满|管理请求过多|管理请求排队超时|HTTP\s+429\b|too many requests|management request queue (?:is )?full/i
+      .test(getAppErrorMessage(error));
 }
 
 /**

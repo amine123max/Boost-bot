@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { Bot } from "../types";
 import { api, enc } from "../api";
 import HelpTip from "./HelpTip.vue";
@@ -8,7 +8,7 @@ import Modal from "./Modal.vue";
 import Icon from './Icon.vue';
 import ChannelIcon from './ChannelIcon.vue';
 import { channelNames as names, channelStateNames as stateNames, type ChannelAccount as Account, type ChatChannel } from '../channel-accounts';
-const props = defineProps<{ bots: Bot[]; embedded?: boolean; request?: number; dialogOnly?: boolean }>();
+const props = defineProps<{ bots: Bot[]; scopeBot?: string; accountList?: Account[]; embedded?: boolean; request?: number; dialogOnly?: boolean }>();
 const emit = defineEmits<{ changed: []; error: [message: string] }>();
 const accounts = ref<Account[]>([]),
   error = ref(""),
@@ -25,6 +25,8 @@ const reconnecting = ref(false);
 const settingsOnly = ref(false);
 const directEntry = ref(false), qrOnly = ref(false);
 const testResult = ref('');
+const displayedAccounts = computed(() => props.accountList ?? accounts.value);
+const botBinding = () => defaultBot.value ? { defaultBot: defaultBot.value } : {};
 async function testCustom() {
   if (busy.value || !credentials.endpoint || credentials.secret.length < 16) return;
   busy.value = true; error.value = ''; testResult.value = '';
@@ -53,9 +55,10 @@ let disposed = false,
   timer: ReturnType<typeof setTimeout> | undefined,
   accountTimer: ReturnType<typeof setTimeout> | undefined;
 async function load() {
+  if (props.accountList) return;
   const ticket = ++accountLoad;
   try {
-    const d = await api<{ accounts: Account[] }>("/channel-accounts");
+    const d = await api<{ accounts: Account[] }>(props.scopeBot ? `/channel-accounts?bot=${enc(props.scopeBot)}` : "/channel-accounts");
     if (!disposed && ticket === accountLoad) accounts.value = d.accounts;
   } catch (e) {
     error.value = (e as Error).message;
@@ -76,7 +79,7 @@ async function begin(kind?: ChatChannel, account?: Account, botId?: string, auto
   if (kind) channel.value = kind;
   feishuMode.value = 'qr';
   sandbox.value = 'false';
-  defaultBot.value = account?.defaultBot || botId || props.bots[0]?.id || '';
+  defaultBot.value = props.scopeBot || account?.defaultBot || botId || props.bots[0]?.id || '';
   label.value = account?.label || '';
   for (const name of Object.keys(credentials) as Array<
     keyof typeof credentials
@@ -114,7 +117,7 @@ async function save() {
     clearTimeout(timer);
     if (flow.value) { const previous = flow.value.id; flow.value = undefined; await api(`/connections/flows/${enc(previous)}`, { method: 'DELETE' }).catch(() => {}); }
     if (channel.value === 'feishu' && feishuMode.value === 'qr') {
-      const response = await api<{ flow: FeishuFlow }>(`/channel-accounts/${enc(key.value)}/feishu/one-click`, { method: 'POST', body: {} });
+      const response = await api<{ flow: FeishuFlow }>(`/channel-accounts/${enc(key.value)}/feishu/one-click`, { method: 'POST', body: botBinding() });
       if (ticket !== attempt || disposed) {
         await api(`/connections/flows/${enc(response.flow.id)}`, { method: 'DELETE' }).catch(() => {});
         return;
@@ -127,7 +130,7 @@ async function save() {
     if (channel.value === "weixin") {
       const response = await api<Login>(
         `/channel-accounts/${enc(key.value)}/weixin/login`,
-        { method: "POST", body: {} },
+        { method: "POST", body: botBinding() },
       );
       if (ticket !== attempt || disposed) return;
       login.value = response;
@@ -145,7 +148,7 @@ async function save() {
           : { token: credentials.token };
     await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}`, {
       method: "PUT",
-      body,
+      body: { ...body, ...botBinding() },
     });
     if (ticket === attempt && !disposed) await finish();
   } catch (e) {
@@ -155,8 +158,8 @@ async function save() {
   }
 }
 async function finish() {
-  const patch = { ...(defaultBot.value ? { defaultBot: defaultBot.value } : {}), ...(label.value.trim() ? { label: label.value.trim() } : {}) };
-  if (Object.keys(patch).length) await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}/settings`, { method: 'PUT', body: patch });
+  const patch = { ...(label.value.trim() ? { label: label.value.trim() } : {}) };
+  if (Object.keys(patch).length) await api(`/channel-accounts/${enc(key.value)}/${enc(channel.value)}/settings`, { method: 'PUT', body: { ...patch, ...(props.scopeBot ? { expectedBot: props.scopeBot } : {}) } });
   adding.value = false;
   emit('changed');
   if (!props.dialogOnly) await load();
@@ -206,9 +209,10 @@ async function update(
     busy.value = true;
     await api(
       `/channel-accounts/${enc(account.key)}/${enc(account.channel)}/settings`,
-      { method: "PUT", body: patch },
+      { method: "PUT", body: { ...patch, ...(props.scopeBot ? { expectedBot: props.scopeBot } : {}) } },
     );
     await load();
+    emit('changed');
   } catch (e) {
     error.value = (e as Error).message;
   } finally {
@@ -247,7 +251,7 @@ async function refreshAccounts() {
   await load();
   if (!disposed) accountTimer = setTimeout(refreshAccounts, 5000);
 }
-onMounted(() => { if (!props.dialogOnly) void refreshAccounts(); });
+onMounted(() => { if (!props.dialogOnly && !props.accountList) void refreshAccounts(); });
 onBeforeUnmount(() => {
   disposed = true;
   clearTimeout(accountTimer);
@@ -258,12 +262,12 @@ onBeforeUnmount(() => {
   <section v-if="!dialogOnly" :class="embedded ? 'channel-settings-embedded' : 'settings-card'">
     <h2 v-if="!embedded">
       聊天渠道<HelpTip
-        text="所有智能体共用渠道账号，每个账号可设置默认回复 Bot。消息上下文仍按 Bot 和渠道会话隔离，凭据仅存于服务端。"
+        text="在此查看工作台的渠道账号及其绑定智能体；每个智能体的右侧面板只显示自己的账号。"
       />
     </h2>
     <p v-if="error" class="error-banner" role="alert">{{ error }}</p>
     <div
-      v-for="account in accounts"
+      v-for="account in displayedAccounts"
       :key="account.channel + account.key"
       class="channel-setting-row"
     >
@@ -271,6 +275,7 @@ onBeforeUnmount(() => {
         >{{ account.label || names[account.channel]
         }}<small><span v-if="account.label && account.label !== names[account.channel]">{{ names[account.channel] }} · </span><span :class="{ 'connected-state': account.status?.state === 'connected' }">{{ stateNames[account.status?.state || ''] || '未连接' }}</span></small></span
       ><SelectControl
+        v-if="!scopeBot"
         :model-value="account.defaultBot"
         :options="bots.map((bot) => ({ value: bot.id, label: bot.name }))"
         :label="(account.label || names[account.channel]) + '默认智能体'"
@@ -349,7 +354,7 @@ onBeforeUnmount(() => {
           autocomplete="new-password"
       /></label>
       </template>
-      <label v-if="bots.length">默认智能体<SelectControl v-model="defaultBot" label="默认智能体" :options="bots.map(bot => ({ value: bot.id, label: bot.name }))" /></label>
+      <label v-if="bots.length && !scopeBot && !reconnecting">绑定智能体<SelectControl v-model="defaultBot" label="绑定智能体" :disabled="busy || !!login" :options="bots.map(bot => ({ value: bot.id, label: bot.name }))" /></label>
       </template>
       <div v-if="qrOnly && !login && !error" class="channel-qr-stage" role="status"><Icon name="refresh" class="qr-loading" :size="24" /><p>正在获取二维码…</p></div>
       <div v-if="login" role="status" :class="{ 'channel-qr-stage': qrOnly }">

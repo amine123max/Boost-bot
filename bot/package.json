@@ -1,7 +1,7 @@
 {
   "name": "boost-bot-runtime",
   "productName": "Boost",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "type": "module",
   "license": "MIT",

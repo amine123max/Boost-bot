@@ -97,5 +97,6 @@ function close() {
 }
 .setting-control-editor :deep(select) {
   width: 100%;
+  min-height: 36px;
 }
 </style>

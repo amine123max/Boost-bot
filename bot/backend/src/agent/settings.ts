@@ -47,7 +47,7 @@ export interface BotSettings {
   avatar: BotAvatarKey | "";
   /** Per-bot visual identity; null preserves legacy avatar colours and stable ID defaults. */
   appearance: BotAppearance | null;
-  /** Transport preferences for direct chat/fallback; agent tools retain their model-native adapters. */
+  /** Protocol for both conversation paths; the streaming toggle applies to direct model chat. */
   modelProtocol: 'auto' | 'chat' | 'responses' | 'messages';
   modelStreaming: boolean;
   modelSource: string;

@@ -47,9 +47,9 @@ Data and workspace locations can be changed separately. Paths refer to the host 
 
 | Area | Contract |
 | --- | --- |
-| Conversations | Persist history and request state; stream real output; support stop/cancellation |
-| Tasks | Show recorded plans separately from execution history; do not fabricate steps or completion |
-| Approvals | Preserve per-Bot permissions and actual user decisions |
+| Conversations | Stream public text, reconnect to active replies, and manage queued messages above the composer |
+| Tasks | Use `/task` in single chat to create a real scheduled task and track it above the composer |
+| Approvals | Preserve per-Bot permissions; answer Web questions above the composer |
 | Memory/context | Separate measured usage from estimates and missing categories |
 | Groups/handoffs | Actor-local membership, explicit delivery and scoped workspace access |
 | File delivery | Durable outbox for final replies, files and important notifications |

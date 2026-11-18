@@ -127,8 +127,9 @@ export async function postJsonRpc<T>(
       if (response.status === 401 && isWebAuthRequiredPayload(payload)) {
         redirectToWebLoginIfBrowser();
       }
-      throw new Error(
-        buildRpcHttpErrorMessage(response.status, payload, response.headers),
+      throw Object.assign(
+        new Error(buildRpcHttpErrorMessage(response.status, payload, response.headers)),
+        { status: response.status },
       );
     }
 

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import Icon from "./Icon.vue";
 import { modelProvider } from "../../../shared/appearance/modelProvider";
-const props = withDefaults(defineProps<{ model?: string; size?: number }>(), {
+const props = withDefaults(defineProps<{ model?: string; manufacturer?: string; size?: number }>(), {
   size: 17,
 });
 const sources = import.meta.glob("../assets/providers/*.svg", {
@@ -10,7 +9,7 @@ const sources = import.meta.glob("../assets/providers/*.svg", {
   import: "default",
   eager: true,
 }) as Record<string, string>;
-const provider = computed(() => modelProvider(props.model));
+const provider = computed(() => modelProvider(props.model, props.manufacturer));
 const svg = computed(
   () => sources[`../assets/providers/${provider.value}.svg`] || "",
 );
@@ -23,7 +22,7 @@ const svg = computed(
     aria-hidden="true"
     :style="{ width: size + 'px', height: size + 'px' }"
     v-html="svg"
-  /><Icon v-else name="model" :size="size" />
+  />
 </template>
 <style scoped>
 .provider-icon {

@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<{
   createdAt?: number;
   interim?: string[];
   framed?: boolean;
+  streaming?: boolean;
   editable?: boolean;
   editDisabled?: boolean;
   sendEdit?: (text: string) => Promise<boolean>;
@@ -72,7 +73,8 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
     </form>
     <div v-else class="message-bubble">
       <Markdown v-for="(value, index) in interim" :key="index" :text="value" />
-      <Markdown v-if="text" :text="text" />
+      <div v-if="text && streaming" class="message-stream-text">{{ text }}</div>
+      <Markdown v-else-if="text" :text="text" />
       <slot />
     </div>
     <div v-if="!editing && (date || text)" class="message-actions">
@@ -95,6 +97,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 <style scoped>
 .message-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; }
 .message-bubble { min-width: 0; max-width: 100%; padding: var(--space-1) 0; }
+.message-stream-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--lh-relaxed, 1.6); }
 .framed-content .message-bubble, .user-content .message-bubble { padding: var(--space-2-5) var(--space-4); border-radius: var(--r-bubble); }
 .framed-content .message-bubble { background: var(--accent-soft); box-shadow: none; }
 .user-content { align-items: flex-end; }

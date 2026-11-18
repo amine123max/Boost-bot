@@ -328,7 +328,7 @@ Copyright Mozilla Foundation and contributors. Licensed under the Apache License
 
 Source: https://github.com/lobehub/lobe-icons
 
-Copyright (c) 2023 LobeHub. MIT License; the full license is included in [LICENSES/lobe-icons-MIT.txt](LICENSES/lobe-icons-MIT.txt). Eight static SVG provider marks are bundled locally for Bot model selection and Boost model labels (DeepSeek, Zhipu, OpenAI, Claude, Gemini, Qwen, Moonshot and Grok). Unknown models use a neutral fallback. Product marks retain their respective owners.
+Copyright (c) 2023 LobeHub. MIT License; the full license is included in [LICENSES/lobe-icons-MIT.txt](LICENSES/lobe-icons-MIT.txt). Static SVG provider marks are bundled locally for Bot model selection and Boost model labels. New assets are sourced from commit `34270bc208d7122778dc00b30bd460f97ea03216` (`packages/static-svg/icons/`); the AWS, BFL and Spark marks are stored as amazon.svg, blackforestlabs.svg and xunfei.svg. Default and unrecognized models display their text label without a mark. Product marks retain their respective owners.
 
 
 ## Chat channel brand SVGs

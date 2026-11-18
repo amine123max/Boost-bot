@@ -3,11 +3,11 @@ import { documentContext } from './documents.js';
 import fs from "node:fs";
 import path from "node:path";
 import type { ChannelId, InboundEvent, ReplySession } from "./types.js";
-import { findBot, setBotForPeer } from "./routes.js";
+import { botBoundChannel, findBot, setBotForPeer } from "./routes.js";
 import { KeyedQueue } from "./queue.js";
 import { eventText } from "./types.js";
 import { isPushChannel } from './types.js';
-import { acceptsImages, type ModelClient, type ChatMessage } from "../llm/client.js";
+import { acceptsImages, type ModelClient } from "../llm/client.js";
 import { TurnStopped, type TurnImage } from "../agent/host.js";
 import { describeStep, fmtSecs, type ActivityStep } from "../agent/activity.js";
 import type { Store } from "../store/db.js";
@@ -15,12 +15,13 @@ import { logger } from "../log.js";
 import type { AgentManager } from "../agent/manager.js";
 import { promptButtons, promptText, questionsOf } from "../agent/approvals.js";
 import { segmentInput, type ChatPlace } from "../agent/prompts/index.js";
+import type { ConversationHarness } from "./conversation-harness.js";
+import type { ChatProtocol } from "../llm/capabilities.js";
 import { clearInflight, markInflight, takeNotice } from "./recovery.js";
 import { pwshProbe, pwshStatusLine } from "../agent/pwsh.js";
 import { isBotProviderModel } from "../modelflare.js";
 import type { ApprovalRow, Conversation } from "../store/db.js";
 import type { AccessControl } from "./access.js";
-import { takeTaskNotes } from "../tasks/service.js";
 import { t } from "../i18n/index.js";
 import { localProxyFailureHint } from "../network-error.js";
 import type { TaskProgress } from "../agent/progress.js";
@@ -94,13 +95,13 @@ export function storeInbound(workspace: string, ev: InboundEvent, now = new Date
 
 export interface RuntimeOptions {
   store: Store;
+  chatHarness: ConversationHarness;
   models: ModelClient;
   defaultModel: () => string;
   botModels?: (botId:string)=>Promise<string[]>;
   contextMessages: number;
   contextChars: number;
-  /** 这个模型该带的推理强度（用户选了、模型也支持时）；纯对话路径用，代理路径由 AgentHost 自己带 */
-  reasoningEffort?: (model: string, botId?: string) => Promise<string | undefined>;
+  modelOptions?: (model: string, botId: string) => Promise<{ protocol: ChatProtocol; reasoningEffort?: string }>;
   /** DSH 代理宿主；缺省或不可用时走纯对话路径 */
   agent?: AgentManager;
   /**
@@ -155,14 +156,24 @@ export class TurnSaid {
   readonly presented: string[] = [];
   /** 等代理启动时显示过的临时文字（「代理已就绪，正在处理…」）：第一段话来了就换掉 */
   provisional = false;
+  private streamed = "";
 
-  constructor(private out: ReplySession) {}
+  constructor(private out: ReplySession, private streamText = false) {}
+  get partial() { return this.streamed.trim(); }
 
   readonly observer = {
+    onText: (delta: string | null) => {
+      if (!this.streamText) return;
+      if (delta === null && !this.streamed) return;
+      this.streamed = delta === null ? "" : this.streamed + delta;
+      this.provisional = false;
+      void this.out.apply({ type: "stream.update", text: this.streamed });
+    },
     onInterim: (text: string) => {
       // 不 await：几个操作按调用顺序交给渠道
-      if (this.provisional) {
+      if (this.provisional || this.streamed) {
         this.provisional = false;
+        this.streamed = "";
         void this.out.apply({ type: "stream.update", text: "" });
       }
       this.interim.push(text);
@@ -333,7 +344,7 @@ export class BotRuntime {
    * signal：网页的停止按钮（排队时就停了也算）；/stop 经 stop() 走同一条路。纯对话中止模型请求并保留已生成的部分，
    * 代理回合交给代理之前直接收尾，之后由代理中止。
    */
-  async handle(ev: InboundEvent, out: ReplySession, opts: { signal?: AbortSignal; existingMessageId?: number; onUserStored?: (id: number) => void } = {}): Promise<void> {
+  async handle(ev: InboundEvent, out: ReplySession, opts: { signal?: AbortSignal; existingMessageId?: number; onUserStored?: (id: number) => void; serial?: boolean } = {}): Promise<void> {
     const { store } = this.opts;
     // 兜底：不在允许名单里的人不建会话、不进模型（正常已在 interceptReply 拦下）
     if (this.opts.access && !this.opts.access.allowed(ev)) {
@@ -350,7 +361,7 @@ export class BotRuntime {
     }
     // 回复和之后的主动消息走这个账号
     if (ev.account && conv.account !== ev.account) store.setConversationAccount(conv.id, ev.account);
-    const t: Inflight = { botId: bot.id, since: Date.now(), abort: new AbortController(), release: KeyedQueue.releaser(),
+    const t: Inflight = { botId: bot.id, since: Date.now(), abort: new AbortController(), release: opts.serial ? undefined : KeyedQueue.releaser(),
       userStored: opts.existingMessageId !== undefined, userMessageId: opts.existingMessageId, onUserStored: opts.onUserStored };
     const link = () => t.abort.abort();
     if (opts.signal?.aborted) link();
@@ -469,10 +480,10 @@ export class BotRuntime {
     const routed = this.opts.route ? this.opts.route(bot.id, model) : model;
     // 只有能看图的模型才收到图片本身；其余模型只看到文字里的“[图片 …]”
     const seen = acceptsImages(routed) ? images : [];
+    const place: ChatPlace = { channel: ev.channel, kind: ev.conversation.kind === "group" ? "group" : "dm" };
 
     let note = "";
     if (agent?.available) {
-      const place: ChatPlace = { channel: ev.channel, kind: ev.conversation.kind === "group" ? "group" : "dm" };
       const handled = await this.handleAgent(agent, bot.id, conv.id, text, routed, place, out, seen, run);
       if (handled === true) return;
       // 应用正在退出：代理进程没了不是该改用纯对话的时候，留给下次启动提醒
@@ -486,14 +497,9 @@ export class BotRuntime {
 
     this.storeUser(run, conv.id, text);
     run.userStored = true;
-    const history = store.contextWindow(conv.id, this.opts.contextMessages, this.opts.contextChars);
-    const messages: ChatMessage[] = [];
-    if (bot.systemPrompt.trim()) messages.push({ role: "system", content: bot.systemPrompt });
-    for (const m of history) if (m.role !== "system") messages.push({ role: m.role, content: m.content });
-    const last = messages[messages.length - 1];
-    if (seen.length && last?.role === "user" && typeof last.content === "string") {
-      last.content = [{ type: "text", text: last.content }, ...seen.map((i) => ({ type: "image_url" as const, image_url: { url: `data:${i.mimeType};base64,${i.data}` } }))];
-    }
+    const messages = this.opts.chatHarness.directInput({ conversationId: conv.id, userMessageId: run.userMessageId,
+      name: bot.name, persona: bot.systemPrompt, place, images: seen,
+      contextMessages: this.opts.contextMessages, contextChars: this.opts.contextChars });
 
     await out.apply({ type: "typing", on: true });
     await out.apply({ type: "stream.start" });
@@ -507,9 +513,9 @@ export class BotRuntime {
     }
     this.directActivity.set(conv.id, monitored);
     await out.apply({ type: 'activity', step: { ...modelStep } });
-    const reasoningEffort = await this.opts.reasoningEffort?.(routed, bot.id).catch(() => undefined);
+    const modelOptions = await this.opts.modelOptions?.(routed, bot.id).catch(() => undefined);
     const call = () =>
-      this.opts.models.streamChat({ botId: bot.id, model: routed, messages, signal, reasoningEffort, protocol: bot.settings.modelProtocol, stream: bot.settings.modelStreaming,
+      this.opts.models.streamChat({ botId: bot.id, model: routed, messages, signal, protocol: bot.settings.modelProtocol, ...modelOptions, stream: bot.settings.modelStreaming,
         onTrace: trace => {
           if (trace.summary !== undefined) modelStep.output = trace.summary;
           modelStep.tokens = { ...modelStep.tokens, ...(trace.inputTokens !== undefined ? { input: trace.inputTokens } : {}), ...(trace.outputTokens !== undefined ? { output: trace.outputTokens } : {}) };
@@ -531,6 +537,7 @@ export class BotRuntime {
       monitored.state = 'done'; monitored.updatedAt = Date.now();
       await out.apply({ type: 'activity', step: { ...modelStep } });
       store.addMessage(conv.id, "assistant", finalText, [modelStep]);
+      this.opts.chatHarness.noteDirectReply(conv.id, run.userMessageId);
       await out.apply({ type: "stream.finish", text: note ? `${note}\n\n${finalText}` : finalText });
     } catch (e) {
       const err = e as Error & { status?: number };
@@ -704,7 +711,7 @@ export class BotRuntime {
       await out.apply(interactiveOp(row));
     });
     // 模型在回合中间说的话、交付的文件：马上显示，结束时随回复存下
-    const said = new TurnSaid(out);
+    const said = new TurnSaid(out, place.channel === 'web');
     await out.apply({ type: "typing", on: true });
     await out.apply({ type: "stream.start" });
     // 代理进程还没就绪（第一次启动可能要几分钟）：先说清楚在等什么，而不是一直"思考中"。模型说的第一段话或最终回复会替换这段文字
@@ -756,10 +763,18 @@ export class BotRuntime {
           return host.state === "starting" ? "starting" : false;
         }
       }
+      // A cold-start status must never replace public text after the model starts streaming.
+      clearInterval(startup);
       if (signal.aborted) return await stoppedEarly();
-      const first = store.getAgentSession(convId) ? text : firstInput(agent, botId, convId, text, place);
+      if (startup) {
+        said.provisional = true;
+        await out.apply({ type: "stream.update", text: t("runtime.agentReady") });
+      }
+      const { existing, fromDirect, recent, notes } = this.opts.chatHarness.agentContext(convId, inflight.userMessageId);
+      const first = existing
+        ? segmentInput({ text, recent })
+        : firstInput(agent, botId, convId, text, place, recent);
       // 后台任务的结果发出去之后，下一条聊天消息带上那张便条：聊天代理知道发生了什么
-      const notes = takeTaskNotes(store, convId);
       const input = notes ? `${notes}\n\n${first}` : first;
       const runOnce = async () => {
         // runTurn 同步登记回合，之后的停止交给代理（TurnStopped，会重启代理进程）
@@ -770,6 +785,11 @@ export class BotRuntime {
           ...(images.length ? { images } : {}),
           onStep,
           observer: {
+            ...said.observer,
+            onText: delta => {
+              if (delta && place.channel === 'web') visible = true;
+              said.observer.onText(delta);
+            },
             // 工具调用不进入聊天：只用于判断代理已开始工作（不再回退到纯对话），正在输入状态由渠道维持
             onProgress: () => {
               visible = true;
@@ -777,10 +797,10 @@ export class BotRuntime {
             // 代理收下了这条消息：先存用户消息（之后并进来的消息排在它后面），再让出渠道队列，后来的消息可以并入这一轮
             onStart: () => {
               this.storeUser(inflight, convId, text);
+              if (fromDirect) this.opts.chatHarness.clearDirectContext(convId);
               inflight.userStored = true;
               inflight.release?.();
             },
-            ...said.observer,
           },
         });
         const halt = () => agent.stopTurn(convId);
@@ -824,7 +844,7 @@ export class BotRuntime {
         log.warn("agent host unavailable, falling back to plain chat");
         return false;
       }
-      const msg = turnFailedText(err, [...steps.values()]);
+      const msg = [said.partial, turnFailedText(err, [...steps.values()])].filter(Boolean).join('\n\n');
       this.storeUser(inflight, convId, text);
       inflight.userStored = true;
       // 出错、中止之前说过的话和交付过的文件留在历史里（文件不再发到其它渠道）
@@ -859,6 +879,15 @@ export class BotRuntime {
     return true;
   }
 
+  async guideConversation(botId: string, id: string, text: string, record = true): Promise<boolean> {
+    const active = [...(this.inflight.get(id) ?? [])].find(turn => !turn.steered && !turn.abort.signal.aborted);
+    const agent = this.opts.agent;
+    if (this.closing || !active || !agent?.canSteer(id) || text.startsWith('/')) return false;
+    if (!(await agent.steer(botId, id, { text }))) return false;
+    if (record) this.opts.store.addMessage(id, 'user', text);
+    return true;
+  }
+
   /**
    * 代理自己醒来的一轮（后台命令结束，DSH 唤醒了空闲的代理）：像普通回合一样登记（/status、/stop、看门狗、插话都认它），
    * 经渠道主动发到会话里（网页对话进 live 登记；飞书回复最近一条消息；微信占一条回复配额），回复与步骤存进历史。
@@ -887,7 +916,7 @@ export class BotRuntime {
     const asked = store.listMessages(convId, 20).filter((m) => m.role === "user").at(-1)?.content;
     markInflight(store, convId, asked || t("runtime.jobResult"));
     const steps = new Map<string, ActivityStep>();
-    const said = new TurnSaid(out);
+    const said = new TurnSaid(out, conv.channel === 'web');
     const unbind = agent.approvals.bindSink(convId, async (row) => void (await out.apply(interactiveOp(row))));
     const halt = () => agent.stopTurn(convId);
     fl.abort.signal.addEventListener("abort", halt, { once: true });
@@ -949,6 +978,9 @@ export class BotRuntime {
   /** 返回 null 表示不是已知命令，按普通消息处理。 */
   private switchBot(ev: InboundEvent, account: string, wanted: string | undefined): string {
     const { store } = this.opts;
+    if (botBoundChannel(ev.channel) && store.getChannelAccount(account, ev.channel)) {
+      return '此渠道账号固定绑定当前智能体。可在 Boost 的聊天渠道设置中调整绑定。';
+    }
     if (!wanted?.trim()) {
       const list = store.listBots().map((b, i) => `${i + 1}. ${b.name}${b.id === ev.botId ? t("runtime.botCurrent") : ""}`).join("\n");
       return t("runtime.botList", { list });
@@ -968,6 +1000,7 @@ export class BotRuntime {
         return help();
       case "/reset":
         this.opts.store.clearMessages(convId);
+        this.opts.chatHarness.resetContext(convId);
         this.opts.agent?.resetConversation(convId);
         return t("runtime.resetDone");
       case "/new": {
@@ -1017,9 +1050,10 @@ export class BotRuntime {
  * 这一段之内不再变化，便于模型端前缀缓存；记忆快照在下一段才刷新（本段内用 recall 查最新），
  * 放进系统提示词的话每记一条都会让整段前缀缓存失效，而且各会话（群记忆）不一样。
  */
-export function firstInput(agent: AgentManager, botId: string, convId: string, text: string, place?: ChatPlace): string {
+export function firstInput(agent: AgentManager, botId: string, convId: string, text: string, place?: ChatPlace, recent?: Array<{ role: string; content: string }>): string {
   const memory = agent.settings(botId).memory.enabled ? agent.memoryPrefix(botId, convId) : undefined;
-  return segmentInput({ place, memory, handoff: agent.takeSeed(convId), text });
+  const handoff = agent.takeSeed(convId);
+  return segmentInput({ place, memory, handoff, text, recent: handoff ? undefined : recent });
 }
 
 /** 审批/提问 → 出站交互操作（文本渠道用 prompt；卡片渠道用 buttons）。 */

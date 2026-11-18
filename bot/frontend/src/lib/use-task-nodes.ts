@@ -2,7 +2,7 @@ import { onBeforeUnmount, ref, watch, type Ref } from 'vue';
 import { api } from '../api';
 import type { TaskNode, TaskNodeAnalysis, TaskNodeReference } from '../../../shared/task-nodes';
 
-/** Only expanded history or an active turn requests AI analysis. */
+/** Plan explicit tasks on demand, with one request per visible detail. */
 export function useTaskNodes(reference: Ref<TaskNodeReference | null>, fingerprint: Ref<string>, enabled: Ref<boolean>) {
   const nodes = ref<TaskNode[]>([]), loading = ref(false), error = ref(''), stale = ref(false);
   let generation = 0, timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined;
@@ -33,7 +33,11 @@ export function useTaskNodes(reference: Ref<TaskNodeReference | null>, fingerpri
     if (enabled.value) schedule(0);
   }, { immediate: true });
   watch([fingerprint, enabled], () => {
-    if (!enabled.value) { clearTimeout(timer); return; }
+    if (!enabled.value) {
+      generation++; controller?.abort(); controller = undefined; clearTimeout(timer);
+      dirty = false; loading.value = false;
+      return;
+    }
     if (fingerprint.value.startsWith('false:')) nextAllowed = 0;
     if (!error.value) schedule(nodes.value.length ? 1500 : 0);
   });

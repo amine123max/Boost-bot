@@ -45,6 +45,7 @@ export interface Activity {
   name?: string;
   kind?: string;
   status?: string;
+  cut?: boolean;
   detail?: string;
   summary?: string;
   input?: string;
@@ -96,7 +97,14 @@ export interface Approval {
   detail?: string;
   reason?: string;
   tool?: string;
-  questions?: Array<{ question: string; options?: Array<{ label: string }> }>;
+  questions?: Array<{ id: string; question: string; detail?: string; multiSelect?: boolean; options?: Array<{ label: string; description?: string }> }>;
+}
+export type QuestionAnswer = { id: string; selected: string[]; custom?: string };
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  state: 'queued' | 'guiding' | 'failed';
+  error?: string;
 }
 export interface History {
   messages: Message[];
@@ -105,6 +113,8 @@ export interface History {
   conversationId?: string;
   live: LiveTurn | LiveTurn[] | null;
   group?: Group;
+  queued?: QueuedMessage[];
+  tasks?: Task[];
 }
 export interface Status {
   username?: string;

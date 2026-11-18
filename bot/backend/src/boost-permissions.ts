@@ -7,7 +7,7 @@ export function memberRequestAllowed(method: string, path: string): boolean {
     return /^\/(status|models|model-info|modelflare|official|account|agent|settings|guide|update|notices|catalog|attention|needs)$/.test(p)
       || /^\/(models\/info|media\/models|approvals|tasks)$/.test(p)
       || /^\/(bots|groups)(\/[^/]+)?$/.test(p)
-      || /^\/bots\/[^/]+\/(chat|chat\/live|chat\/metrics|conversations|previews|settings)$/.test(p)
+      || /^\/bots\/[^/]+\/(chat|chat\/live|chat\/updates|chat\/metrics|chat\/tasks|conversations|previews|settings)$/.test(p)
       || /^\/conversations(\/[^/]+(\/messages|\/file|\/turn)?)?$/.test(p)
       || /^\/conversations\/[^/]+\/messages\/\d+\/activity$/.test(p)
       || /^\/groups\/[^/]+\/(live|messages)$/.test(p);
@@ -17,6 +17,7 @@ export function memberRequestAllowed(method: string, path: string): boolean {
     || (['PUT', 'DELETE'].includes(method) && /^\/(bots|groups)\/[^/]+$/.test(p))
     || (method === 'PUT' && /^\/bots\/[^/]+\/chat\/model$/.test(p))
     || (method === 'POST' && /^\/bots\/[^/]+\/(chat(\/(stream|messages))?|clear|stop)$/.test(p))
+    || (method === 'POST' && /^\/bots\/[^/]+\/chat\/queue\/[a-zA-Z0-9_-]{8,80}$/.test(p))
     || (method === 'POST' && /^\/conversations\/[^/]+\/(stop|clear|model)$/.test(p))
-    || (method === 'POST' && /^\/groups\/[^/]+\/(messages|chat|stop|clear)$/.test(p));
+    || (method === 'POST' && /^\/groups\/[^/]+\/(messages|chat|stop|clear|queue\/[a-zA-Z0-9_-]{8,80})$/.test(p));
 }

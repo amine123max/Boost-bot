@@ -4,7 +4,9 @@ import path from "node:path";
 import { saveConfigFile, type AppConfig, type ReasoningEffort } from "./config.js";
 import { Store, type Bot, type ChannelAccount } from "./store/db.js";
 import { OpenAICompatClient, type ModelClient } from "./llm/client.js";
+import { chatProtocol, supportsChatEffort } from "./llm/capabilities.js";
 import { BotRuntime } from "./core/runtime.js";
+import { ConversationHarness } from "./core/conversation-harness.js";
 import { KeyedQueue } from "./core/queue.js";
 import { CollaborationService } from './core/collaboration.js';
 import { BotManagement } from './core/bot-management.js';
@@ -16,7 +18,7 @@ import { Outbox } from "./core/outbox.js";
 import { Delivery, type DeliveryOptions } from "./core/delivery.js";
 import { AccessControl } from "./core/access.js";
 import { MESSENGERS, MESSENGER_LABEL, isMessenger, type ChannelStatus, type MessengerId } from "./core/types.js";
-import { botForPeer, defaultBotFor } from "./core/routes.js";
+import { botBoundChannel, botForPeer, ChannelBindingError, defaultBotFor } from "./core/routes.js";
 import { MagpieSupervisor } from "./magpie/supervisor.js";
 import { FeishuChannel } from "./channels/feishu/channel.js";
 import { LarkTransport, type FeishuTransport } from "./channels/feishu/transport.js";
@@ -182,6 +184,7 @@ export class App {
   readonly models: ModelClient;
   readonly modelSources: ModelSources;
   readonly runtime: BotRuntime;
+  readonly chatHarness: ConversationHarness;
   readonly agent: AgentManager;
   readonly queue = new KeyedQueue();
   readonly channels = new Map<string, BotChannels>();
@@ -248,6 +251,7 @@ export class App {
       log: logFilePath(),
     });
     this.store = new Store(path.join(config.dataDir, "boost-bot.db"), opts.databaseKey, opts.onDatabaseMigration);
+    this.chatHarness = new ConversationHarness(this.store);
     this.collaboration = new CollaborationService(this.store);
     this.botManagement = new BotManagement(this.store, id => this.startBot(id));
     this.workspaceStorage = new WorkspaceStorage(config);
@@ -296,10 +300,9 @@ export class App {
       contextWindow: async (model) => (await this.infoOf(model))?.context,
       // 桌面版：代理执行的命令用系统代理（环境里没设代理时）；命令行、Docker 只认环境变量
       systemProxy: async (url) => this.desktop?.resolveProxy?.(url),
-      // 代理的对话接口按 OKINTO 目录选（Responses / Anthropic Messages / Chat）；外部端点只当它会 Chat
+      // Unknown hosted metadata must not overwrite an explicitly selected protocol.
       apiInfo: async (model) => {
-        if (!this.magpie) return undefined;
-        const info = await this.infoOf(model);
+        const info = this.magpie ? await this.infoOf(model) : undefined;
         return info && { endpoints: info.endpoints, reasoning: info.reasoning };
       },
       effort: () => this.config.llm.reasoningEffort,
@@ -341,6 +344,7 @@ export class App {
       delivery: this.delivery,
       approvals: this.agent.approvals,
       onChange: () => this.attention.kick(),
+      onConversationMessage: id => this.chatHarness.announce(id),
       defaultModel: () => this.config.llm.defaultModel,
       route: (botId, model) => this.routeModel(botId, model),
       maxBackground: config.agent.maxBackground,
@@ -373,16 +377,22 @@ export class App {
     this.runtime = new BotRuntime({
       agent: this.agent,
       store: this.store,
+      chatHarness: this.chatHarness,
       models: this.models,
       defaultModel: () => this.config.llm.defaultModel,
       botModels: async botId => { const source=this.store.getBot(botId)?.settings.modelSource||'default';return source==='default'?this.runtime.listModels():this.modelSources.models(source); },
       contextMessages: config.llm.contextMessages,
       contextChars: config.llm.contextChars,
-      // 纯对话路径的推理强度：用户选了、模型资料也标了推理才带（外部端点没有模型资料，不带）
-      reasoningEffort: async (model, botId) => {
-        const botEffort = botId ? this.store.getBot(botId)?.settings.reasoningEffort : undefined;
+      modelOptions: async (model, botId) => {
+        const settings = this.store.getBot(botId)?.settings;
+        const botEffort = settings?.reasoningEffort;
         const effort = botEffort && botEffort !== "auto" ? botEffort : this.config.llm.reasoningEffort;
-        return effort !== "auto" && (await this.infoOf(model))?.reasoning === true ? effort : undefined;
+        // A catalog refresh must not delay the first visible response.
+        const info = this.modelInfoCache && (!settings || settings.modelSource === 'default')
+          ? this.lookupModelInfo(this.modelInfoCache.data, model)
+          : undefined;
+        const protocol = chatProtocol(settings?.modelProtocol, info?.endpoints);
+        return { protocol, reasoningEffort: effort !== "auto" && supportsChatEffort(protocol, model, info?.reasoning) === true ? effort : undefined };
       },
       route: (botId, model) => this.routeModel(botId, model),
       access: this.access,
@@ -668,6 +678,17 @@ export class App {
     if (!bot) return;
     for (const conversation of this.store.listConversations(botId)) this.runtime.stop(conversation.id);
     this.tasks.dropBot(botId);
+    for (const account of this.store.listChannelAccounts()) {
+      if (account.defaultBot !== botId || !botBoundChannel(account.channel)) continue;
+      if (account.channel === 'feishu') await this.stopFeishu(account.key);
+      else {
+        const channel = this.channels.get(account.key);
+        channel?.weixinLogin?.cancel();
+        await channel?.weixin?.stop().catch(() => {});
+        if (channel) { channel.weixin = undefined; channel.weixinLogin = undefined; }
+        this.runtime.registerReplier(account.key, 'weixin', undefined);
+      }
+    }
     // 渠道账号是全局的，不跟着机器人停：之后它们的消息交给别的机器人（core/routes.ts）
     await this.agent.stopBot(botId);
     if (bot?.settings.budget.enabled && this.account.signedIn) {
@@ -724,7 +745,10 @@ export class App {
 
   /** 某个模型的资料：官方 API 的按完整 id；其余去掉内置网关的 provider 前缀，再试最后一段（openai/x → x） */
   private async infoOf(model: string): Promise<ModelInfo | undefined> {
-    const info = await this.modelInfo();
+    return this.lookupModelInfo(await this.modelInfo(), model);
+  }
+
+  private lookupModelInfo(info: Record<string, ModelInfo>, model: string): ModelInfo | undefined {
     if (officialOf(model)) return info[model.trim()];
     const bare = parsePlaygroundModel(model)?.model ?? bareModel(model);
     return info[bareModel(model)] ?? info[bare] ?? info[bare.split("/").pop() ?? bare];
@@ -1076,10 +1100,11 @@ export class App {
     for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
   }
 
-  private ensureChannelAccount(key: string, channel: string, label: string, enabled = true): ChannelAccount {
+  private ensureChannelAccount(key: string, channel: string, label: string, enabled = true, botId?: string): ChannelAccount {
     const cur = this.store.getChannelAccount(key, channel);
     if (cur) return cur;
-    const account: ChannelAccount = { key, channel, label: this.freeChannelLabel(channel, label), defaultBot: defaultBotFor(this.store, key, channel), enabled, credentials: {}, createdAt: Date.now() };
+    if (botId && !this.store.getBot(botId)) throw new Error('绑定的智能体已不存在');
+    const account: ChannelAccount = { key, channel, label: this.freeChannelLabel(channel, label), defaultBot: botId ?? defaultBotFor(this.store, key, channel), enabled, credentials: {}, createdAt: Date.now() };
     this.store.saveChannelAccount(account);
     return account;
   }
@@ -1094,7 +1119,7 @@ export class App {
 
     const fsAccount = this.store.getChannelAccount(key, "feishu");
     const { appId, appSecret } = fsAccount?.credentials ?? {};
-    if (fsAccount?.enabled && appId && appSecret && !ch.feishu) {
+    if (fsAccount?.enabled && this.store.getBot(fsAccount.defaultBot) && appId && appSecret && !ch.feishu) {
       registerSecret(appSecret);
       const brand = fsAccount.credentials.brand === "lark" ? "lark" : "feishu";
       const transport = this.opts.feishuTransport?.({ id: key, feishuAppId: appId, feishuAppSecret: appSecret, brand }) ?? new LarkTransport(appId, appSecret, brand);
@@ -1116,7 +1141,8 @@ export class App {
     }
 
     registerSecret(this.store.getWeixinAccount(key)?.botToken);
-    if (this.store.getChannelAccount(key, "weixin")?.enabled && !ch.weixin) {
+    const weixin = this.store.getChannelAccount(key, "weixin");
+    if (weixin?.enabled && this.store.getBot(weixin.defaultBot) && !ch.weixin) {
       ch.weixin = new WeixinChannel(key, this.store, this.runtime, this.queue, {
         fetchImpl: this.opts.weixinFetch,
         cdnBaseUrl: this.config.weixin.cdnBaseUrl,
@@ -1203,7 +1229,7 @@ export class App {
       if (id === "telegram") this.store.deleteKV(telegramOffsetKey(key));
     }
     this.store.saveMessengerAccount({ botId: key, channel: id, credentials, name });
-    this.ensureChannelAccount(key, id, name || MESSENGER_LABEL[id]);
+    this.ensureChannelAccount(key, id, name || MESSENGER_LABEL[id], true, typeof input.defaultBot === 'string' ? input.defaultBot : undefined);
     await this.startBot(key);
   }
 
@@ -1216,13 +1242,18 @@ export class App {
   }
 
   /** 连接（或改凭据）飞书应用：Secret 留空沿用已保存的；App ID 留空就是移除。换了应用：单聊会话都是新的，连上后第一个发消息的人成为主人 */
-  async connectFeishu(key: string, appId: string, appSecret: string, brand?: "feishu" | "lark"): Promise<void> {
+  async connectFeishu(key: string, appId: string, appSecret: string, brand?: "feishu" | "lark", botId?: string): Promise<void> {
     if (!appId) return this.removeFeishu(key);
     const cur = this.store.getChannelAccount(key, "feishu");
+    const resolvedBrand = brand ?? (appId === cur?.credentials.appId && cur.credentials.brand === 'lark' ? 'lark' : 'feishu');
+    if (this.store.listChannelAccounts('feishu').some(row => row.key !== key &&
+      row.credentials.appId === appId && (row.credentials.brand || 'feishu') === resolvedBrand)) {
+      throw new ChannelBindingError('这个飞书应用已存在，请在聊天渠道设置中调整绑定。');
+    }
     const same = appId === cur?.credentials.appId;
     if (!same) this.access.resetOwner(key, "feishu");
-    const base = this.ensureChannelAccount(key, "feishu", t("app.feishu_account_name"));
-    const lark = (brand ?? (same ? cur?.credentials.brand : undefined)) === "lark";
+    const base = this.ensureChannelAccount(key, "feishu", t("app.feishu_account_name"), true, botId);
+    const lark = resolvedBrand === "lark";
     this.store.saveChannelAccount({ ...base, credentials: { appId, appSecret: appSecret || cur?.credentials.appSecret || "", ...(lark ? { brand: "lark" } : {}) } });
     await this.stopFeishu(key);
     await this.startBot(key);
@@ -1245,23 +1276,25 @@ export class App {
   }
 
   /** 全局渠道账号的列表（设置 › 连接）：别名、默认机器人、状态。序号按渠道数，和用户说的「第二个微信」一致 */
-  channelAccounts() {
+  channelAccounts(botId?: string) {
     const seen: Record<string, number> = {};
-    return this.store.listChannelAccounts().map((a) => {
+    return this.store.listChannelAccounts().flatMap((a) => {
       seen[a.channel] = (seen[a.channel] ?? 0) + 1;
+      const defaultBot = botBoundChannel(a.channel) ? a.defaultBot : defaultBotFor(this.store, a.key, a.channel);
+      if (botId && a.defaultBot !== botId) return [];
       const status = this.channelStatus(a.key) as unknown as Record<string, ChannelStatus>;
-      return {
+      return [{
         key: a.key,
         channel: a.channel,
         number: seen[a.channel],
         label: a.label,
-        defaultBot: defaultBotFor(this.store, a.key, a.channel),
+        defaultBot,
         enabled: a.enabled,
         status: status[a.channel],
         requests: this.store.listAccess({ botId: a.key, channel: a.channel, status: "pending" }).length,
         // 还没有主人：连上之后第一个发单聊消息的人成为主人，界面据此提示"等第一条消息"
         hasOwner: !!this.access.owner(a.key, a.channel),
-      };
+      }];
     });
   }
 
@@ -1280,7 +1313,10 @@ export class App {
       if (!this.store.getBot(patch.defaultBot)) return "no-bot";
       next.defaultBot = patch.defaultBot;
     }
-    if (patch.enabled !== undefined) next.enabled = patch.enabled;
+    if (patch.enabled !== undefined) {
+      if (patch.enabled && botBoundChannel(channel) && !this.store.getBot(next.defaultBot)) return 'no-bot';
+      next.enabled = patch.enabled;
+    }
     this.store.saveChannelAccount(next);
     if (patch.enabled !== undefined && patch.enabled !== cur.enabled) await this.restartBot(key);
     return "ok";
@@ -1322,7 +1358,7 @@ export class App {
   }
 
   // ---------- 微信扫码 ----------
-  startWeixinLogin(key: string): WeixinLogin {
+  startWeixinLogin(key: string, botId?: string): WeixinLogin {
     const ch = this.channels.get(key) ?? {};
     this.channels.set(key, ch);
     ch.weixinLogin?.cancel();
@@ -1335,20 +1371,25 @@ export class App {
     });
     ch.weixinLogin = login;
     void login.run().then(async (res) => {
-      if (!res) return;
+      const current = this.store.getChannelAccount(key, "weixin");
+      if (!res || ch.weixinLogin !== login || (botId && (!this.store.getBot(botId) || (current && current.defaultBot !== botId)))) return;
+      if (this.store.listChannelAccounts('weixin').some(row => row.key !== key && this.store.getWeixinAccount(row.key)?.ilinkBotId === res.ilinkBotId)) {
+        login.rejectBinding('这个微信机器人已存在，请使用已有账号或在设置中调整绑定。');
+        return;
+      }
       // 换了一个微信扫码：原来的主人留在允许名单里（可以移除），不会被拦在外面
       const prevOwner = this.store.getWeixinAccount(key)?.ownerUserId;
       this.store.saveWeixinAccount({ botId: key, botToken: res.botToken, ilinkBotId: res.ilinkBotId, baseUrl: res.baseUrl, ownerUserId: res.userId });
       if (prevOwner && prevOwner !== res.userId) this.access.allow(key, "weixin", prevOwner, "previous-owner");
       // 这次拿到了扫码者：之前没拿到时第一个发消息成为主人的人，也留在允许名单里
       if (res.userId) this.access.resetOwner(key, "weixin", { keep: true });
-      const account = this.ensureChannelAccount(key, "weixin", t("app.weixin_account_name"));
+      const account = this.ensureChannelAccount(key, "weixin", t("app.weixin_account_name"), true, botId);
       if (!account.enabled) this.store.saveChannelAccount({ ...account, enabled: true });
       await ch.weixin?.stop();
       ch.weixin = undefined;
       await this.startBot(key);
       this.notice("info", t("app.weixin_connected", { name: account.label }));
-    });
+    }).catch(error => log.warn('weixin account could not be started', { message: (error as Error).message }));
     return login;
   }
 

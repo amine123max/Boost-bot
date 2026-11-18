@@ -12,15 +12,13 @@ import type {
   AggregateApi,
   AppSettings,
   AppSessionResult,
-  DashboardAdminUsageSummary,
-  MemberDashboardSummary,
   UsageAggregateSummary,
 } from "@/types";
 import type { AppSettingsPatch } from "@/lib/api/app-client";
 import { appClient } from "@/lib/api/app-client";
 import { accountClient } from "@/lib/api/account-client";
 import { serviceClient } from "@/lib/api/service-client";
-import { dashboardClient } from "@/lib/api/dashboard-client";
+import { isManagementReadBusy } from "@/lib/api/transport-errors";
 import { attachUsagesToAccounts } from "@/lib/api/normalize";
 import {
   getAppErrorMessage,
@@ -40,12 +38,11 @@ export const boost = reactive({
   connections: [] as AggregateApi[],
   settings: null as AppSettings | null,
   session: null as AppSessionResult | null,
-  summary: null as DashboardAdminUsageSummary | null,
-  memberSummary: null as MemberDashboardSummary | null,
   selectedId: "",
   recentAccountId: "",
   quotaSummary: null as UsageAggregateSummary | null,
   updatedAt: null as Date | null,
+  refreshVersion: 0,
 });
 export const isAdmin = computed(
   () =>
@@ -101,8 +98,45 @@ export async function refreshAccounts() {
     boost.quotaSummary = quotaResult.value;
   if (admin && quotaResult.status === "rejected") throw quotaResult.reason;
 }
-export async function refreshData() {
-  const jobs: Array<[string, () => Promise<() => void>]> = [
+let refreshingData: Promise<void> | undefined;
+let retryingData: Promise<void> | undefined;
+let refreshRetry: ReturnType<typeof setTimeout> | undefined;
+export function refreshData(): Promise<void> {
+  clearTimeout(refreshRetry);
+  if (retryingData) return retryingData.then(refreshData);
+  return refreshingData ??= loadData().finally(() => { refreshingData = undefined; });
+}
+type RefreshJob = [string, () => Promise<() => void>];
+
+async function runRefreshJobs(jobs: RefreshJob[], errors = new Map<string, string>(), attempt = 0) {
+  const results = await Promise.allSettled(jobs.map(([, load]) => load()));
+  const busy: RefreshJob[] = [];
+  const failures: string[] = [];
+  results.forEach((result, index) => {
+    const job = jobs[index];
+    if (result.status === "fulfilled") result.value();
+    else if (isManagementReadBusy(result.reason)) busy.push(job);
+    else {
+      const message = `${job[0]}：${getAppErrorMessage(result.reason)}`;
+      errors.set(job[0], message);
+      failures.push(message);
+    }
+  });
+  boost.error = Array.from(errors.values()).join("；");
+  if (failures.length) notify(failures.join("；"), true);
+  if (!busy.length) {
+    if (!errors.size) boost.updatedAt = new Date();
+    return;
+  }
+  const session = boost.session;
+  refreshRetry = setTimeout(() => {
+    if (boost.session !== session || !boost.connected || refreshingData || retryingData) return;
+    retryingData = runRefreshJobs(busy, errors, attempt + 1)
+      .finally(() => { retryingData = undefined; });
+  }, Math.min(320 * 2 ** attempt, 15_000));
+}
+async function loadData() {
+  const jobs: RefreshJob[] = [
     ["订阅", async () => {
       const version = ++accountRefreshVersion;
       const [accounts, usages] = await Promise.all([
@@ -156,34 +190,9 @@ export async function refreshData() {
           return () => { boost.selectedId = selectedId; };
         },
       ],
-      [
-        "用量",
-        async () => {
-          const summary = await dashboardClient.getAdminUsageSummary();
-          return () => { boost.summary = summary; };
-        },
-      ],
     );
-  else
-    jobs.push([
-      "用量",
-      async () => {
-        const memberSummary = await dashboardClient.getMemberSummary();
-        return () => { boost.memberSummary = memberSummary; };
-      },
-    ]);
-  const results = await Promise.allSettled(jobs.map(([, load]) => load()));
-  results.forEach((result) => {
-    if (result.status === "fulfilled") result.value();
-  });
-  const errors = results.flatMap((r, i) =>
-    r.status === "rejected"
-      ? [`${jobs[i][0]}：${getAppErrorMessage(r.reason)}`]
-      : [],
-  );
-  boost.error = errors.join("；");
-  if (boost.error) notify(boost.error, true);
-  boost.updatedAt = new Date();
+  await runRefreshJobs(jobs);
+  boost.refreshVersion++;
 }
 export async function initialize(options: { startService?: boolean } = {}) {
   if (boost.loading) return;

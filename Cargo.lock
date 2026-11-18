@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "boost-core"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "base64",
  "fs2",
@@ -403,7 +403,7 @@ dependencies = [
 
 [[package]]
 name = "boost-service"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "axum",
  "base64",
@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "boost-start"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "boost-service",
  "ctrlc",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "boost-web"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "axum",
  "boost-service",

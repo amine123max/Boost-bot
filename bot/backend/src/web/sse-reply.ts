@@ -1,6 +1,11 @@
 import type http from "node:http";
+import type { ActivityStep } from "../agent/activity.js";
 import type { OutboundOp, ReplySession } from "../core/types.js";
 import { describeFile } from "./files.js";
+
+export function publicActivity({ id, kind, title, status, cut, at, ms }: ActivityStep): ActivityStep {
+  return { id, kind, title, status, cut, at, ms };
+}
 
 /**
  * 运行时的 OutboundOp → 网页对话的 SSE 事件：text（到目前为止的完整回复，覆盖式）、interim（模型在回合中间说的一段话，追加）、
@@ -26,26 +31,28 @@ export function opEvent(op: OutboundOp): [string, unknown] | undefined {
     case "interactive":
       return ["prompt", { kind: op.kind, prompt: op.prompt, requestId: op.requestId, code: op.code }];
     case "activity":
-      return ["activity", op.step];
+      return ["activity", publicActivity(op.step)];
   }
 }
 
 /**
  * 网页对话渠道：把事件写成 text/event-stream。
  * 事件见 opEvent，另有 snapshot（接上进行中的回合时先发一次）、stopping、done、error。
- * 运行时的 stream.update 本身就是累计文本，所以前端只需整体替换，不用拼接增量。
+ * 旧客户端接收累计正文；启用增量时按订阅独立计算偏移，首次及重连仍从快照开始。
  */
 export class SseReply implements ReplySession {
   private closed = false;
+  private sentText = '';
   text = "";
 
-  constructor(private res: http.ServerResponse) {
+  constructor(private res: http.ServerResponse, private deltaText = false) {
     res.writeHead(200, {
       "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-store",
+      "cache-control": "no-store, no-transform",
       "x-accel-buffering": "no",
       connection: "keep-alive",
     });
+    res.flushHeaders();
     res.on("close", () => (this.closed = true));
     // 代理回合可能长时间没有输出：定期发注释行，避免中间层断开空闲连接
     const beat = setInterval(() => this.raw(": keep-alive\n\n"), 15_000);
@@ -57,6 +64,21 @@ export class SseReply implements ReplySession {
   }
 
   send(event: string, data: unknown): void {
+    if (this.deltaText) {
+      const frame = data as { text?: string; final?: boolean } | null;
+      if (event === 'snapshot' || event === 'turn' || event === 'turnEnd') this.sentText = frame?.text ?? '';
+      if (event === 'text' && typeof frame?.text === 'string') {
+        const next = frame.text;
+        if (next.startsWith(this.sentText)) {
+          const offset = this.sentText.length;
+          const append = next.slice(offset);
+          this.sentText = next;
+          if (!append && !frame.final) return;
+          event = 'textDelta';
+          data = { offset, append, ...(frame.final ? { final: true } : {}) };
+        } else this.sentText = next; // Reset or rewrite; send the authoritative replacement.
+      }
+    }
     this.raw(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   }
 

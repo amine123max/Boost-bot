@@ -40,6 +40,7 @@ pub(super) fn classify(method: &str) -> RpcClass {
         | "dashboard/memberSummary"
         | "requestlog/list"
         | "requestlog/summary"
+        | "gateway/manualAccount/get"
         | "service/telemetry"
         | "service/listenConfig/get"
         | "accountManager/session/current"
@@ -101,6 +102,7 @@ mod tests {
     #[test]
     fn classification_is_explicit_and_cross_domain_changes_are_exclusive() {
         assert_eq!(classify("account/list"), RpcClass::Read);
+        assert_eq!(classify("gateway/manualAccount/get"), RpcClass::Read);
         assert_eq!(
             classify("account/import"),
             RpcClass::Write(Resource::Accounts)

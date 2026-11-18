@@ -256,6 +256,10 @@
     {
       "en": "docs/releases/v0.5.1.md",
       "zh": "docs/releases/v0.5.1.zh-CN.md"
+    },
+    {
+      "en": "docs/releases/v0.5.2.md",
+      "zh": "docs/releases/v0.5.2.zh-CN.md"
     }
   ]
 }

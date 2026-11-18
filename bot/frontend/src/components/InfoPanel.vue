@@ -51,13 +51,14 @@ async function connect(channel: ChatChannel, account?: Account) {
   channelBusy.value = true;
   try {
     if (account && !account.enabled) {
-      await api(`/channel-accounts/${enc(account.key)}/${enc(channel)}/settings`, { method: 'PUT', body: { enabled: true } });
+      await api(`/channel-accounts/${enc(account.key)}/${enc(channel)}/settings`, { method: 'PUT', body: { enabled: true, expectedBot: props.bot.id } });
       await load();
     } else await channelDialog.value?.begin(channel, account, props.bot.id, true);
   } catch (e) { channelError.value = (e as Error).message; }
   finally { channelBusy.value = false; }
 }
 let generation = 0,
+  request = 0,
   timer: ReturnType<typeof setTimeout> | undefined;
 async function load() {
   clearTimeout(timer);
@@ -65,24 +66,24 @@ async function load() {
     timer = setTimeout(load, 5000);
     return;
   }
-  const ticket = generation,
+  const ticket = generation, version = ++request,
     id = props.bot.id;
   error.value = "";
   try {
     const [conversationsResult, accountsResult] = await Promise.allSettled([
       api<{ conversations: Conversation[] }>(`/conversations?bot=${enc(id)}`),
-      props.configure ? api<{ accounts: Account[] }>("/channel-accounts") : Promise.resolve({ accounts: [] as Account[] }),
+      props.configure ? api<{ accounts: Account[] }>(`/channel-accounts?bot=${enc(id)}`) : Promise.resolve({ accounts: [] as Account[] }),
     ]);
-    if (ticket !== generation) return;
+    if (ticket !== generation || version !== request) return;
     if (conversationsResult.status === 'fulfilled') conversations.value = conversationsResult.value.conversations;
     else error.value = conversationsResult.reason instanceof Error ? conversationsResult.reason.message : '会话读取失败';
     if (accountsResult.status === 'fulfilled') accounts.value = accountsResult.value.accounts.filter(account => account.defaultBot === id);
     else channelError.value = accountsResult.reason instanceof Error ? accountsResult.reason.message : '渠道读取失败';
 
   } catch (e) {
-    if (ticket === generation) error.value = (e as Error).message;
+    if (ticket === generation && version === request) error.value = (e as Error).message;
   } finally {
-    if (ticket === generation) timer = setTimeout(load, 5000);
+    if (ticket === generation && version === request) timer = setTimeout(load, 5000);
   }
 }
 watch(
@@ -122,8 +123,8 @@ onBeforeUnmount(() => {
       <template v-if="configure">
       <BotChannels :key="bot.id" :accounts="accounts" :busy="channelBusy" @connect="connect" @edit="channelDialog?.editAccount($event)" @more="channelDialog?.begin(undefined, undefined, bot.id)" />
       <p v-if="channelError" class="notice" role="alert">{{ channelError }}</p>
-      <PanelSection title="管理聊天渠道" help="管理工作台共用的渠道账号，可调整默认智能体、启停账号或添加新的连接。">
-        <ChannelSettings :bots="bots" embedded @changed="load" />
+      <PanelSection title="管理聊天渠道" help="管理分配给当前智能体的渠道账号；工作台设置可查看所有账号。">
+        <ChannelSettings :key="bot.id" :bots="bots" :scope-bot="bot.id" :account-list="accounts" embedded @changed="load" />
       </PanelSection>
       </template>
       <BotApprovals :key="bot.id" :bot-id="bot.id" :configure="configure" :pending="pending" @changed="emit('saved')" />
@@ -154,7 +155,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </aside>
-  <ChannelSettings v-if="configure" :key="bot.id" ref="channelDialog" :bots="bots" dialog-only @changed="load" @error="channelError = $event" />
+  <ChannelSettings v-if="configure" :key="bot.id" ref="channelDialog" :bots="bots" :scope-bot="bot.id" dialog-only @changed="load" @error="channelError = $event" />
   <ConversationHistory
     v-if="viewing"
     :key="viewing.id"

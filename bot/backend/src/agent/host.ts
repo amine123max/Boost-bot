@@ -18,6 +18,7 @@ import { DEFAULT_SETTINGS, permissionMode, type BotSettings } from "./settings.j
 import type { BotPermission } from "../botkit/format.js";
 import type { AccountService } from "./accounts.js";
 import { acceptsImages } from "../llm/client.js";
+import { chatProtocol, claudeAdaptive, supportsChatEffort } from "../llm/capabilities.js";
 import { CUA_SKILL, MEDIA_SKILL, TASK_RULES, agentPersona, botPrompt } from "./prompts/index.js";
 import { t, t as tr } from "../i18n/index.js";
 import { dirBytes, taskSessionDirs } from "../tasks/retention.js";
@@ -136,6 +137,7 @@ function loadSdk(runtimeDir: string): Promise<SdkModule> {
 
 /** 回合中的可见进度（工具调用等），由渠道批量发送。 */
 export interface TurnObserver {
+  onText?(delta: string | null): void;
   onProgress?(text: string): void;
   /**
    * DSH 会话事件（time 是事件自带的时间）；子代理的开始/结束以 subagent/started、subagent/finished 送来，
@@ -347,13 +349,7 @@ export function effortApplies(api: AgentApi, reasoning?: boolean): boolean {
  * Claude 4.6 起（以及 Fable、Mythos）用 adaptive 思考加 output_config.effort，较新的型号收到 budget_tokens 直接 400；
  * 更早的型号只有 budget_tokens。pi-ai 对不在它目录里的模型 id 默认走 budget，所以要明确告诉它。
  */
-export function claudeAdaptive(model: string): boolean {
-  if (/claude-(?:fable|mythos)/i.test(model)) return true;
-  const m = /claude-(?:opus|sonnet|haiku)-(\d+)(?:[-.](\d{1,2})(?!\d))?/i.exec(model);
-  if (!m) return false;
-  const major = Number(m[1]);
-  return major > 4 || (major === 4 && Number(m[2] ?? 0) >= 6);
-}
+export { claudeAdaptive };
 
 /** 补丁里模型的 compat：只放和以前不一样、不写就会出错的那几项 */
 function profileCompat(api: AgentApi, model: string, reasoning?: boolean): Record<string, boolean> | undefined {
@@ -1146,17 +1142,24 @@ exec "$REAL" "$@"
    * 模型资料在一个子进程的生命期内只查一次（和以前一样：接口在拉起进程时选定）。
    */
   async routeFor(model: string): Promise<ModelRoute> {
-    let p = this.routes.get(model);
+    const preference = this.settings().modelProtocol;
+    const routeKey = `${preference}:${model}`;
+    let p = this.routes.get(routeKey);
     if (!p) {
       const ask = <T>(q: Promise<T | undefined> | undefined) => withTimeoutOr(q ?? Promise.resolve(undefined), 3000, undefined).catch(() => undefined);
       p = Promise.all([ask(this.o.contextWindow?.(model)), ask(this.o.apiInfo?.(model))]).then(([known, info]) => {
-        const api = agentApi(info?.endpoints);
-        return { model, provider: providerFor(api, info?.reasoning), api, limits: modelLimits(model, known), reasoning: info?.reasoning };
+        const protocol = chatProtocol(preference, info?.endpoints);
+        const api = preference === 'auto' ? agentApi(info?.endpoints)
+          : protocol === 'responses' ? 'openai-responses' : protocol === 'messages' ? 'anthropic-messages' : 'openai-completions';
+        const effectiveProtocol = api === 'openai-responses' ? 'responses' : api === 'anthropic-messages' ? 'messages' : 'chat';
+        const reasoning = info?.reasoning ?? supportsChatEffort(effectiveProtocol, model);
+        return { model, provider: providerFor(api, reasoning), api, limits: modelLimits(model, known), reasoning };
       });
-      this.routes.set(model, p);
+      this.routes.set(routeKey, p);
     }
     const r = await p;
-    const fb = r.api !== "openai-completions" ? this.fallbacks.get(model) : undefined;
+    const rememberedFallback = r.api !== "openai-completions" ? this.fallbacks.get(model) : undefined;
+    const fb = rememberedFallback?.from === r.api ? rememberedFallback : undefined;
     return fb ? { ...r, provider: "magpie", api: "openai-completions", fallback: fb } : r;
   }
 
@@ -1656,6 +1659,13 @@ exec "$REAL" "$@"
       turnError: undefined as string | undefined,
     };
     const onNotification = (n: SdkNotification) => {
+      if (n.method === 'session.publicText') {
+        if (n.params?.sessionId === sessionId) {
+          if (n.params.reset === true) observer?.onText?.(null);
+          else if (typeof n.params.delta === 'string') observer?.onText?.(n.params.delta);
+        }
+        return;
+      }
       if (process.env.AMB_DSH_TRACE) fs.appendFileSync(process.env.AMB_DSH_TRACE, JSON.stringify(n).slice(0, 2000) + "\n");
       if (n.method === "subagent.started" || n.method === "subagent.finished") return observer?.onEvent?.(n.method.replace(".", "/"), n.params, Date.now());
       if (n.method !== "session.event") return;

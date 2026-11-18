@@ -67,7 +67,7 @@ export function useTrayDock(editing: Ref<boolean>) {
           Number.isFinite(next.x) &&
           Number.isFinite(next.y)
         )
-          trayPreferences.position = { x: next.x, y: next.y };
+          trayPreferences.position = { x: next.x, y: next.y, monitor: next.monitor, scale: next.scale };
       }
     } catch (error) {
       actionError.value = getAppErrorMessage(error);
@@ -101,6 +101,7 @@ export function useTrayDock(editing: Ref<boolean>) {
     )
       return;
     stopPointer();
+    restorePosition = null;
     dragging = true;
     void getCurrentWindow()
       .startDragging()
@@ -109,7 +110,8 @@ export function useTrayDock(editing: Ref<boolean>) {
       })
       .finally(() => {
         dragging = false;
-        void syncLayout();
+        clearTimeout(layoutTimer);
+        layoutTimer = setTimeout(() => void syncLayout(), 100);
       });
   }
   function startDragging(event: PointerEvent) {

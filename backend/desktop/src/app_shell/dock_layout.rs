@@ -18,6 +18,15 @@ pub(crate) struct DockLayout {
     horizontal: bool,
     x: i32,
     y: i32,
+    monitor: String,
+    scale: f64,
+}
+#[derive(Clone, Deserialize)]
+struct SavedPosition {
+    x: i32,
+    y: i32,
+    monitor: Option<String>,
+    scale: Option<f64>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +37,7 @@ pub(crate) struct LayoutOptions {
     vertical_height: f64,
     orientation: String,
     snap: bool,
-    position: Option<PhysicalPosition<i32>>,
+    position: Option<SavedPosition>,
 }
 
 fn dimensions(horizontal: bool, rings: u32, metrics: u32) -> LogicalSize<f64> {
@@ -141,7 +150,7 @@ fn configured_layout(
         (area.position.x + area.size.width as i32 - pixels.width as i32).max(area.position.x);
     let max_y =
         (area.position.y + area.size.height as i32 - pixels.height as i32).max(area.position.y);
-    let desired = options.position.unwrap_or(position);
+    let desired = position;
     let next = PhysicalPosition::new(
         (match edge {
             Edge::Left => area.position.x,
@@ -159,6 +168,80 @@ fn configured_layout(
     Ok((edge, horizontal, size, next))
 }
 
+#[cfg(target_os = "macos")]
+fn work_area(window: &tauri::Window, monitor: &tauri::Monitor) -> PhysicalRect<i32, u32> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+    let scale = monitor.scale_factor();
+    let origin = monitor.position().to_logical::<f64>(scale);
+    let fallback = *monitor.work_area();
+    // Tauri 2.10 converts the horizontal inset but leaves the macOS work area's
+    // Y at the physical screen edge. AppKit's visibleFrame excludes the menu bar.
+    let read = move |mtm: MainThreadMarker| {
+        let screens = NSScreen::screens(mtm);
+        let Some(primary) = screens.firstObject() else {
+            return fallback;
+        };
+        let primary_frame = primary.frame();
+        let primary_top = primary_frame.origin.y + primary_frame.size.height;
+        for screen in screens.to_vec() {
+            let frame = screen.frame();
+            let top = primary_top - frame.origin.y - frame.size.height;
+            if (frame.origin.x - origin.x).abs() > 1.0 || (top - origin.y).abs() > 1.0 {
+                continue;
+            }
+            let visible = screen.visibleFrame();
+            return PhysicalRect {
+                position: tauri::LogicalPosition::new(
+                    visible.origin.x,
+                    primary_top - visible.origin.y - visible.size.height,
+                )
+                .to_physical(scale),
+                size: LogicalSize::new(visible.size.width, visible.size.height).to_physical(scale),
+            };
+        }
+        fallback
+    };
+    if let Some(mtm) = MainThreadMarker::new() {
+        return read(mtm);
+    }
+    let (send, recv) = std::sync::mpsc::sync_channel(1);
+    if window
+        .run_on_main_thread(move || {
+            if let Some(mtm) = MainThreadMarker::new() {
+                let _ = send.send(read(mtm));
+            }
+        })
+        .is_ok()
+    {
+        return recv
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .unwrap_or(fallback);
+    }
+    fallback
+}
+
+#[cfg(not(target_os = "macos"))]
+fn work_area(_: &tauri::Window, monitor: &tauri::Monitor) -> PhysicalRect<i32, u32> {
+    *monitor.work_area()
+}
+
+fn monitor_key(monitor: &tauri::Monitor) -> String {
+    let position = monitor.position();
+    let scale = if cfg!(target_os = "macos") {
+        monitor.scale_factor()
+    } else {
+        1.0
+    };
+    let origin = position.to_logical::<f64>(scale);
+    format!(
+        "{}|{:.0}|{:.0}",
+        monitor.name().map(String::as_str).unwrap_or(""),
+        origin.x,
+        origin.y
+    )
+}
+
 pub(crate) fn sync(
     window: &tauri::Window,
     rings: u32,
@@ -166,49 +249,67 @@ pub(crate) fn sync(
     options: Option<LayoutOptions>,
 ) -> Result<DockLayout, String> {
     let position = window.outer_position().map_err(|e| e.to_string())?;
-    let desired = options
+    let saved = options
         .as_ref()
-        .and_then(|options| options.position)
-        .unwrap_or(position);
-    let monitor = window
-        .available_monitors()
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .find(|monitor| {
-            let area = monitor.work_area();
-            desired.x >= area.position.x
-                && desired.y >= area.position.y
-                && desired.x < area.position.x + area.size.width as i32
-                && desired.y < area.position.y + area.size.height as i32
-        })
+        .and_then(|options| options.position.as_ref());
+    let saved_monitor = if let Some(point) = saved {
+        let monitors = window.available_monitors().map_err(|e| e.to_string())?;
+        monitors
+            .iter()
+            .find(|monitor| point.monitor.as_deref() == Some(monitor_key(monitor).as_str()))
+            .or_else(|| {
+                monitors.iter().find(|monitor| {
+                    let origin = monitor.position();
+                    let size = monitor.size();
+                    point.x >= origin.x
+                        && point.y >= origin.y
+                        && point.x < origin.x + size.width as i32
+                        && point.y < origin.y + size.height as i32
+                })
+            })
+            .cloned()
+    } else {
+        None
+    };
+    let monitor = saved_monitor
         .or(window.current_monitor().map_err(|e| e.to_string())?)
+        .or_else(|| window.primary_monitor().ok().flatten())
         .ok_or("无法读取显示器")?;
-    let current = window.inner_size().map_err(|e| e.to_string())?;
+    let area = work_area(window, &monitor);
+    let scale = monitor.scale_factor();
+    let key = monitor_key(&monitor);
+    let desired = saved.map_or(position, |p| {
+        let point = PhysicalPosition::new(p.x, p.y);
+        if cfg!(target_os = "macos") && p.monitor.as_deref() == Some(key.as_str()) {
+            let saved_scale = p
+                .scale
+                .filter(|value| value.is_finite() && *value >= 1.0)
+                .unwrap_or(scale);
+            point.to_logical::<f64>(saved_scale).to_physical(scale)
+        } else {
+            point
+        }
+    });
+    let current = window
+        .inner_size()
+        .map_err(|e| e.to_string())?
+        .to_logical::<f64>(window.scale_factor().map_err(|e| e.to_string())?)
+        .to_physical(scale);
     let mut previous = EDGE.lock().map_err(|_| "悬浮窗布局暂不可用")?;
-    let (mut edge, mut size, mut next) = resolve(
-        desired,
-        current,
-        *monitor.work_area(),
-        monitor.scale_factor(),
-        *previous,
-        rings,
-        metrics,
-    );
+    let (mut edge, mut size, mut next) =
+        resolve(desired, current, area, scale, *previous, rings, metrics);
     let mut horizontal = edge == Edge::Top;
     if let Some(options) = options {
-        (edge, horizontal, size, next) = configured_layout(
-            &options,
-            edge,
-            position,
-            *monitor.work_area(),
-            monitor.scale_factor(),
-        )?;
+        (edge, horizontal, size, next) = configured_layout(&options, edge, desired, area, scale)?;
     }
     *previous = edge;
-    if current != size.to_physical::<u32>(monitor.scale_factor()) {
+    let resized = current != size.to_physical::<u32>(scale);
+    if resized {
         window.set_size(size).map_err(|e| e.to_string())?;
     }
-    if position != next {
+    if position != next || (resized && edge == Edge::Top) {
+        #[cfg(target_os = "macos")]
+        let next = next.to_logical::<f64>(scale);
         window.set_position(next).map_err(|e| e.to_string())?;
     }
     Ok(DockLayout {
@@ -216,6 +317,8 @@ pub(crate) fn sync(
         horizontal,
         x: next.x,
         y: next.y,
+        monitor: key,
+        scale,
     })
 }
 
@@ -231,12 +334,12 @@ mod tests {
             vertical_height: 220.0,
             orientation: "horizontal".into(),
             snap: false,
-            position: Some(PhysicalPosition::new(-1500, 120)),
+            position: None,
         };
         let (edge, horizontal, size, position) = configured_layout(
             &options,
             Edge::Right,
-            PhysicalPosition::new(0, 0),
+            PhysicalPosition::new(-1500, 120),
             area(),
             1.5,
         )

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { ActivityStep } from "../agent/activity.js";
 import type { OutboundOp, ReplySession } from "../core/types.js";
-import { opEvent } from "./sse-reply.js";
+import { opEvent, publicActivity } from "./sse-reply.js";
 import { describeFile, type ShownFile } from "./files.js";
 
 export interface LivePrompt {
@@ -56,6 +56,7 @@ export class LiveTurn implements ReplySession {
   readonly abort = new AbortController();
   private subs = new Set<Listener>();
   private textTimer: ReturnType<typeof setTimeout> | undefined;
+  private publishedText = '';
 
   constructor(
     readonly conversationId: string,
@@ -81,13 +82,29 @@ export class LiveTurn implements ReplySession {
       this.prompts.push({ kind: op.kind, prompt: op.prompt, requestId: op.requestId, code: op.code });
     }
     const ev = opEvent(op);
-    if (op.type === 'stream.update') {
-      // Coalesce cumulative text frames; snapshots always retain the latest text.
-      if (!this.textTimer) this.textTimer = setTimeout(() => { this.textTimer = undefined; if (!this.done) this.emit('text', { text: this.text }); }, 32);
+    if (op.type === 'stream.update' && op.text) {
+      // Publish immediately, then coalesce bursts within one display frame.
+      if (!this.textTimer) {
+        this.publishText();
+        this.textTimer = setTimeout(() => {
+          this.textTimer = undefined;
+          if (!this.done) this.publishText();
+        }, 16);
+      }
       return;
     }
-    if (op.type === 'stream.finish' || op.type === 'text') { clearTimeout(this.textTimer); this.textTimer = undefined; }
+    if (op.type === 'stream.update' || op.type === 'stream.finish' || op.type === 'text') {
+      clearTimeout(this.textTimer);
+      this.textTimer = undefined;
+      this.publishedText = this.text;
+    }
     if (ev) this.emit(ev[0], ev[1]);
+  }
+
+  private publishText() {
+    if (this.text === this.publishedText) return;
+    this.publishedText = this.text;
+    this.emit('text', { text: this.text });
   }
 
   snapshot(): LiveSnapshot {
@@ -98,7 +115,7 @@ export class LiveTurn implements ReplySession {
       userMessageId: this.userMessageId,
       interim: [...this.interim],
       text: this.text,
-      steps: [...this.steps.values()],
+      steps: [...this.steps.values()].map(publicActivity),
       prompts: [...this.prompts],
       files: [...this.files],
       stopping: this.stopping,
@@ -133,6 +150,7 @@ export class LiveTurn implements ReplySession {
 
   finish(event: "done" | "error", data: unknown): void {
     if (this.done) return;
+    if (this.textTimer) this.publishText();
     this.done = true;
     clearTimeout(this.textTimer); this.textTimer = undefined;
     this.emit(event, data);
