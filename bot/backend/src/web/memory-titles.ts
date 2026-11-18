@@ -25,7 +25,7 @@ function cache(app: App, botId: string): Cache {
   const binding = modelBinding(app, botId).binding;
   try {
     const value = JSON.parse(app.store.getKV(key(botId)) || 'null');
-    if (value?.binding === binding && value.titles && typeof value.titles === 'object') return value;
+    if (value?.titles && typeof value.titles === 'object') return { binding, titles: value.titles };
   } catch { /* A missing or incompatible cache never hides the saved memory. */ }
   return { binding, titles: {} };
 }

@@ -22,14 +22,13 @@ const entriesOf=(scope?:Scope):Entry[]=>scope?[...scope.entries,...scope.topics.
 const own=computed(()=>entriesOf(scopes.value.find(scope=>scope.kind==='bot'&&scope.id===props.bot.id)));
 const entries=computed(()=>entriesOf(selected.value).filter(entry=>(entry.text+' '+(entry.topic||'')).toLowerCase().includes(query.value.trim().toLowerCase())));
 const isRemoving=(entry:Entry)=>!!removing.value&&removing.value.text===entry.text&&removing.value.topic===entry.topic;
-const summaryError=ref('');
 let summaryKey='', summarizing=false, summaryController:AbortController|undefined;
 async function summarize(){
   const botId=props.bot.id, visible=own.value.slice(0,3);
   if(summarizing||!visible.length||visible.every(entry=>entry.title))return;
   const fingerprint=JSON.stringify([botId,props.bot.settings.modelSource,props.bot.defaultModel,props.bot.settings.utilityModel,visible.map(entry=>[entry.topic,entry.text])]);
   if(summaryKey===fingerprint)return;
-  summaryKey=fingerprint;summarizing=true;summaryError.value='';
+  summaryKey=fingerprint;summarizing=true;
   const abort=new AbortController();summaryController=abort;
   try{
     const result=await api<{entries:Array<{text:string;topic:string;title?:string}>}>(`/bots/${enc(botId)}/memory/titles`,{method:'POST',body:{},signal:abort.signal});
@@ -37,7 +36,7 @@ async function summarize(){
     const scope=scopes.value.find(scope=>scope.kind==='bot'&&scope.id===botId);
     const apply=(entry:Entry,topic='')=>{const match=result.entries.find(item=>item.text===entry.text&&item.topic===topic);if(match?.title)entry.title=match.title;};
     scope?.entries.forEach(entry=>apply(entry));scope?.topics.forEach(topic=>topic.entries.forEach(entry=>apply(entry,topic.name)));
-  }catch(e){if(!disposed&&!abort.signal.aborted&&botId===props.bot.id)summaryError.value=(e as Error).message;}
+  }catch{ /* Keep the existing title or original text when the provider is unavailable. */ }
   finally{if(summaryController===abort)summarizing=false;}
 }
 let generation=0, disposed=false, timer:ReturnType<typeof setTimeout>|undefined, controller:AbortController|undefined;
@@ -70,7 +69,7 @@ function openAdd(){text.value='';topic.value='';addError.value='';addingMemory.v
 async function armRemoval(entry:Entry){removing.value=entry;await nextTick();memoryDialog.value?.querySelector<HTMLButtonElement>('.memory-delete-confirm')?.focus({preventScroll:true});}
 watch([scopeKey,query],()=>{removing.value=undefined;});
 watch(()=>props.bot.settings.memory.enabled,value=>enabled.value=value);
-watch(()=>props.bot.id,()=>{summaryController?.abort();summarizing=false;summaryKey='';summaryError.value='';scopes.value=[];loaded.value=false;managing.value=false;addingMemory.value=false;scopeKey.value='bot:'+props.bot.id;void load();},{immediate:true});
+watch(()=>props.bot.id,()=>{summaryController?.abort();summarizing=false;summaryKey='';scopes.value=[];loaded.value=false;managing.value=false;addingMemory.value=false;scopeKey.value='bot:'+props.bot.id;void load();},{immediate:true});
 onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort();summaryController?.abort();clearTimeout(timer);});
 </script>
 <template>
@@ -79,7 +78,6 @@ onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort();summaryContr
     <div class="memory-controls"><button class="memory-toggle" :class="{enabled}" role="switch" :aria-checked="enabled" aria-label="启用长期记忆" :disabled="busy" @click="toggle">{{enabled?'已启用':'启用'}}</button><span v-if="own.length" class="memory-count">{{own.length}}条</span><span v-else-if="loaded&&!error" class="memory-empty-inline">还没有长期记忆<button @click="open">添加记忆</button></span></div>
     <p v-if="error&&!managing" class="notice" role="alert">{{error}}</p>
     <div class="memory-preview"><button v-for="(entry,index) in own.slice(0,3)" :key="index" class="memory-preview-entry" :title="entry.text" @click="open"><span v-if="entry.topic" class="memory-preview-topic"><span class="memory-topic">{{entry.topic}}</span><span aria-hidden="true">：</span></span><span class="memory-preview-title">{{entry.title||memoryTitle(entry.text)}}</span></button><p v-if="!loaded&&!error" class="memory-empty" role="status">正在读取记忆…</p></div>
-    <p v-if="summaryError" class="memory-summary-status" role="status">概括暂不可用<button :title="summaryError" @click="summaryKey='';summarize()">重试</button></p>
     <button v-if="own.length>3" class="memory-more" @click="open">查看全部{{own.length}}条</button>
   </PanelSection>
   <Modal v-if="managing" compact stable :busy="busy" title="长期记忆" @close="managing=false"><div ref="memoryDialog" class="memory-dialog-layout"><div class="editor-form memory-dialog-body">

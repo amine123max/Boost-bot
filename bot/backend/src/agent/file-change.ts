@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
+import nodePath from "node:path";
 import { redactText } from "../log.js";
 
 export interface FileChange {
   key: string;
   name: string;
+  directory?: string;
+  workspacePath?: string;
   operation: "create" | "update";
   added?: number;
   removed?: number;
@@ -55,7 +58,7 @@ function previewHunk(oldText: string | null, newText: string): NonNullable<FileC
 }
 
 /** DSH's successful file tool result supplies applied metadata. Raw diffs stay on the host. */
-export function fileChange(tool: string, value: unknown, captureDiff = false): FileChange | undefined {
+export function fileChange(tool: string, value: unknown, captureDiff = false, workspace?: string): FileChange | undefined {
   if (tool !== "edit" && tool !== "write" || !value || typeof value !== "object") return;
   const { path, operation, diffs } = value as { path?: unknown; operation?: unknown; diffs?: unknown };
   if (typeof path !== "string" || !path || path.length > 4096 || !Array.isArray(diffs)) return;
@@ -64,6 +67,20 @@ export function fileChange(tool: string, value: unknown, captureDiff = false): F
   const name = redactText(path.split(/[\\/]/).pop() || "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200);
   if (!name) return;
   const result: FileChange = { key: createHash("sha256").update(path).digest("hex").slice(0, 24), name, operation: create ? "create" : "update" };
+  const displayPath = workspace
+    ? nodePath.relative(workspace, nodePath.resolve(workspace, path))
+    : path;
+  if (!nodePath.isAbsolute(displayPath) && !nodePath.win32.isAbsolute(displayPath)) {
+    const parts = displayPath.split(/[\\/]/);
+    if (parts.every(part => part && part !== '..' && part !== '.' && !/[:\u0000-\u001f\u007f]/.test(part))) {
+      const directory = parts.slice(0,-1).join('/');
+      if (directory && directory.length <= 480) result.directory = redactText(directory);
+      if (workspace && captureDiff && path.length <= 1024) {
+        const absolute = nodePath.resolve(workspace, path);
+        if (!/[\u0000-\u001f\u007f]/.test(absolute)) result.workspacePath = redactText(absolute);
+      }
+    }
+  }
   if (!diffs.length || diffs.length > 32) return result;
   let added = 0, removed = 0;
   let size = 0;

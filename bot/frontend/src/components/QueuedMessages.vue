@@ -34,16 +34,16 @@ async function save() {
         <button class="primary-button" :disabled="!!chat.queueBusy || !text.trim()">保存</button>
       </form>
       <template v-else>
-        <span class="queue-order" :title="'队列第 ' + (index + 1) + ' 项'" :aria-label="'队列第 ' + (index + 1) + ' 项'">
+        <span class="queue-order" :aria-label="'队列第 ' + (index + 1) + ' 项'">
           <Icon name="queue-turn" :size="17" />
         </span>
-        <div class="queue-text"><span :title="item.text">{{ item.text }}</span><small v-if="item.error">{{ item.error }}</small></div>
-        <span v-if="item.state !== 'queued'" class="state">{{ item.state === 'failed' ? '未完成' : '引导中' }}</span>
+        <div class="queue-text"><span>{{ item.text }}</span><small v-if="item.error">{{ item.error }}</small></div>
+        <span v-if="item.state !== 'queued'" class="state">{{ item.state === 'failed' ? '未完成' : '处理中' }}</span>
         <template v-if="item.state === 'queued'">
-          <button v-if="chat.running && !item.text.startsWith('/')" class="quiet-button queue-guide" :disabled="!!chat.queueBusy" type="button" @click="chat.changeQueue(item.id, 'guide')">引导</button>
+          <button class="quiet-button queue-guide" :disabled="!!chat.queueBusy || chat.stopping" type="button" @click.stop="chat.changeQueue(item.id, chat.running && !item.text.startsWith('/') ? 'guide' : 'promote')"><Icon name="steer" :size="14" />{{ chat.running && item.text.startsWith('/') ? '优先发送' : '立即处理' }}</button>
         </template>
         <button v-if="item.state === 'failed'" class="quiet-button" type="button" :disabled="!!chat.queueBusy" @click="chat.changeQueue(item.id, 'retry')">重发</button>
-        <button v-if="item.state !== 'guiding'" class="icon-btn" type="button" aria-label="移除待发送消息" :disabled="!!chat.queueBusy" @click="chat.changeQueue(item.id, 'remove')"><Icon name="trash" :size="15" /></button>
+        <button v-if="item.state !== 'guiding'" class="icon-btn" type="button" aria-label="移除待发送消息" :disabled="!!chat.queueBusy" @click.stop="chat.changeQueue(item.id, 'remove')"><Icon name="trash" :size="15" /></button>
         <button v-if="item.state === 'queued'" class="icon-btn" type="button" aria-label="更多队列操作" :aria-expanded="more === item.id" :disabled="!!chat.queueBusy" @click="toggleMore($event,item.id)"><Icon name="more" :size="16" /></button>
       </template>
     </li>
@@ -66,7 +66,9 @@ li { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:5px 10px
 .queue-text span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 small, .state { color:var(--muted); font-size:11px; }
 .state { flex:none; }
-.queue-guide { display:inline-flex; align-items:center; gap:4px; flex:none; }
+.queue-guide,.queue-guide:is(:hover,:focus-visible,:active) { background:transparent; }
+.queue-guide { display:inline-flex; align-items:center; gap:4px; padding-inline:4px; flex:none; white-space:nowrap; }
+.queue-guide:hover:not(:disabled) { color:var(--fg); }
 li[data-state="failed"] .state { color:var(--red); }
 .queued-messages button { min-height:28px; }
 @media (max-width:430px) {

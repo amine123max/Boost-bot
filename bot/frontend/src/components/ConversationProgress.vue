@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, useId } from 'vue';
 import type { Activity } from '../types';
 import Icon from './Icon.vue';
 import TurnFileChanges from './TurnFileChanges.vue';
-import { vDisclosurePlacement } from '../lib/disclosure-placement';
+import ExecutionShell from './ExecutionShell.vue';
+import SpringDisclosure from './SpringDisclosure.vue';
 
-const props = defineProps<{ steps: Activity[]; running?: boolean }>();
+const props = defineProps<{ steps: Activity[]; running?: boolean; now?:number }>();
 const work = computed(() => props.steps.filter(step => ['tool', 'job', 'subagent'].includes(step.kind || '')));
 const active = computed(() => props.running ? work.value.filter(step => step.status === 'running') : []);
 const done = computed(() => work.value.filter(step => !active.value.includes(step)));
 const auxiliary = computed(() => done.value.filter(step => !step.fileChange));
+const expanded = ref(false);
+const panelId = useId();
 
 function action(step: Activity) {
   if (step.kind === 'job') return '后台工作';
@@ -43,30 +46,26 @@ function activeLabel(step: Activity) {
   if (stepIcon(step) === 'edit') return action(step) === '修改文件' ? '正在编辑文件' : `正在${action(step)}`;
   return `正在运行${action(step)}`;
 }
+function runningTime(step: Activity) {
+  if (!props.now || typeof step.at !== 'number' || !Number.isFinite(step.at)) return '';
+  const seconds = Math.max(0, Math.floor((props.now - step.at) / 1000));
+  return seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m`;
+}
 </script>
 
 <template>
   <div v-if="work.length" class="execution-trail" aria-label="本轮执行">
     <div v-for="step in active" :key="step.id" class="execution-row is-running">
       <Icon :name="stepIcon(step)" :size="16" /><span>{{ activeLabel(step) }}</span>
+      <span v-if="stepIcon(step) === 'terminal'" class="command-elapsed">{{ runningTime(step) }}</span>
     </div>
-    <details v-if="done.length" v-disclosure-placement data-expand-mode="down" class="done-steps">
-      <summary class="execution-row" :title="`${done.length} 项操作`"><Icon :name="groupIcon" :size="16" /><span>{{ groupLabel }}</span><Icon name="chevron" :size="12" /></summary>
-      <div class="execution-content">
+    <div v-if="done.length" class="done-steps">
+      <button type="button" class="execution-row" :aria-expanded="expanded" :aria-controls="panelId" @click="expanded = !expanded"><Icon :name="groupIcon" :size="16" /><span>{{ groupLabel }}</span><Icon name="chevron" :size="12" class="execution-chevron" /></button>
+      <SpringDisclosure :id="panelId" :open="expanded">
       <TurnFileChanges v-if="!running" :steps="done" inline />
       <ul v-if="auxiliary.length">
         <li v-for="step in auxiliary" :key="step.id">
-          <details v-if="step.commandPreview" v-disclosure-placement data-expand-mode="down" class="shell-detail">
-            <summary class="execution-row">
-              <Icon name="terminal" :size="16" />
-              <span>{{ step.status === 'ok' && !step.cut ? '已运行命令' : '命令未完成' }}</span><Icon name="chevron" :size="12" />
-            </summary>
-            <div class="shell-output">
-              <div>Shell</div>
-              <pre tabindex="0"><code>{{ '$ ' + step.commandPreview }}<template v-if="step.shellOutput">{{ '\n' + step.shellOutput }}</template></code></pre>
-              <div class="shell-result"><Icon :name="step.status === 'ok' && !step.cut ? 'check' : 'info'" :size="13" />{{ step.status === 'ok' && !step.cut ? '成功' : '未完成' }}</div>
-            </div>
-          </details>
+          <ExecutionShell v-if="step.commandPreview" :command="step.commandPreview" :output="step.shellOutput" :success="step.status === 'ok' && !step.cut" />
           <div v-else class="execution-row">
             <Icon :name="stepIcon(step)" :size="14" />
             <span>{{ step.status === 'ok' && !step.cut ? '已执行' : '未完成' }}</span>
@@ -75,8 +74,8 @@ function activeLabel(step: Activity) {
           </div>
         </li>
       </ul>
-      </div>
-    </details>
+      </SpringDisclosure>
+    </div>
   </div>
 </template>
 
@@ -87,20 +86,12 @@ function activeLabel(step: Activity) {
 .execution-row svg, .execution-row small { flex:none; }
 .execution-row small { margin-inline-start:auto; font-variant-numeric:tabular-nums; }
 .is-running { color:var(--fg-2); }
-summary { list-style:none; cursor:pointer; width:fit-content; }
-summary::-webkit-details-marker { display:none; }
-details[open] > summary > svg:last-child { transform:rotate(90deg); }
-summary:hover { color:var(--fg); background:transparent; }
-summary:focus:not(:focus-visible) { outline:none; }
-.done-steps[open] { display:flex; flex-direction:column; }
-.execution-content { max-height:var(--disclosure-space, 260px); overflow:auto; scrollbar-width:thin; }
+.command-elapsed { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+button.execution-row:hover { color:var(--fg); background:transparent; }
+.execution-chevron { transition:transform 220ms ease-out; }
+button[aria-expanded="true"] .execution-chevron { transform:rotate(90deg); }
 .shell-label { color:var(--muted); font-size:inherit; }
-.shell-detail summary:hover .shell-label { color:var(--fg); }
-.shell-detail summary { width:auto; }
-.shell-detail[open] { display:flex; flex-direction:column; }
-.shell-output { margin:3px 0 6px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--pill); overflow:auto; max-height:min(230px,var(--disclosure-space,230px)); }
-.shell-output pre { margin:8px 0; overflow:auto; max-height:150px; line-height:1.55; scrollbar-width:thin; }
-.shell-result { display:flex; align-items:center; justify-content:flex-end; gap:5px; }
-ul { list-style:none; margin:3px 0 0; padding:0; max-height:240px; overflow:auto; }
+ul { list-style:none; margin:3px 0 0; padding:0; }
 li::marker { content:''; }
+@media (prefers-reduced-motion:reduce) { .execution-chevron { transition:none; } }
 </style>

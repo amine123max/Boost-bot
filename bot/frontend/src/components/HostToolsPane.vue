@@ -1,34 +1,42 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue';
-import { api, enc } from '../api';
+import { api, ApiError, enc } from '../api';
 import Icon from './Icon.vue';
 
 type Plugin = {id:string;url:string};
 interface HostActivity {
   agents:{providers?: {provider:string;running:number;waiting:number;progress:number|null;sessions?: {state:string;progress:number|null;updatedAt:number}[]}[];updatedAt:number};
-  processes:{name:string;pid:number}[];
+  processes:{name:string;pid:number;provider?:string}[];
   matchingProcesses:number;
 }
 interface Tools {voiceModel:boolean;computerEnabled:boolean;computer:{available:boolean;reason?:string};permission:string;localPlugins:Plugin[];trustedBot:boolean}
 const props = defineProps<{botId:string}>();
 const emit = defineEmits<{saved:[]}>();
 const tools=ref<Tools>(), host=ref<HostActivity>(), error=ref(''), hostError=ref(''), busy=ref(false);
-const name=ref(''), endpoint=ref(''), search=ref(''), confirming=ref(false);
+const name=ref(''), endpoint=ref(''), confirming=ref(false);
+const loading=ref(false), observing=ref(false), configError=ref('');
 let controller:AbortController|undefined;
+const providers = [{id:'codex',name:'Codex'},{id:'claude',name:'Claude Code'},{id:'deepseek',name:'DeepSeek Harness'}];
+const activity = (id:string) => host.value?.agents.providers?.find(provider => provider.provider === id);
+const processes = (id:string) => host.value?.processes.filter(row => row.provider === id) ?? [];
 const states: Record<string, string> = { working:'运行中', waiting:'等待输入', done:'已完成', stopped:'已停止', failed:'失败' };
 async function load() {
+  if (loading.value) return;
   const id=props.botId;
-  try { const value=await api<Tools>(`/bots/${enc(id)}/workspace-tools`); if(id===props.botId)tools.value=value; }
-  catch(e){ if(id===props.botId)error.value=(e as Error).message; }
+  loading.value=true;
+  try { const value=await api<Tools>(`/bots/${enc(id)}/workspace-tools`); if(id===props.botId){tools.value=value;configError.value='';} }
+  catch(e){ if(id===props.botId)configError.value=e instanceof ApiError && e.status===404 ? '当前宿主尚未提供工具配置，请用最新 Bot 服务重新打开工作台。' : (e as Error).message; }
+  finally{loading.value=false;}
 }
 async function observe(){
   controller?.abort();
   const request=new AbortController();controller=request;
-  hostError.value='';
+  observing.value=true;
   try{
-    const result=await api<HostActivity>(`/bots/${enc(props.botId)}/host-activity?name=${enc(search.value.trim())}`,{signal:request.signal});
-    if(!request.signal.aborted)host.value=result;
-  }catch(e){if(!request.signal.aborted)hostError.value=(e as Error).message;}
+    const result=await api<HostActivity>(`/bots/${enc(props.botId)}/host-activity?name=%40agents`,{signal:request.signal});
+    if(!request.signal.aborted){host.value=result;hostError.value='';}
+  }catch(e){if(!request.signal.aborted)hostError.value=e instanceof ApiError && e.status===404 ? '当前服务尚未提供本机监控。' : (e as Error).message;}
+  finally{if(controller===request)observing.value=false;}
 }
 async function save(body:Record<string,unknown>){
   if(busy.value)return;
@@ -48,7 +56,7 @@ async function add(){
   }
 }
 watch(()=>props.botId,()=>{
-  controller?.abort();tools.value=host.value=undefined;error.value=hostError.value='';confirming.value=false;void load();
+  controller?.abort();tools.value=host.value=undefined;error.value=hostError.value='';confirming.value=false;void load();void observe();
 },{immediate:true});
 onBeforeUnmount(()=>controller?.abort());
 </script>
@@ -57,7 +65,9 @@ onBeforeUnmount(()=>controller?.abort());
   <div class="host-tools">
     <section>
       <strong><Icon name="monitor" :size="15" />电脑控制</strong>
-      <p>{{ !tools ? '正在读取宿主配置。' : !tools.trustedBot ? '目录 Bot 不可使用电脑控制。' : !tools.computer.available ? '此宿主暂未提供可用的电脑控制驱动。' : tools.computerEnabled ? '已启用，按此智能体的授权规则执行。' : '可启用本机应用观察和输入操作。' }}</p>
+      <p v-if="configError" role="alert">{{ configError }}</p>
+      <p v-else>{{ !tools ? '正在读取宿主配置。' : !tools.trustedBot ? '目录 Bot 不可使用电脑控制。' : !tools.computer.available ? '此宿主暂未提供可用的电脑控制驱动。' : tools.computerEnabled ? '已启用，按此智能体的授权规则执行。' : '可启用本机应用观察和输入操作。' }}</p>
+      <button v-if="!tools || !tools.computer.available" type="button" class="quiet-button" :disabled="loading || busy" @click="load">{{ loading ? '正在检测…' : '重新检测宿主' }}</button>
       <button v-if="tools?.computerEnabled" type="button" class="quiet-button" :disabled="busy" @click="save({computerUse:{enabled:false}})">停用</button>
       <button v-else-if="tools?.trustedBot && tools.computer.available" type="button" class="quiet-button" @click="confirming = true">启用电脑控制</button>
       <div v-if="confirming" class="host-confirm">
@@ -68,28 +78,22 @@ onBeforeUnmount(()=>controller?.abort());
     </section>
     <section>
       <strong><Icon name="activity" :size="15" />本机任务与外部 Agent</strong>
-      <form class="host-input" @submit.prevent="observe"><input v-model="search" maxlength="80" placeholder="可按进程名筛选" aria-label="进程名" /><button class="quiet-button" type="submit">读取</button></form>
-      <p v-if="hostError" role="alert">{{ hostError }}</p>
-      <template v-if="host && !hostError">
-        <ul class="providers" v-if="host.agents.providers?.length">
-          <li v-for="p in host.agents.providers" :key="p.provider">
-            <details v-if="p.sessions?.length">
-              <summary>{{ {codex:'Codex',claude:'Claude',deepseek:'DeepSeek'}[p.provider] || p.provider }} · {{ p.running }} 运行 · {{ p.waiting }} 等待</summary>
+      <div class="scan-row"><span role="status">{{ hostError || (!host ? '正在扫描本机进程与会话…' : '本机进程与近期会话') }}</span><button class="quiet-button" type="button" :disabled="observing" :aria-busy="observing" @click="observe">重新扫描</button></div>
+        <ul class="providers">
+          <li v-for="p in providers" :key="p.id">
+            <details>
+              <summary>{{ p.name }}<small>{{ !host ? '—' : activity(p.id)?.running ? activity(p.id)?.running + ' 运行中' : activity(p.id)?.waiting ? activity(p.id)?.waiting + ' 等待' : processes(p.id).length ? processes(p.id).length + ' 个进程' : '无活跃进程' }}</small></summary>
               <ul class="processes">
-                <li v-for="(session, i) in p.sessions" :key="i">
+                <li v-for="process in processes(p.id)" :key="process.pid"><span>{{ process.name }}</span><code>{{ process.pid }}</code></li>
+                <li v-for="(session, i) in activity(p.id)?.sessions" :key="i">
                   <span>{{ states[session.state] ?? '状态未知' }}<span v-if="session.progress != null"> · {{ session.progress }}%</span></span>
                   <time :datetime="new Date(session.updatedAt).toISOString()">{{ new Date(session.updatedAt).toLocaleTimeString() }}</time>
                 </li>
               </ul>
+              <p v-if="!processes(p.id).length && !activity(p.id)?.sessions?.length">没有可读取的近期会话或进程。</p>
             </details>
-            <span v-else>{{ {codex:'Codex',claude:'Claude',deepseek:'DeepSeek'}[p.provider] || p.provider }} · 无近期会话</span>
           </li>
         </ul>
-        <p v-else>未发现可读取的外部 Agent 日志。</p>
-        <details><summary>{{ host.matchingProcesses }} 个匹配进程</summary>
-          <ul class="processes"><li v-for="p in host.processes" :key="p.pid"><span>{{ p.name }}</span><code>{{ p.pid }}</code></li></ul>
-        </details>
-      </template>
     </section>
     <section>
       <strong><Icon name="link" :size="15" />本机 MCP 插件</strong>
@@ -104,16 +108,21 @@ onBeforeUnmount(()=>controller?.abort());
         <button type="submit" class="quiet-button" :disabled="busy"><Icon name="plus" :size="14" />添加插件</button>
       </form>
     </section>
-    <section><strong><Icon name="voice" :size="15" />本机语音</strong><p>{{ tools?.voiceModel ? '已安装语音模型。' : '未安装语音模型；仍可使用渠道已提供的转写。' }}</p></section>
+    <section><strong><Icon name="voice" :size="15" />本机语音</strong><p>{{ !tools ? '语音状态暂不可用。' : tools.voiceModel ? '已安装语音模型。' : '未安装语音模型；仍可使用渠道已提供的转写。' }}</p><button class="quiet-button" type="button" :disabled="loading" @click="load">刷新语音状态</button></section>
     <p v-if="error" role="alert">{{ error }}</p>
   </div>
 </template>
 
 <style scoped>
-.host-tools { display:grid; gap:10px; }
-.host-tools section { display:grid; gap:6px; min-width:0; padding:10px; border:1px solid var(--line); border-radius:10px; }
+.host-tools { display:grid; gap:14px; padding:4px 0; }
+.host-tools section { display:grid; gap:6px; min-width:0; }
+.host-tools section > button { justify-self:start; }
 .host-tools strong,.host-tools button { display:inline-flex; gap:6px; align-items:center; }
 .host-tools p { margin:0; font-size:var(--fs-xs); color:var(--muted); overflow-wrap:anywhere; }
+.scan-row { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:32px; color:var(--muted); font-size:var(--fs-xs); }
+.scan-row button { flex:none; white-space:nowrap; }
+.providers details { width:100%; }
+.providers small { float:inline-end; color:var(--muted); }
 .host-input { display:flex; gap:5px; align-items:center; min-width:0; }
 .host-input input { flex:1; min-width:0; padding:5px 6px; border:1px solid var(--line); border-radius:6px; }
 .plugin-form { flex-wrap:wrap; }

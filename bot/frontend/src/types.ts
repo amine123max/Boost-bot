@@ -53,7 +53,7 @@ export interface Activity {
   at?: number;
   ms?: number;
   section?: number;
-  fileChange?: { key: string; name: string; operation: 'create' | 'update'; added?: number; removed?: number; diff?: { kind: 'context' | 'add' | 'remove'; text: string }[] };
+  fileChange?: { key: string; name: string; directory?: string; workspacePath?: string; operation: 'create' | 'update'; added?: number; removed?: number; diff?: { kind: 'context' | 'add' | 'remove'; text: string }[] };
   tokens?: { input?: number; output?: number };
   modelKey?: string;
   commandPreview?: string;

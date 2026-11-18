@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import Markdown from "./Markdown.vue";
 import Icon from "./Icon.vue";
 import HelpTip from './HelpTip.vue';
 import StreamingReply from './StreamingReply.vue';
+import CopyButton from './CopyButton.vue';
 
 const props = withDefaults(defineProps<{
   text: string;
@@ -28,42 +29,11 @@ async function submitEdit() {
   try { if (await props.sendEdit(editText.value)) editing.value = false; }
   finally { sending.value = false; }
 }
-const copied = ref(false), error = ref("");
-let timer: ReturnType<typeof setTimeout> | undefined, disposed = false;
 const date = computed(() => {
   if (!props.createdAt) return null;
   const value = new Date(props.createdAt);
   return Number.isFinite(value.getTime()) ? value : null;
 });
-async function copy() {
-  clearTimeout(timer);
-  copied.value = false;
-  error.value = "";
-  try {
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(props.text);
-    else {
-      const previous = document.activeElement as HTMLElement | null;
-      const field = document.createElement("textarea");
-      field.value = props.text;
-      field.setAttribute("aria-label", "待复制的消息");
-      field.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
-      (previous?.closest("dialog") || document.body).append(field);
-      try {
-        field.select();
-        if (!document.execCommand("copy")) throw new Error("clipboard unavailable");
-      } finally {
-        field.remove();
-        previous?.focus({ preventScroll: true });
-      }
-    }
-    if (disposed) return;
-    copied.value = true;
-    timer = setTimeout(() => { copied.value = false; }, 1800);
-  } catch {
-    if (!disposed) error.value = "复制失败，请选择消息文字手动复制";
-  }
-}
-onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 </script>
 
 <template>
@@ -79,18 +49,9 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
       <slot />
     </div>
     <div v-if="!streaming && !editing && (date || text)" class="message-actions">
-      <button
-        v-if="text"
-        type="button"
-        class="message-copy"
-        :aria-label="role === 'user' ? '复制消息' : '复制回复'"
-        :title="copied ? '已复制' : role === 'user' ? '复制消息' : '复制回复'"
-        @click="copy"
-      ><Icon :name="copied ? 'check' : 'copy'" :size="16" /></button>
+      <CopyButton v-if="text" class="message-copy" :text="text" :label="role === 'user' ? '复制消息' : '复制回复'" />
       <button v-if="text && role === 'user' && editable" type="button" class="message-copy" :disabled="editDisabled" aria-label="重新编辑消息" title="重新编辑消息" @click="beginEdit"><Icon name="edit" :size="17" /></button>
       <time v-if="date" :datetime="date.toISOString()" :title="date.toLocaleString('zh-CN', { hour12: false })">{{ date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) }}</time>
-      <span class="sr-only" role="status">{{ copied ? '已复制' : '' }}</span>
-      <span v-if="error" class="message-copy-error" role="alert">{{ error }}</span>
     </div>
   </div>
 </template>
@@ -108,7 +69,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 .message-copy { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: inherit; cursor: pointer; transition: color 140ms, background 140ms; }
 .message-copy:hover { color: var(--fg); background: var(--pill); }
 .message-copy:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.message-copy-error { color: var(--red); }
 .is-editing { width:min(680px, calc(100vw - 96px)); align-items:stretch; }
 .message-editor { display:grid; gap:10px; width:100%; box-sizing:border-box; }
 .message-editor textarea { width:100%; box-sizing:border-box; resize:vertical; min-height:72px; background:transparent; color:inherit; border:0; padding:0; outline:0; font:inherit; line-height:1.6; }

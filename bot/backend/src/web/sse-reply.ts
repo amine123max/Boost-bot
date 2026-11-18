@@ -4,7 +4,7 @@ import type { OutboundOp, ReplySession } from "../core/types.js";
 import { describeFile } from "./files.js";
 
 export function publicActivity({ id, kind, title, status, cut, at, ms, section, fileChange, tokens, modelKey }: ActivityStep): ActivityStep {
-  const change = fileChange && { key: fileChange.key, name: fileChange.name, operation: fileChange.operation, added: fileChange.added, removed: fileChange.removed };
+  const change = fileChange && { key: fileChange.key, name: fileChange.name, directory: fileChange.directory, operation: fileChange.operation, added: fileChange.added, removed: fileChange.removed };
   return { id, kind, title: kind === 'tool' ? title.match(/^[\w.-]{1,80}$/)?.[0] || 'tool' : '', status, cut, at, ms, section, fileChange: change,
     ...(kind === 'model' ? { modelKey: modelKey || title, tokens } : {}) };
 }

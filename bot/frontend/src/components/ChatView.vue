@@ -11,6 +11,8 @@ import TurnTranscript from "./TurnTranscript.vue";
 import ComposerQuestion from "./ComposerQuestion.vue";
 import QueuedMessages from "./QueuedMessages.vue";
 import ChatTasks from "./ChatTasks.vue";
+import TurnFileChanges from "./TurnFileChanges.vue";
+import ConversationTimeline from "./ConversationTimeline.vue";
 import MessageBubble from "./MessageBubble.vue";
 import type { Bot, Group, FileItem, Task } from "../types";
 import type { Conversation } from "../conversation";
@@ -18,7 +20,7 @@ import { defineComponent, type PropType } from "vue";
 import { downloadFile } from "../api";
 
 export default defineComponent({
-  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, TurnTranscript, ComposerQuestion, QueuedMessages, ChatTasks, MessageBubble },
+  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, TurnTranscript, ComposerQuestion, QueuedMessages, ChatTasks, MessageBubble, TurnFileChanges, ConversationTimeline },
   props: {
     chat: { type: Object as PropType<Conversation>, required: true },
     bot: Object as PropType<Bot>,
@@ -80,12 +82,53 @@ export default defineComponent({
       () => props.group?.name || props.bot?.name || "智能体",
     );
     const transcript = ref<HTMLElement>();
+    const dock = ref<HTMLElement>(), activeMessage = ref(''), lastVisibleMessage = ref(''), timelineRoom = ref(false);
+    let dockObserver: ResizeObserver | undefined, activeFrame = 0;
     let scrollFrame = 0;
+    function updateActiveMessage() {
+      if (activeFrame) return;
+      activeFrame = requestAnimationFrame(() => {
+        activeFrame = 0;
+        const rows = transcript.value?.querySelectorAll<HTMLElement>('.message.is-user[data-message-id]');
+        if (!rows?.length || !scroller.value) { activeMessage.value = lastVisibleMessage.value = ''; return; }
+        const viewport = scroller.value.getBoundingClientRect();
+        const visibleTop = Math.max(viewport.top, scroller.value.closest('.chat')?.querySelector('.chat-head')?.getBoundingClientRect().bottom ?? viewport.top);
+        const visibleBottom = Math.min(viewport.bottom, dock.value?.getBoundingClientRect().top ?? viewport.bottom);
+        function at(line: number) {
+          let low=0, high=rows!.length-1;
+          while (low < high) {
+            const middle=Math.ceil((low+high)/2);
+            if (rows![middle].getBoundingClientRect().top <= line) low=middle;
+            else high=middle-1;
+          }
+          return rows![low].dataset.messageId || '';
+        }
+        activeMessage.value = at(visibleTop + 8);
+        lastVisibleMessage.value = at(Math.max(visibleTop + 8, visibleBottom - 1));
+      });
+    }
+    function onScroll() {
+      const view=scroller.value;
+      if (!view) return;
+      nearBottom.value = view.scrollHeight - view.scrollTop - view.clientHeight < 100;
+      updateActiveMessage();
+    }
+    function jump(id: string) {
+      const row=transcript.value?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`);
+      const view = scroller.value;
+      if (!row || !view) return;
+      nearBottom.value = false;
+      activeMessage.value = id;
+      const inset = parseFloat(getComputedStyle(view).scrollPaddingTop) || 0;
+      view.scrollTo({top:view.scrollTop + row.getBoundingClientRect().top - view.getBoundingClientRect().top - inset - 10,
+        behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+    }
     function scroll() {
       if (scrollFrame) return;
       scrollFrame = requestAnimationFrame(() => {
         scrollFrame = 0;
         if (nearBottom.value && scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight;
+        updateActiveMessage();
       });
     }
     watch(
@@ -100,8 +143,25 @@ export default defineComponent({
       () => props.chat.live?.text,
       () => props.chat.live?.interim?.length,
     ], scroll, { flush:'post' });
-    onMounted(scroll);
-    onBeforeUnmount(() => cancelAnimationFrame(scrollFrame));
+    onMounted(() => {
+      let dockHeight = -1;
+      dockObserver = new ResizeObserver(() => {
+        const height = dock.value?.offsetHeight ?? 0;
+        if (height !== dockHeight) {
+          dockHeight = height;
+          dock.value?.parentElement?.style.setProperty('--chat-dock-height', height + 'px');
+          scroll();
+        } else updateActiveMessage();
+        const pane = scroller.value?.getBoundingClientRect(), column = transcript.value?.getBoundingClientRect();
+        timelineRoom.value = !!pane && !!column && column.left - pane.left >= 38 &&
+          pane.height - height >= 270;
+      });
+      if (dock.value) dockObserver.observe(dock.value);
+      if (scroller.value) dockObserver.observe(scroller.value);
+      if (transcript.value) dockObserver.observe(transcript.value);
+      scroll();
+    });
+    onBeforeUnmount(() => { dockObserver?.disconnect(); cancelAnimationFrame(scrollFrame); cancelAnimationFrame(activeFrame); });
     function mention(bot: Bot | null) {
       props.chat.draft += `${props.chat.draft && !props.chat.draft.endsWith(" ") ? " " : ""}@${bot ? bot.id : "所有人"} `;
       composer.value?.focus();
@@ -142,6 +202,7 @@ export default defineComponent({
       file,
       question, approvals, deferredPrompts, commands, chooseCommand, submit, taskDock, taskCreated,
       nearBottom,
+      dock, activeMessage, lastVisibleMessage, timelineRoom, onScroll, jump,
     };
   },
 });
@@ -209,13 +270,7 @@ export default defineComponent({
     <div
       ref="scroller"
       class="chat-scroll"
-      @scroll="
-        nearBottom =
-          ($event.target as HTMLElement).scrollHeight -
-            ($event.target as HTMLElement).scrollTop -
-            ($event.target as HTMLElement).clientHeight <
-          100
-      "
+      @scroll.passive="onScroll"
     >
       <div v-if="(chat.loading || chat.recovering) && !chat.messages.length && !chat.live" class="empty-state" role="status">
         <span class="loading-ring" />{{ chat.recovering ? '正在同步会话' : '正在加载会话' }}
@@ -260,6 +315,7 @@ export default defineComponent({
         <article
           v-for="m in chat.messages"
           :key="m.id"
+          :data-message-id="String(m.id)"
           class="message"
           :class="{
             'is-user': m.role === 'user',
@@ -342,7 +398,9 @@ export default defineComponent({
         </section>
       </div>
     </div>
-    <div class="conversation-dock">
+    <ConversationTimeline v-if="timelineRoom" :key="chat.conversationId || bot?.id || group?.id" :messages="chat.messages" :conversation-id="chat.conversationId" :active="activeMessage" :last-visible="lastVisibleMessage" @jump="jump" />
+    <div ref="dock" class="conversation-dock">
+      <TurnFileChanges v-if="chat.running && chat.live" :steps="chat.live.steps || []" running />
       <QueuedMessages :key="chat.conversationId || bot?.id || group?.id" :chat="chat" />
       <p v-if="deferredPrompts" class="deferred-prompts" role="status"><Icon name="tasks" :size="14" />{{ deferredPrompts }} 个后台任务需要处理，当前回复继续生成</p>
       <ComposerQuestion v-if="question && configure" :key="question.id" :item="question" :submit="answer => chat.answer(question!, 'answer', answer)" />
@@ -408,12 +466,19 @@ export default defineComponent({
 .stop-button { display:inline-grid; place-items:center; width:30px; height:30px; min-width:30px; padding:0; border:0; border-radius:50%; background:var(--fg); color:var(--bg); }
 .stop-square { width:10px; height:10px; border-radius:2px; background:currentColor; }
 .stop-button:disabled { opacity:.5; }
-.conversation-dock { display:grid; flex:none; width:var(--col); margin:0 auto; gap:6px; padding:4px 0 var(--dock-pb); z-index:var(--z-float); }
+.conversation-dock { position:absolute; inset-inline:0; bottom:0; display:grid; width:var(--col); margin:0 auto; gap:6px; padding:4px 0 var(--dock-pb); z-index:var(--z-float); }
 .conversation-dock .composer-dock { position:static; padding:0; overflow:visible; scrollbar-gutter:auto; }
-.conversation-dock .composer { width:100%; position:relative; }
+.conversation-dock .composer { width:100%; position:relative; background:color-mix(in srgb,var(--bot-neutral-panel) 82%,transparent); backdrop-filter:blur(18px); }
+.conversation-dock :deep(.queued-messages) { background:var(--bot-queue-glass); backdrop-filter:blur(16px); }
+/* A filtered header is a backdrop root: when the task menu is open, allow
+   the menu's own filter to sample the transcript underneath the header. */
+:global(.conversation-view > .chat-head:has(.tasks-list)) { backdrop-filter:none; }
+:global(html[data-glass="off"]) .conversation-dock .composer,
+:global(html[data-glass="off"]) .conversation-dock :deep(.queued-messages) { background:var(--bot-neutral-panel); backdrop-filter:none; }
 .conversation-dock:has(.deferred-prompts, .composer-commands) :deep(.queued-messages) { margin-bottom:0; }
 .conversation-view .chat-scroll { mask-image:none; }
-.conversation-view .chat-col { padding-bottom:var(--space-5); }
+.conversation-view .chat-col { padding-bottom:calc(var(--chat-dock-height, 76px) + var(--space-5)); }
+.conversation-view .chat-scroll { scroll-padding-bottom:var(--chat-dock-height, 76px); }
 .background-notice .message-body { padding:9px 12px; border-radius:13px; border:1px solid var(--line); background:var(--pill); }
 .background-label, .deferred-prompts { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:var(--fs-xs); margin:0; }
 .conversation-view > .error-banner { margin-top:var(--head-h); }

@@ -1,5 +1,17 @@
 @import "../../../frontend/src/styles/surfaces.css";
 @import "../../../frontend/src/styles/accent-colors.css";
+:root {
+  --bot-neutral-panel: #f1f1f1;
+  --bot-neutral-row: #f7f7f7;
+  --bot-queue-glass: rgb(243 243 243 / .84);
+  --bot-task-glass: rgb(243 243 243 / .78);
+}
+:root[data-theme="dark"] {
+  --bot-neutral-panel: #333333;
+  --bot-neutral-row: #292929;
+  --bot-queue-glass: rgb(41 41 41 / .84);
+  --bot-task-glass: rgb(69 69 69 / .69);
+}
 :root[data-theme][data-accent] {
   --accent: var(--accent-light);
   --primary: var(--accent);

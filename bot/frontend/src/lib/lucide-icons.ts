@@ -11,6 +11,7 @@ export const lucide: Record<string, Part[]> = {
   more: [12,19,5].map(cx => ['circle', {cx,cy:12,r:1}]),
   steer: [['polyline', {points:'15 10 20 15 15 20'}], path('M4 4v7a4 4 0 0 0 4 4h12')],
   'queue-turn': [path('M5 4v11a3 3 0 0 0 3 3h12 M17 15l3 3-3 3 M10 7h8 M10 11h5')],
+  'task-list': [['circle', {cx:5,cy:7,r:2.4}], ['circle', {cx:5,cy:17,r:2.4}], path('M11 7h10 M11 17h10')],
   trash: [
     path('M3 6h18'), path('M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6'), path('M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2'),
     ['line', {x1:10,x2:10,y1:11,y2:17}], ['line', {x1:14,x2:14,y1:11,y2:17}],

@@ -70,7 +70,6 @@ onBeforeUnmount(() => { disposed=true; generation++; controller?.abort(); clearT
       <span class="background-concurrency"><SelectControl :model-value="slots" :options="Array.from({length:8},(_,i)=>({value:String(i+1),label:(i+1)+'项并发'}))" label="并行后台任务数" :disabled="busy" @update:model-value="settings({taskSlots:Number($event)})" /><HelpTip text="当前智能体允许1–8项并行任务，所有智能体共享宿主的全局执行名额，超出上限的任务自动排队。" label="后台任务并发说明" /></span>
     </div>
     <p v-if="error" class="notice" role="alert">{{ error }}<button @click="load">重试</button></p>
-    <p v-if="titles.error.value" class="task-empty" role="status">标题概括暂不可用 <button :title="titles.error.value" @click="titles.retry">重试</button></p>
     <div class="background-task-list">
       <BackgroundTaskItem v-for="work in visible" :key="work.key" :work="work" :title="titles.title(work)" :active="panelOpen" />
       <p v-if="loaded && !sorted.length && !error" class="task-empty">暂无后台任务</p>

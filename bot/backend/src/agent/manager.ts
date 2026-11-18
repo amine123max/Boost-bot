@@ -445,7 +445,7 @@ export class AgentManager {
   private async track(botId: string, input: TurnInput & { onStep?: (step: ActivityStep) => void }, run: (input: TurnInput) => Promise<TurnResult>): Promise<TurnResult> {
     const conv = input.conversationId;
     this.recentTaskProgress = this.recentTaskProgress.filter(task => task.id !== conv);
-    const t: TurnProgress = { botId, since: Date.now(), lastProgress: 0, activity: new ActivityLog(input.onStep, input.model, { chat: true }), abort: new AbortController(), tools: new Set(), jobs: new Set(), media: 0, interim: [] };
+    const t: TurnProgress = { botId, since: Date.now(), lastProgress: 0, activity: new ActivityLog(input.onStep, input.model, { chat: true, workspace: this.host(botId).workspace }), abort: new AbortController(), tools: new Set(), jobs: new Set(), media: 0, interim: [] };
     this.turnsInProgress.set(conv, t);
     // 看门狗：代理已经在处理，却长时间没有进展（模型不回、只在重试），又不是在等用户批准或回答、
     // 也没有工具、命令或生成任务在跑（生视频、转到后台的长命令、子代理里的工具）→ 中止

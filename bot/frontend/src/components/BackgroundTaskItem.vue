@@ -52,8 +52,8 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
     <button class="background-task-row" :aria-expanded="open" :aria-controls="id" :aria-label="(open ? '收起任务：' : '展开任务：') + work.title" @click="open = !open">
       <Icon name="chevron" :size="12" class="task-chevron" :class="{ expanded: open }" />
       <TaskStepStatus :state="work.state" />
-      <span class="background-task-title" :title="work.title">{{ title }}</span>
-      <span class="task-label" :class="work.state === 'done' ? 'is-done' : work.state === 'failed' ? 'is-failed' : 'is-working'" :title="run?.error || work.label">{{ status }}</span>
+      <span class="background-task-title" :title="flat ? undefined : work.title">{{ title }}</span>
+      <span class="task-label" :class="work.state === 'done' ? 'is-done' : work.state === 'failed' ? 'is-failed' : 'is-working'" :title="flat ? undefined : run?.error || work.label">{{ status }}</span>
     </button>
     <SpringDisclosure :id="id" :open="open">
       <div v-if="visited" class="background-task-progress">
@@ -71,7 +71,7 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
 .flat { background:transparent; }
 .flat .background-task-row:hover { color:var(--fg); background:transparent; }
 .flat .background-task-title { font-size:var(--chat-text-size,var(--fs-lg)); }
-.flat .task-label { font-size:var(--fs-xs); padding:0; background:transparent; }
+.flat .task-label { font-size:var(--fs-xs); padding:1px 5px; }
 .task-chevron { flex:none; color:var(--muted); transition:transform 220ms ease; }
 .task-chevron.expanded { transform:rotate(90deg); }
 .background-task-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }

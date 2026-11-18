@@ -2,6 +2,7 @@ import http from "node:http";
 import { validateBotInput } from '../core/bot-management.js';
 import { CustomTransport } from '../channels/messenger/custom.js';
 import { cachedMemoryTitle, generateMemoryTitles } from './memory-titles.js';
+import { summarizeConversationTurn } from './conversation-summary.js';
 import { generateTaskTitles } from './task-titles.js';
 import { createPanelTask, rememberPanelEntry, PanelActionError } from './panel-actions.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
@@ -406,9 +407,9 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
   }
 
   async function changeMessageQueue(req: http.IncomingMessage, res: http.ServerResponse, queue: ConsoleMessages, scope: string, id: string) {
-    const input = await readJson(req);
-    const action = input.action;
-    if (action !== 'edit' && action !== 'remove' && action !== 'guide' && action !== 'retry') throw new HttpError(400, '队列操作无效');
+    const input = req.method === 'DELETE' ? {} : await readJson(req);
+    const action = req.method === 'DELETE' ? 'remove' : input.action;
+    if (action !== 'edit' && action !== 'remove' && action !== 'guide' && action !== 'retry' && action !== 'promote') throw new HttpError(400, '队列操作无效');
     try {
       await queue.change(scope, id, action, input);
       return send(res, 200, { queued: queue.list(scope) });
@@ -1384,7 +1385,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         }
         return send(res, 200, { ok: true });
       }
-      if (seg.length === 4 && seg[2] === "queue" && m === "POST") {
+      if (seg.length === 4 && seg[2] === "queue" && (m === "POST" || m === "DELETE")) {
         return changeMessageQueue(req, res, groupMessages, groupId, seg[3]);
       }
       // 接着这个群：先发正在答的那一轮，之后转发事件（turn、同 chat/stream 的事件、turnEnd），都答完了发 idle 结束
@@ -1404,6 +1405,16 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
     }
     if (seg[0] === "conversations") {
+      if (seg.length === 5 && seg[2] === 'messages' && seg[4] === 'summary' && m === 'POST') {
+        const input = await readJson(req);
+        const id = Number(seg[3]), reply = input?.replyId;
+        if (!Number.isSafeInteger(id) || id < 1 || (reply !== undefined && (!Number.isSafeInteger(reply) || reply < 1))) throw new HttpError(400, '消息编号无效');
+        let summary;
+        try { summary = await summarizeConversationTurn(app, decodeURIComponent(seg[1]), id, reply); }
+        catch { throw new HttpError(503, 'AI 总结暂不可用，请稍后重试。'); }
+        if (!summary) throw new HttpError(404, '未找到该会话的消息。');
+        return send(res, 200, { summary });
+      }
       if (seg.length === 1 && m === "GET") return send(res, 200, { conversations: app.store.listConversations(url.searchParams.get("bot") || undefined) });
       if (seg.length === 3 && seg[2] === "messages" && m === "GET") {
         const conv = app.store.getConversation(decodeURIComponent(seg[1]));
@@ -1419,6 +1430,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         return send(res, 200, { steps: (steps as ActivityStep[]).map(step => {
           const view = publicActivity(step);
           if (includeDiff && view.fileChange && step.fileChange?.diff) view.fileChange.diff = step.fileChange.diff;
+          if (includeDiff && view.fileChange && step.fileChange?.workspacePath) view.fileChange.workspacePath = step.fileChange.workspacePath;
           if (includeDiff && step.commandPreview) view.commandPreview = step.commandPreview;
           if (includeDiff && step.shellOutput) view.shellOutput = step.shellOutput;
           return view;
@@ -1571,7 +1583,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       }
       if (sub === 'task-titles' && m === 'POST') {
         const body = await readJson(req);
-        try { return send(res, 200, await generateTaskTitles(app, id, body.items)); }
+        try { return send(res, 200, await generateTaskTitles(app, id, body.items, body.cachedOnly === true)); }
         catch (error) { throw new HttpError(502, (error as Error).message); }
       }
       if (sub === "memory" && m === "GET") {
@@ -1692,7 +1704,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
           throw error;
         }
       }
-      if (seg[2] === 'chat' && seg[3] === 'queue' && seg.length === 5 && m === 'POST') {
+      if (seg[2] === 'chat' && seg[3] === 'queue' && seg.length === 5 && (m === 'POST' || m === 'DELETE')) {
         return changeMessageQueue(req, res, consoleMessages, id, seg[4]);
       }
       if (sub === "chat" && m === "POST") {

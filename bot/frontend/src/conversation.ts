@@ -332,15 +332,16 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
   }
   async function send(): Promise<boolean> { return submit(draft.value); }
   async function edit(original: Message, text: string): Promise<boolean> { return submit(text, original); }
-  async function changeQueue(id: string, action: 'edit' | 'remove' | 'guide' | 'retry', text?: string) {
+  async function changeQueue(id: string, action: 'edit' | 'remove' | 'guide' | 'retry' | 'promote', text?: string) {
     if (queueBusy.value) return false;
     const ticket = generation;
     queueBusy.value = id;
     try {
-      await api(`${path.value}/queue/${enc(id)}`, { method: 'POST', body: {
+      const result = await api<{queued:QueuedMessage[]}>(`${path.value}/queue/${enc(id)}`, action === 'remove' ? { method:'DELETE' } : { method: 'POST', body: {
         action, text, ...(action === 'guide' && live.value?.id ? { expectedTurnId: live.value.id } : {}),
       } });
       if (ticket === generation) {
+        if (Array.isArray(result.queued)) queued.value = result.queued;
         await syncHistory(ticket);
         if (!controller) void load(false);
       }

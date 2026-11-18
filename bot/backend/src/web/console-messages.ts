@@ -133,7 +133,7 @@ export class ConsoleMessages {
     }
   }
 
-  async change(botId: string, id: string, action: 'edit' | 'remove' | 'guide' | 'retry', input: Input) {
+  async change(botId: string, id: string, action: 'edit' | 'remove' | 'guide' | 'retry' | 'promote', input: Input) {
     const { app, live } = this.options;
     const conv = `${botId}:web:console`;
     const entries = this.entries(botId), row = entries.find(item => item.id === id);
@@ -155,12 +155,12 @@ export class ConsoleMessages {
           updated.state = guided ? 'done' : uncertain ? 'failed' : 'queued';
           if (guided) updated.text = '';
           if (uncertain) updated.error = '未能确认引导结果。请检查对话后再决定是否重发。';
+          if (!guided && !uncertain) this.prioritize(current, updated);
           this.save(botId, current);
         }
         this.kick(botId);
       }
       if (uncertain) throw new ConsoleMessageError(409, '未能确认引导结果，请检查对话记录');
-      if (!guided) throw new ConsoleMessageError(409, '当前回复暂不支持插话，消息仍在队列中');
       return;
     }
     if (action === 'edit') {
@@ -172,9 +172,18 @@ export class ConsoleMessages {
       row.state = 'queued';
       row.error = undefined;
       entries.push(...entries.splice(entries.indexOf(row), 1));
+    } else if (action === 'promote') {
+      if (row.state !== 'queued') throw new ConsoleMessageError(409, '要优先发送的消息已变化');
+      this.prioritize(entries, row);
     } else { row.state = 'cancelled'; row.text = ''; }
     this.save(botId, entries);
-    this.kick(botId);
+    if (action === 'promote' || action === 'retry') this.kick(botId);
+  }
+
+  private prioritize(entries: QueuedMessage[], row: QueuedMessage) {
+    entries.splice(entries.indexOf(row), 1);
+    const index = entries.findIndex(item => item.state === 'queued');
+    entries.splice(index < 0 ? entries.length : index, 0, row);
   }
 
   submit(botId: string, input: Input): Promise<Receipt> {

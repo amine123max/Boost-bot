@@ -15,6 +15,7 @@ import BotChannels from './BotChannels.vue';
 import PanelSection from './PanelSection.vue';
 import BotApprovals from './BotApprovals.vue';
 import HostToolsPane from './HostToolsPane.vue';
+import BotAvatar from './BotAvatar.vue';
 const props = defineProps<{
   bot: Bot;
   bots: Bot[];
@@ -43,7 +44,7 @@ const conversations = ref<Conversation[]>([]),
   accounts = ref<Account[]>([]),
   error = ref("");
 const viewing = ref<Conversation | null>(null);
-const tab = ref<''|'tasks'|'channels'|'tools'|'history'>('');
+const tab = ref<''|'tasks'|'channels'|'tools'|'history'>('tasks');
 function select(value: typeof tab.value) { tab.value = tab.value === value ? '' : value; }
 const channelDialog = ref<InstanceType<typeof ChannelSettings>>();
 const channelError = ref('');
@@ -93,7 +94,7 @@ watch(
   [() => props.bot.id, () => props.configure],
   () => {
     generation++;
-    tab.value = '';
+    tab.value = 'tasks';
     clearTimeout(timer);
     conversations.value = [];
     accounts.value = [];
@@ -110,6 +111,7 @@ onBeforeUnmount(() => {
 <template>
   <aside class="panel" aria-label="智能体信息">
     <div class="panel-head">
+      <BotAvatar :bot="bot" :size="22" :ambient="false" class="panel-avatar" />
       <span class="title">{{ bot.name }}</span
       ><SettingsButton label="智能体设置" @click="emit('edit')" /><button v-if="configure" class="icon-btn" aria-label="删除智能体" @click="emit('delete')">
         <Icon name="trash" :size="16" /></button
@@ -122,10 +124,10 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <nav class="panel-views" aria-label="面板内容">
-      <button type="button" class="icon-btn" aria-label="任务与审批" title="任务与审批" :aria-pressed="tab==='tasks'" @click="select('tasks')"><Icon name="tasks" :size="17" /></button>
-      <button v-if="configure" type="button" class="icon-btn" aria-label="渠道" title="渠道" :aria-pressed="tab==='channels'" @click="select('channels')"><Icon name="link" :size="17" /></button>
-      <button v-if="configure" type="button" class="icon-btn" aria-label="宿主工具" title="宿主工具" :aria-pressed="tab==='tools'" @click="select('tools')"><Icon name="monitor" :size="17" /></button>
-      <button type="button" class="icon-btn" aria-label="历史与记忆" title="历史与记忆" :aria-pressed="tab==='history'" @click="select('history')"><Icon name="clock" :size="17" /></button>
+      <button type="button" class="icon-btn" aria-label="任务与审批" :aria-pressed="tab==='tasks'" @click="select('tasks')"><Icon name="task-list" :size="17" /></button>
+      <button v-if="configure" type="button" class="icon-btn" aria-label="渠道" :aria-pressed="tab==='channels'" @click="select('channels')"><Icon name="link" :size="17" /></button>
+      <button v-if="configure" type="button" class="icon-btn" aria-label="宿主工具" :aria-pressed="tab==='tools'" @click="select('tools')"><Icon name="monitor" :size="17" /></button>
+      <button type="button" class="icon-btn" aria-label="历史与记忆" :aria-pressed="tab==='history'" @click="select('history')"><Icon name="clock" :size="17" /></button>
     </nav>
     <div class="panel-body">
       <p v-if="error" class="notice" role="alert">{{ error }}</p>
@@ -180,8 +182,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.panel-body { scrollbar-width: none; -ms-overflow-style: none; }
-.panel-views { display:flex; align-items:center; gap:5px; padding:5px 10px; }
+.panel { --panel-tools-inset: var(--pane-px, 16px); background:var(--bot-neutral-row); }
+.panel-body { scrollbar-width:none; padding-inline:var(--panel-tools-inset); }
+.panel-views { display:flex; align-items:center; gap:5px; padding:5px max(0px,calc(var(--panel-tools-inset) - (var(--ctl-md) - 17px) / 2)); }
+.panel-views .icon-btn { --ib-size:var(--ctl-md); }
+.panel-body :deep(.panel-section-heading) { padding-inline:0; }
+.panel-body :deep(.panel-section-toggle) { padding-inline-start:0; }
+.panel-body :deep(.panel-section-inner) { padding-inline-start:19px; }
+.panel-avatar { flex:none; }
 .panel-views button[aria-pressed="true"] { background:var(--pill); color:var(--fg); }
 .panel-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .panel-body > :deep(.background-tasks > .list-head) { margin-top: 4px; }

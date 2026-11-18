@@ -88,7 +88,7 @@ export class ActivityLog {
   constructor(
     private onChange?: (step: ActivityStep) => void,
     private model = "",
-    private opts: { chat?: boolean } = {},
+    private opts: { chat?: boolean; workspace?: string } = {},
   ) {}
 
   get last(): ActivityStep | undefined {
@@ -180,7 +180,7 @@ export class ActivityLog {
         const shellOutput = prev.commandPreview && !/password|secret|credential|api[_-]?key|bearer|token|-----BEGIN|\.env\b/i.test(output)
           ? redactText(output).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "") : undefined;
         this.put({ ...prev, status: msg.isError ? "error" : "ok", ms: Math.max(0, time - prev.at), output: output || undefined, shellOutput,
-          ...(!msg.isError && this.opts.chat ? { fileChange: fileChange(prev.title, data.meta, true) } : {}) });
+          ...(!msg.isError && this.opts.chat ? { fileChange: fileChange(prev.title, data.meta, true, this.opts.workspace) } : {}) });
         // 命令跑得太久，转到了后台：单独记一步，结束时（job/settled 或结束通知）更新
         const job = promotedJob(data);
         if (job) this.put({ id: `j:${job}`, kind: "job", title: tr("activity.job"), summary: prev.summary, input: prev.input, status: "running", at: time });

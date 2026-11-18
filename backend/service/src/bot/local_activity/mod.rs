@@ -367,19 +367,42 @@ fn list_processes(name: Option<&str>) -> Result<(usize, Vec<Value>), String> {
         let mut matching = 0;
         let mut list = Vec::new();
         if let Some((_, rows)) = cache.as_ref() {
-            for (name, pid) in rows
-                .iter()
-                .filter(|(name, _)| name.to_lowercase().contains(&query))
-            {
+            for (name, pid) in rows.iter().filter(|(name, _)| {
+                if query == "@agents" {
+                    agent_process(name).is_some()
+                } else {
+                    name.to_lowercase().contains(&query)
+                }
+            }) {
                 matching += 1;
                 if list.len() < 50 {
-                    list.push(json!({"name": name, "pid": pid}));
+                    let mut row = json!({"name": name, "pid": pid});
+                    if query == "@agents" {
+                        row["provider"] = json!(agent_process(name));
+                    }
+                    list.push(row);
                 }
             }
         }
         (matching, list)
     };
     Ok(result)
+}
+
+fn agent_process(name: &str) -> Option<&'static str> {
+    let name = name.to_ascii_lowercase();
+    match name.trim_end_matches(".exe") {
+        "codex"
+        | "codex-cli"
+        | "codex-app-server"
+        | "codex-desktop"
+        | "openai-codex"
+        | "codex-x86_64-pc-windows-msvc"
+        | "codex-aarch64-pc-windows-msvc" => Some("codex"),
+        "claude" | "claude-code" | "claude-cli" => Some("claude"),
+        "dsh" | "deepseek" | "deepseek-cli" | "deepseek-harness" => Some("deepseek"),
+        _ => None,
+    }
 }
 
 pub(crate) fn host_snapshot(name: Option<&str>) -> Result<Value, String> {
@@ -391,6 +414,18 @@ pub(crate) fn host_snapshot(name: Option<&str>) -> Result<Value, String> {
 mod tests {
     use super::*;
     use std::io::Write;
+    #[test]
+    fn agent_scan_recognizes_executables_without_matching_unrelated_names() {
+        assert_eq!(agent_process("Codex.exe"), Some("codex"));
+        assert_eq!(agent_process("claude-code"), Some("claude"));
+        assert_eq!(agent_process("dsh.exe"), Some("deepseek"));
+        assert_eq!(agent_process("node.exe"), None);
+        assert_eq!(agent_process("codex-notes.exe"), None);
+        let (count, rows) = list_processes(Some("@agents")).unwrap();
+        assert!(count >= rows.len());
+        assert!(rows.iter().all(|row| row["provider"].is_string()));
+    }
+
     #[test]
     fn host_process_rows_contain_only_names_and_pids() {
         let (count, processes) = list_processes(None).unwrap();

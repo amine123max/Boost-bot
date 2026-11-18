@@ -786,6 +786,7 @@ export class Store {
     for (const c of convs) {
       this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(String(c.id));
       this.deleteKV(`direct-context:${c.id}`);
+      this.deleteKV(`conversation-titles:v1:${c.id}`);
     }
     this.db.prepare("DELETE FROM agent_segments WHERE conversation_id IN (SELECT id FROM conversations WHERE bot_id = ?)").run(id);
     this.db.prepare("DELETE FROM conversations WHERE bot_id = ?").run(id);
@@ -932,6 +933,7 @@ export class Store {
       this.db.prepare("DELETE FROM agent_sessions WHERE conversation_id = ?").run(c.id);
       this.db.prepare("DELETE FROM conversations WHERE id = ?").run(c.id);
       this.db.prepare("DELETE FROM kv WHERE key = ?").run(`group-seen:${id}:${c.botId}`);
+      this.deleteKV(`conversation-titles:v1:${c.id}`);
     }
     this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(groupPeer(id));
     this.db.prepare("DELETE FROM bot_groups WHERE id = ?").run(id);
@@ -1027,6 +1029,7 @@ export class Store {
   }
   clearMessages(conversationId: string): void {
     this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(conversationId);
+    this.deleteKV(`conversation-titles:v1:${conversationId}`);
   }
 
   /**

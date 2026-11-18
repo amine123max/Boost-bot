@@ -321,12 +321,6 @@ onBeforeUnmount(() => {
               ><span>{{ item.derived ? '≈ ' : '' }}{{ format(item.value) }}</span>
             </div>
             <p class="model-menu-note" v-if="breakdown.some(part => part.value === null)">工具、技能与项目上下文未单独计量。</p>
-            <p class="model-menu-caption">上下文归档</p>
-            <p v-if="!metrics?.context.archives?.length" class="model-menu-note">暂无归档。只有实际压缩或切换会话段后才会出现记录。</p>
-            <details v-for="archive in metrics?.context.archives" :key="archive.id" class="context-archive">
-              <summary>{{ archive.kind === 'compaction' ? '上下文压缩' : '会话段交接' }} · {{ new Date(archive.endedAt).toLocaleString('zh-CN') }}</summary>
-              <p>{{ archive.summary || '这条历史记录未保存摘要。' }}</p>
-            </details>
           </div
           ></SpringDisclosure
         >
@@ -449,9 +443,6 @@ onBeforeUnmount(() => {
 .context-toggle-icon.expanded {
   transform: rotate(-90deg);
 }
-.context-archive { padding:5px 0; font-size:var(--fs-xs); }
-.context-archive summary { cursor:pointer; }
-.context-archive p { margin:6px 0; max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
 .model-menu-section {
   border-top: 1px solid var(--line);
   margin-top: 8px;

@@ -718,7 +718,6 @@ onBeforeUnmount(() => {
                 与智能体开始工作
               </button>
             </div>
-            <p v-if="taskTitles.error.value" class="notice" role="status">标题概括暂不可用 <button :title="taskTitles.error.value" @click="taskTitles.retry">重试</button></p>
             <BackgroundTaskItem v-for="work in workItems" :key="work.key" :work="work" :title="taskTitles.title(work)" @details="selectedTask = $event" /></template
           >
           <template v-else-if="route.kind === 'discover'"

@@ -56,12 +56,14 @@ async function load() {
   } catch { if (!controller.signal.aborted) failed.value = true; }
   finally { if (request === controller) loading.value = false; }
 }
-watch(() => [props.message?.id, props.conversationId], () => {
+// Restoring history can replace the message object without changing its identity.
+// Keep the execution disclosure mounted when a poll returns the same message.
+watch([() => props.message?.id, () => props.message?.conversationId || props.conversationId], () => {
   request?.abort(); request = undefined; history.value = null; loading.value = false; failed.value = false;
   if (props.eager) void load();
 });
-watch(() => [props.eager, props.message?.hasExecution], () => { if (props.eager) void load(); }, { immediate: true });
-watch(() => [props.running, started.value], () => {
+watch([() => props.eager, () => props.message?.hasExecution], () => { if (props.eager) void load(); }, { immediate: true });
+watch([() => props.running, started], () => {
   clearInterval(clock);
   now.value = Date.now();
   if (props.running && started.value != null) clock = setInterval(() => { now.value = Date.now(); }, 1000);
@@ -74,12 +76,12 @@ onBeforeUnmount(() => { clearInterval(clock); request?.abort(); });
     <div v-if="elapsed" class="turn-elapsed">{{ elapsed }}</div>
     <template v-for="(part, index) in interim" :key="index">
       <Markdown :text="part" />
-      <ConversationProgress :steps="sections[index + 1] ?? []" :running="running" />
+      <ConversationProgress :steps="sections[index + 1] ?? []" :running="running" :now="now" />
     </template>
     <MessageBubble v-if="text" :text="text" :created-at="message?.createdAt" :role="message?.role" :framed="framed" :streaming="!!live" />
-    <ConversationProgress :steps="sections[0] ?? []" :running="running" />
-    <ConversationProgress :steps="tail" :running="running" />
-    <TurnFileChanges :steps="fileSteps" :running="!!live && !!running" />
+    <ConversationProgress :steps="sections[0] ?? []" :running="running" :now="now" />
+    <ConversationProgress :steps="tail" :running="running" :now="now" />
+    <TurnFileChanges v-if="!live || !running" :steps="fileSteps" />
     <slot />
     <p v-if="live && (stopping || !text && !interim.length && !live.steps?.some(step => ['tool', 'job', 'subagent'].includes(step.kind || '')))" class="turn-status" role="status">
       {{ stopping ? '正在结束当前处理…' : recovering ? '正在同步回复…' : '正在准备回复…' }}

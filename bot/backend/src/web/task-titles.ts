@@ -24,13 +24,13 @@ function cache(app: App, botId: string): Cache {
   const binding = modelBinding(app, botId).binding;
   try {
     const saved = JSON.parse(app.store.getKV(key(botId)) || 'null');
-    if (saved?.binding === binding && saved.titles && typeof saved.titles === 'object') return saved;
+    if (saved?.titles && typeof saved.titles === 'object') return { binding, titles: saved.titles };
   } catch { /* Keep the original title available when cache data is absent. */ }
   return { binding, titles: {} };
 }
 
 /** Only owned, persisted tasks are summarized; polling and run progress never change the cache key. */
-export async function generateTaskTitles(app: App, botId: string, input: unknown) {
+export async function generateTaskTitles(app: App, botId: string, input: unknown, cachedOnly = false) {
   if (!Array.isArray(input) || input.length > 8) throw new Error('每次最多概括8项任务');
   const items: Item[] = [];
   for (const value of input) {
@@ -43,8 +43,7 @@ export async function generateTaskTitles(app: App, botId: string, input: unknown
   if (!state) { state = { pending: new Map(), retryAt: new Map(), gate: new WorkGate(2, 16) }; states.set(app, state); }
   const current = modelBinding(app, botId), saved = cache(app, botId);
   const missing = items.filter(item => !saved.titles[digest(item)]);
-  if (missing.length) {
-    if (!current.model) throw new Error('请先为当前智能体选择模型');
+  if (!cachedOnly && missing.length && current.model) {
     const requestKey = createHash('sha256').update(JSON.stringify([botId, current.binding, missing.map(digest).sort()])).digest('hex');
     let pending = state.pending.get(requestKey);
     if (!pending) {
@@ -84,7 +83,7 @@ export async function generateTaskTitles(app: App, botId: string, input: unknown
       }).finally(() => active.pending.delete(requestKey));
       active.pending.set(requestKey, pending);
     }
-    await pending;
+    try { await pending; } catch { /* Cached and original titles remain usable. */ }
   }
   const latest = cache(app, botId);
   return { entries: items.map(item => ({ kind: item.kind, id: item.id, title: latest.titles[digest(item)] })) };
