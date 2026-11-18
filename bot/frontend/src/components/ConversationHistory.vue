@@ -5,7 +5,7 @@ import { api, enc, downloadFile } from "../api";
 import Modal from "./Modal.vue";
 import ConversationLabel from "./ConversationLabel.vue";
 import MessageBubble from "./MessageBubble.vue";
-import ConversationProgress from "./ConversationProgress.vue";
+import TurnTranscript from "./TurnTranscript.vue";
 import Icon from "./Icon.vue";
 const props = defineProps<{
   conversation: { id: string; channel: string; createdAt: number };
@@ -88,13 +88,7 @@ onBeforeUnmount(() => {
         class="history-message"
         :class="{ user: message.role === 'user' }"
       >
-        <ConversationProgress
-          v-if="message.steps"
-          :count="message.steps"
-          :conversation-id="conversation.id"
-          :message-id="message.id"
-        />
-        <MessageBubble :framed="conversation.channel !== 'web'" :text="message.content" :role="message.role" :created-at="message.createdAt">
+        <TurnTranscript v-if="message.role === 'assistant'" :message="message" :conversation-id="conversation.id" :eager="message.id === messages.at(-1)?.id" :framed="conversation.channel !== 'web'">
         <button
           v-for="file in message.files"
           :key="file.path"
@@ -104,12 +98,11 @@ onBeforeUnmount(() => {
         >
           <Icon name="file" />{{ file.name }}
         </button>
-        </MessageBubble>
+        </TurnTranscript>
+        <MessageBubble v-else :framed="conversation.channel !== 'web'" :text="message.content" :role="message.role" :created-at="message.createdAt" />
       </article>
       <section v-if="turn" class="activity-panel">
-        <span role="status">{{ stopping ? "正在停止" : "处理中" }}</span>
-        <ConversationProgress :steps="turn.steps" running />
-        <MessageBubble v-if="turn.interim.length" :framed="conversation.channel !== 'web'" :text="turn.interim.join('\n\n')" />
+        <TurnTranscript :live="{botId: '', text: '', startedAt:turn.since, steps:turn.steps, interim:turn.interim}" :framed="conversation.channel !== 'web'" running :stopping="stopping" />
         <div class="button-row">
           <button class="danger-button" :disabled="stopping" @click="stop">
             停止

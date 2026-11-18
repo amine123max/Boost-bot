@@ -30,7 +30,7 @@ export interface ChatRequest {
   reasoningEffort?: string;
   protocol?: 'auto' | ChatProtocol;
   stream?: boolean;
-  onTrace?: (event: { summary?: string; inputTokens?: number; outputTokens?: number }) => void;
+  onTrace?: (event: { inputTokens?: number; outputTokens?: number }) => void;
 }
 
 export interface ModelClient {
@@ -78,7 +78,7 @@ export class OpenAICompatClient implements ModelClient {
       return { type: 'image', source: data ? { type: 'base64', media_type: data[1], data: data[2] } : { type: 'url', url: p.image_url.url } };
     }) }));
     const body = protocol === 'responses'
-      ? { model: req.model, input, stream: streaming, ...(req.reasoningEffort ? { reasoning: { effort: req.reasoningEffort, summary: 'auto' } } : {}) }
+      ? { model: req.model, input, stream: streaming, ...(req.reasoningEffort ? { reasoning: { effort: req.reasoningEffort } } : {}) }
       : protocol === 'messages'
         ? { model: req.model, system, messages: anthropic, max_tokens: 8192, stream: streaming,
             ...(req.reasoningEffort && claudeAdaptive(req.model) ? { thinking: { type: 'adaptive' }, output_config: { effort: req.reasoningEffort } } : {}) }
@@ -93,11 +93,11 @@ export class OpenAICompatClient implements ModelClient {
       const detail = await res.text().catch(() => "");
       throw new ModelError(`HTTP ${res.status}`, res.status, detail.slice(0, 500));
     }
-    let full = '', summary = '';
-    type WireContent = { type?: string; text?: string; summary?: Array<{ text?: string }>; content?: WireContent[] };
+    let full = '';
+    type WireContent = { type?: string; text?: string; content?: WireContent[] };
     type WireChunk = {
       type?: string; delta?: string | { type?: string; text?: string }; response?: WireChunk;
-      choices?: Array<{ delta?: { content?: string | null; reasoning_summary?: string }; message?: { content?: string; reasoning_summary?: string } }>;
+      choices?: Array<{ delta?: { content?: string | null }; message?: { content?: string } }>;
       content?: WireContent[]; output?: WireContent[];
       usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number };
       message?: { usage?: WireChunk['usage'] };
@@ -107,13 +107,6 @@ export class OpenAICompatClient implements ModelClient {
       if (chunk.error || chunk.type === 'response.failed') throw new ModelError(chunk.error?.message || chunk.response?.error?.message || 'upstream error', 502, '');
       const usage = chunk.usage || chunk.response?.usage || chunk.message?.usage;
       if (usage) req.onTrace?.({ inputTokens: usage.input_tokens ?? usage.prompt_tokens, outputTokens: usage.output_tokens ?? usage.completion_tokens });
-      // Only provider-designated public summaries are exposed, never raw thinking blocks.
-      const summaryDelta = chunk.type === 'response.reasoning_summary_text.delta' && typeof chunk.delta === 'string' ? chunk.delta : chunk.choices?.[0]?.delta?.reasoning_summary;
-      if (summaryDelta) { summary += summaryDelta; req.onTrace?.({ summary }); }
-      if (json) {
-        const finalSummary = protocol === 'responses' ? (chunk.output || []).flatMap(item => item.summary || []).map(item => item.text || '').join('\n') : chunk.choices?.[0]?.message?.reasoning_summary;
-        if (finalSummary) req.onTrace?.({ summary: finalSummary });
-      }
       let delta = protocol === 'chat' ? chunk.choices?.[0]?.delta?.content ?? chunk.choices?.[0]?.message?.content ?? ''
         : protocol === 'responses' ? chunk.type === 'response.output_text.delta' && typeof chunk.delta === 'string' ? chunk.delta : ''
           : typeof chunk.delta === 'object' && chunk.delta.type === 'text_delta' ? chunk.delta.text || '' : '';

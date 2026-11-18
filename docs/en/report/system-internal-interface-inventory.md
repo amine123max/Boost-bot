@@ -154,7 +154,7 @@ Requests use JSON-RPC method names. Frontend underscore commands and camelCase/s
 
 ## Scheduling and error semantics
 
-An explicit rpc_policy classifies scheduling; names do not prove read-only behavior. Writes share 6 execution slots and at most 256 waiters, with at most 32 waiters per resource. Reads have 16 in-flight slots and no hidden queue. Cross-resource and unknown methods use a global barrier. Queue timeout means not executed; disconnection after execution begins does not imply rollback. Proxies must not replay writes.
+An explicit rpc_policy classifies scheduling; names do not prove read-only behavior. Writes share 6 execution slots and at most 256 waiters, with at most 32 waiters per resource. Reads have 32 execution slots, at most 96 admitted requests including waiters, and a 2-second queue deadline. Cross-resource and unknown methods use a global barrier. Queue timeout means not executed; disconnection after execution begins does not imply rollback. Proxies must not replay writes.
 
 ## Maintenance sources
 

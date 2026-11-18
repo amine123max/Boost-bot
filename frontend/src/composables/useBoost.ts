@@ -78,6 +78,20 @@ export async function perform<T>(
     return undefined;
   }
 }
+/** Keep the last visible data when a navigation read hits short-lived contention. */
+export async function readForPage<T>(action: () => Promise<T>, active: () => boolean): Promise<T | undefined> {
+  for (let attempt = 0; active(); attempt++) {
+    try {
+      const result = await action();
+      return active() ? result : undefined;
+    } catch (error) {
+      if (!active()) return;
+      if (!isManagementReadBusy(error)) throw error;
+      if (attempt >= 1) return;
+      await new Promise(resolve => setTimeout(resolve, 320));
+    }
+  }
+}
 let accountRefreshVersion = 0;
 let appliedAccountRefresh = 0;
 export async function refreshAccounts() {

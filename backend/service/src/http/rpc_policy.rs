@@ -46,6 +46,8 @@ pub(super) fn classify(method: &str) -> RpcClass {
         | "accountManager/session/current"
         | "accountManager/users/list"
         | "accountManager/apiKeyOwners/list"
+        | "quota/modelPools"
+        | "quota/modelPriceRules"
         | "modelGroups/list" => RpcClass::Read,
 
         "account/import"
@@ -103,6 +105,8 @@ mod tests {
     fn classification_is_explicit_and_cross_domain_changes_are_exclusive() {
         assert_eq!(classify("account/list"), RpcClass::Read);
         assert_eq!(classify("gateway/manualAccount/get"), RpcClass::Read);
+        assert_eq!(classify("quota/modelPools"), RpcClass::Read);
+        assert_eq!(classify("quota/modelPriceRules"), RpcClass::Read);
         assert_eq!(
             classify("account/import"),
             RpcClass::Write(Resource::Accounts)

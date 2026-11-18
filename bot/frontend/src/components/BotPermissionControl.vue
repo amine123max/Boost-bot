@@ -18,6 +18,7 @@ const trigger = ref<HTMLButtonElement>(),
   menu = ref<HTMLElement>(),
   open = ref(false),
   saving = ref(false),
+  confirming = ref(false),
   error = ref(""),
   active = ref(0),
   position = ref({});
@@ -64,6 +65,7 @@ function place() {
 function close(focus = false) {
   if (saving.value) return;
   open.value = false;
+  confirming.value = false;
   if (focus) trigger.value?.focus();
 }
 async function toggle() {
@@ -80,10 +82,16 @@ async function toggle() {
     ?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')
     [active.value]?.focus();
 }
-async function save(value: string) {
+async function save(value: string, confirmed = false) {
   if (saving.value || props.running || !props.configure) return;
   if (value === props.bot.settings.permission) {
     close(true);
+    return;
+  }
+  if (value === "full" && !confirmed) {
+    confirming.value = true;
+    await nextTick();
+    menu.value?.querySelector<HTMLElement>('.confirm-full')?.focus();
     return;
   }
   const id = props.bot.id;
@@ -92,10 +100,11 @@ async function save(value: string) {
   try {
     await api(`/bots/${enc(id)}/settings`, {
       method: "PUT",
-      body: { permission: value },
+      body: { permission: value, ...(confirmed ? { confirmFullAccess: true } : {}) },
     });
     saving.value = false;
     open.value = false;
+    confirming.value = false;
     emit("saved");
     if (id === props.bot.id) trigger.value?.focus();
   } catch (e) {
@@ -136,6 +145,7 @@ watch(
   () => props.bot.id,
   () => {
     open.value = false;
+    confirming.value = false;
     error.value = "";
   },
 );
@@ -203,6 +213,13 @@ onBeforeUnmount(() => {
           :size="15"
         />
       </button>
+      <section v-if="confirming" class="permission-confirm">
+        <p>此 Bot 的命令将以当前系统用户身份运行。电脑操作需在 Bot 设置中启用，并受系统授权限制。</p>
+        <div class="button-row">
+          <button type="button" class="quiet-button" :disabled="saving" @click="confirming = false">取消</button>
+          <button type="button" class="primary-button confirm-full" :disabled="saving || running" @click="save('full', true)">确认完全访问</button>
+        </div>
+      </section>
       <p v-if="running">请先停止此Bot的对话和后台任务。</p>
       <p v-else-if="!configure">更改权限需要管理员。</p>
       <p v-if="error" role="alert" class="permission-error">{{ error }}</p>
@@ -258,6 +275,8 @@ onBeforeUnmount(() => {
 .bot-permission-menu::-webkit-scrollbar {
   display: none;
 }
+.permission-confirm { padding:7px; border:1px solid var(--line); border-radius:8px; font-size:12px; }
+.permission-confirm p { margin:0 0 8px; }
 .bot-permission-menu > p {
   display: flex;
   align-items: center;

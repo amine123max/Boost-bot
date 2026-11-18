@@ -22,6 +22,7 @@ import {
   notify,
   perform,
   copyText,
+  readForPage,
 } from "@/composables/useBoost";
 import { accountClient } from "@/lib/api/account-client";
 const query = ref("");
@@ -34,7 +35,7 @@ const pools = ref<QuotaModelPoolItem[]>([]);
 let active = false;
 onActivated(() => {
   active = true;
-  if (boost.ready && isAdmin.value) void perform(reload);
+  if (boost.ready && isAdmin.value) void reloadOnActivation();
 });
 onDeactivated(() => {
   active = false;
@@ -46,7 +47,7 @@ onDeactivated(() => {
 watch(
   () => boost.ready,
   (ready) => {
-    if (ready && active && isAdmin.value) void perform(reload);
+    if (ready && active && isAdmin.value) void reloadOnActivation();
   },
 );
 const dialog = ref(false);
@@ -110,18 +111,22 @@ const visible = computed(() =>
         a.providerType === providerFilter.value),
   ),
 );
+let activationRead: Promise<void | undefined> | undefined;
+function reloadOnActivation() {
+  return activationRead ??= perform(reload).finally(() => { activationRead = undefined; });
+}
 async function reload() {
   const version = ++reloadVersion;
   const [items, result] = await Promise.all([
-    accountClient.listAggregateApis(),
-    quotaClient.modelPools().catch((e) => {
+    readForPage(() => accountClient.listAggregateApis(), () => active),
+    readForPage(() => quotaClient.modelPools(), () => active).catch((e) => {
       notify(`读取模型额度失败: ${getAppErrorMessage(e)}`, true);
       return null;
     }),
   ]);
   if (version < appliedReload) return;
   appliedReload = version;
-  boost.connections = items;
+  if (items) boost.connections = items;
   if (result) pools.value = result.items;
 }
 function open(a?: AggregateApi) {

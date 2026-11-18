@@ -58,7 +58,9 @@ impl Task {
     }
     fn call(&mut self, id: &str, name: &str, args: &Value, at: i64) {
         self.at = at;
-        if self.tools.len() < 128 { self.tools.insert(id.to_string()); }
+        if self.tools.len() < 128 {
+            self.tools.insert(id.to_string());
+        }
         self.rate.waiting(true, at);
         if matches!(
             name,
@@ -163,7 +165,11 @@ impl Task {
                     }
                     "token_count" => {
                         self.at = at;
-                        self.usage(&p["info"]["total_token_usage"], &p["info"]["last_token_usage"], at);
+                        self.usage(
+                            &p["info"]["total_token_usage"],
+                            &p["info"]["last_token_usage"],
+                            at,
+                        );
                     }
                     _ => {}
                 }
@@ -171,10 +177,19 @@ impl Task {
                 match p["type"].as_str().unwrap_or("") {
                     "function_call" | "custom_tool_call" => self.call(
                         p["call_id"].as_str().unwrap_or(""),
-                        if p["name"] == "report_progress" && matches!(p["namespace"].as_str(), Some("pacer_progress" | "mcp__pacer_progress")) {
+                        if p["name"] == "report_progress"
+                            && matches!(
+                                p["namespace"].as_str(),
+                                Some("pacer_progress" | "mcp__pacer_progress")
+                            )
+                        {
                             "mcp__pacer_progress__report_progress"
-                        } else { p["name"].as_str().unwrap_or("") },
-                        p.get("arguments").or_else(|| p.get("input")).unwrap_or(&Value::Null),
+                        } else {
+                            p["name"].as_str().unwrap_or("")
+                        },
+                        p.get("arguments")
+                            .or_else(|| p.get("input"))
+                            .unwrap_or(&Value::Null),
                         at,
                     ),
                     "function_call_output" | "custom_tool_call_output" => {
@@ -187,13 +202,26 @@ impl Task {
                 self.usage(&p["thread_token_usage"], &p["usage"], at);
             } else if kind == "item_completed" {
                 let item = record.get("item").unwrap_or(&p["item"]);
-                if matches!(item["type"].as_str(), Some("mcpToolCall" | "mcp_tool_call" | "McpToolCall"))
-                    && item["server"] == "pacer_progress" && item["tool"] == "report_progress"
+                if matches!(
+                    item["type"].as_str(),
+                    Some("mcpToolCall" | "mcp_tool_call" | "McpToolCall")
+                ) && item["server"] == "pacer_progress"
+                    && item["tool"] == "report_progress"
                     && matches!(item["status"].as_str(), Some("completed" | "Completed"))
                 {
                     let id = item["id"].as_str().unwrap_or("pacer-progress-item");
-                    self.call(id, "mcp__pacer_progress__report_progress", &item["arguments"], at);
-                    self.result(id, &item["result"]["content"], item["result"]["isError"] == true || item["result"]["is_error"] == true, at);
+                    self.call(
+                        id,
+                        "mcp__pacer_progress__report_progress",
+                        &item["arguments"],
+                        at,
+                    );
+                    self.result(
+                        id,
+                        &item["result"]["content"],
+                        item["result"]["isError"] == true || item["result"]["is_error"] == true,
+                        at,
+                    );
                 }
             }
         } else if provider == "claude" {
@@ -304,12 +332,20 @@ impl Task {
 impl Task {
     fn usage(&mut self, total: &Value, last: &Value, at: i64) {
         let cumulative = total["output_tokens"].as_u64();
-        if cumulative.is_some() && cumulative == self.last_usage_total { return; }
-        if !self.rate.has_baseline() && cumulative.is_some() {
-            if let Some(tokens) = last["output_tokens"].as_u64() { self.rate.response(tokens, self.model_started, at); }
+        if cumulative.is_some() && cumulative == self.last_usage_total {
+            return;
         }
-        if let Some(tokens) = cumulative { self.rate.cumulative(tokens, at); self.last_usage_total = Some(tokens); }
-        else if let Some(tokens) = last["output_tokens"].as_u64() { self.rate.response(tokens, self.model_started, at); }
+        if !self.rate.has_baseline() && cumulative.is_some() {
+            if let Some(tokens) = last["output_tokens"].as_u64() {
+                self.rate.response(tokens, self.model_started, at);
+            }
+        }
+        if let Some(tokens) = cumulative {
+            self.rate.cumulative(tokens, at);
+            self.last_usage_total = Some(tokens);
+        } else if let Some(tokens) = last["output_tokens"].as_u64() {
+            self.rate.response(tokens, self.model_started, at);
+        }
     }
 }
 
@@ -334,7 +370,11 @@ mod tests {
     #[test]
     fn modern_usage_and_custom_tools_are_observed_without_duplicate_samples() {
         let mut task = Task::default();
-        task.consume("codex", &json!({"type":"event_msg","payload":{"type":"task_started","turn_id":"modern"}}), 1000);
+        task.consume(
+            "codex",
+            &json!({"type":"event_msg","payload":{"type":"task_started","turn_id":"modern"}}),
+            1000,
+        );
         task.consume("codex", &json!({"type":"token_usage_record","payload":{"usage":{"output_tokens":60},"thread_token_usage":{"output_tokens":1060}}}), 3000);
         assert_eq!(task.rate.value(3000), Some(30.0));
         task.consume("codex", &json!({"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"output_tokens":60},"total_token_usage":{"output_tokens":1060}}}}), 3500);

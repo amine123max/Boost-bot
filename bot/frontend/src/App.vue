@@ -346,6 +346,7 @@ async function saveBot(confirmed = false) {
         method: "PUT",
         body: {
           permission: botSettings.permission,
+          ...(confirmed ? { confirmFullAccess: true } : {}),
           memory: {
             enabled: botSettings.memory,
             teamWrite: botSettings.teamWrite,

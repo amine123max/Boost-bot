@@ -166,6 +166,7 @@ export interface TaskServiceOptions {
   /** 任务有变化（阶段、进展）；规则有变化时是规则 id */
   onChange?: (taskId: string) => void;
   onConversationMessage?: (conversationId: string) => void;
+  readHostActivity?: (name: string) => Promise<unknown>;
   /** 规则：用主模型写那一句结果（检查用的是小模型）；没有就用检查时的草稿 */
   complete?: (botId: string, model: string, system: string, user: string) => Promise<string>;
   /** 新规则的时区（默认本机的） */
@@ -1210,7 +1211,7 @@ export class TaskService {
     if (pushed) this.post(conv, task, id, purpose, text, files, hint);
     // 交付的文件跟着这条消息存下：网页对话里是文件卡片（图片直接显示），点开就能看
     this.store.db.transaction(() => {
-      this.store.addMessage(conv.id, "assistant", text, undefined, { files });
+      this.store.addMessage(conv.id, "assistant", text, undefined, { files, backgroundNotice: true });
       this.store.updateRun(runId, { delivery: id });
       this.note(conv.id, outcome === "done" ? `[后台任务「${task.title}」已完成，结果已写入会话] ${text}` : `[后台任务「${task.title}」未完成，原因已写入会话] ${text}`);
     })();
@@ -1348,6 +1349,37 @@ export class TaskService {
           ].join("\n"),
         };
       }
+      case "inspect": {
+        const ref = typeof a.task === "string" ? a.task.trim() : "";
+        const wider = a.scope === "workspace";
+        const bot = this.store.getBot(botId);
+        const console = conv.channel === "web" && conv.id === `${botId}:web:console`;
+        if (wider && (!console ||
+            bot?.settings.permission !== "full" || bot.origin === "catalog")) {
+          return { error: "Workspace task inspection requires a trusted web-console Bot with full access." };
+        }
+        if (ref) {
+          const row = this.store.getTask(ref);
+          if (!row || row.endReason === "archived" || (!wider && row.botId !== botId) ||
+              (!console && row.conversationId !== conv.id)) return { error: "Task not found in the allowed scope." };
+          return { text: JSON.stringify(this.inspection(row, row.conversationId === conv.id)) };
+        }
+        const scope = wider ? {} : { botId, ...(console ? {} : { conversationId: conv.id }) };
+        const rows = [
+          ...this.store.listTasks({ ...scope, open: true, limit: 16 }),
+          ...this.store.listTasks({ ...scope, open: false, limit: 8 }),
+        ];
+        return { text: JSON.stringify(rows.map(row => this.inspection(row, row.conversationId === conv.id))) };
+      }
+      case "inspect-host": {
+        const bot = this.store.getBot(botId);
+        if (conv.id !== `${botId}:web:console` || bot?.settings.permission !== "full" || bot.origin === "catalog" || !this.o.readHostActivity) {
+          return { error: "Host observation is only available in a trusted web-console Bot explicitly set to full access." };
+        }
+        try {
+          return { text: JSON.stringify(await this.o.readHostActivity(typeof a.name === 'string' ? a.name.slice(0,80) : '')) };
+        } catch { return { error: "Host observation is unavailable; the Boost system administrator must authorize the host." }; }
+      }
       case "rule_create":
         return this.ruleCreateTool(conv, a);
       case "rule_update":
@@ -1366,6 +1398,13 @@ export class TaskService {
   }
 
   /** 按 id 或标题里的字找这个会话的任务（新的在前） */
+  private inspection(row: TaskRow, includeReport: boolean) {
+    const task = this.view(row);
+    return { id: task.id, botId: task.botId, title: task.title, state: task.stage.label,
+      progress: task.progress ?? null, updatedAt: task.updatedAt, startedAt: task.live?.since,
+      ...(includeReport && task.latest ? { latest: task.latest } : {}) };
+  }
+
   private find(conversationId: string, ref: string): TaskRow | undefined {
     const r = ref.trim();
     if (!r) return undefined;
@@ -1567,7 +1606,7 @@ export class TaskService {
       else delivery.push({ ...base, replyTo, kind: replyTo ? "text" : "notice" });
     }
     if (row.kind === "question") {
-      this.store.addMessage(conv.id, "assistant", text);
+      this.store.addMessage(conv.id, "assistant", text, undefined, { backgroundNotice: true });
       this.o.onConversationMessage?.(conv.id);
     }
     log.info("pushed a background task's prompt", { task: task.id, kind: row.kind, channel: conv.channel });
@@ -1871,6 +1910,8 @@ export class TaskService {
   private changed(taskId: string): void {
     try {
       this.o.onChange?.(taskId);
+      const task = taskId ? this.store.getTask(taskId) : undefined;
+      if (task) this.o.onConversationMessage?.(task.conversationId);
     } catch {
       /* ignore */
     }
@@ -2645,7 +2686,7 @@ export class TaskService {
         ref: `rule:${rule.id}`,
       });
     }
-    this.store.addMessage(conv.id, "assistant", text);
+    this.store.addMessage(conv.id, "assistant", text, undefined, { backgroundNotice: true });
     this.note(conv.id, purpose === "failure" ? `[规则「${rule.title}」已暂停，原因已写入会话] ${text}` : `[规则「${rule.title}」的结果已写入会话] ${text}`);
     this.o.onConversationMessage?.(conv.id);
     log.info("rule message handed over", { rule: rule.id, id, purpose, channel: conv.channel });

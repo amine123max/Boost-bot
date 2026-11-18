@@ -57,10 +57,10 @@ sequenceDiagram
 | Frontend runtime | 6 outstanding RPCs | Not shared across browser tabs |
 | Service writes | 6 executing, at most 256 waiting, 60 s queue deadline | Shared by async and legacy HTTP entrypoints in one process |
 | Resource lanes | Serial execution, at most 32 waiting per lane | Accounts, keys, models, billing, Bot and settings; maintenance separately |
-| Read lane | 16 active, immediate rejection when full | Explicitly reviewed read methods only |
+| Read lane | 32 active, 96 admitted including waiters, 2 s queue deadline | Explicitly reviewed read methods only |
 | Cross-domain changes | Global read/write barrier | Deletion, ownership, reload and unknown methods use conservative scheduling |
 
-A task waits for its resource before taking a global execution slot. A hot resource therefore cannot consume every execution slot while waiting on its own lock. Reads do not accumulate a hidden queue; cancellation releases admission. Client timeout after execution begins does not imply rollback, and proxies must not replay writes.
+A task waits for its resource before taking a global execution slot. A hot resource therefore cannot consume every execution slot while waiting on its own lock. Readers waiting for an execution slot do not hold the shared barrier. Cancellation releases admission. Client timeout after execution begins does not imply rollback, and proxies must not replay writes.
 
 Sources: [classification](backend/service/src/http/rpc_policy.rs), [scheduler](backend/service/src/http/rpc_queue.rs), [typed transport](frontend/src/lib/api/transport.ts).
 

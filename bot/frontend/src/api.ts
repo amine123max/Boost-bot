@@ -47,10 +47,10 @@ export async function api<T = Record<string, unknown>>(
   return data;
 }
 
-export function eventParser(emit: (event: string, data: unknown) => void) {
+export function eventParser(emit: (event: string, data: unknown, id?: string) => void) {
   let buffer = "",
     event = "message";
-  let data: string[] = [];
+  let data: string[] = [], id: string | undefined;
   function line(value: string) {
     if (!value) {
       if (data.length) {
@@ -61,11 +61,13 @@ export function eventParser(emit: (event: string, data: unknown) => void) {
         } catch {
           parsed = raw;
         }
-        emit(event, parsed);
+        emit(event, parsed, id);
       }
       event = "message";
       data = [];
+      id = undefined;
     } else if (value.startsWith("event:")) event = value.slice(6).trim();
+    else if (value.startsWith("id:")) id = value.slice(3).trim();
     else if (value.startsWith("data:"))
       data.push(value.slice(5).replace(/^ /, ""));
   }
@@ -79,9 +81,9 @@ export function eventParser(emit: (event: string, data: unknown) => void) {
       }
     },
     end() {
-      if (buffer) line(buffer);
+      // An interrupted response can end halfway through an event. Never advance
+      // the resume cursor for a frame that did not have a terminating blank line.
       buffer = "";
-      line("");
     },
   };
 }
@@ -95,7 +97,7 @@ export async function stream(
   }: {
     body?: unknown;
     signal?: AbortSignal;
-    onEvent: (event: string, data: unknown) => void;
+    onEvent: (event: string, data: unknown, id?: string) => void;
   },
 ) {
   const timeout = new AbortController();

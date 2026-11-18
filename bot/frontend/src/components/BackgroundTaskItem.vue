@@ -8,11 +8,11 @@ import SpringDisclosure from './SpringDisclosure.vue';
 import ActivityTrace from './ActivityTrace.vue';
 import TaskStepStatus from './TaskStepStatus.vue';
 
-const props = withDefaults(defineProps<{ work: BackgroundWork; title: string; active?: boolean }>(), { active: true });
+const props = withDefaults(defineProps<{ work: BackgroundWork; title: string; active?: boolean; flat?: boolean }>(), { active: true });
 interface Run { id: string; state: string; outcome?: string; error?: string; startedAt?: number; endedAt?: number }
 const open = ref(false), visited = ref(false), loading = ref(false), error = ref('');
 const steps = ref<Activity[]>([]), run = ref<Run>(), id = useId();
-const status = computed(() => props.work.label);
+const status = computed(() => props.flat && props.work.state === 'working' && props.work.task?.stage?.key !== 'working/asking' ? '进行中' : props.work.label);
 const path = computed(() => `/${props.work.kind === 'rule' ? 'rules' : 'tasks'}/${enc(props.work.id)}`);
 let timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined, generation = 0, disposed = false, loadedRunId = '';
 function cancel() { generation++; controller?.abort(); clearTimeout(timer); loading.value = false; }
@@ -48,7 +48,7 @@ watch(() => props.work.runId, () => { if (open.value) void load(); });
 onBeforeUnmount(() => { disposed = true; cancel(); });
 </script>
 <template>
-  <article class="background-task-item">
+  <article class="background-task-item" :class="{ flat }">
     <button class="background-task-row" :aria-expanded="open" :aria-controls="id" :aria-label="(open ? '收起任务：' : '展开任务：') + work.title" @click="open = !open">
       <Icon name="chevron" :size="12" class="task-chevron" :class="{ expanded: open }" />
       <TaskStepStatus :state="work.state" />
@@ -68,6 +68,10 @@ onBeforeUnmount(() => { disposed = true; cancel(); });
 .background-task-item { min-width:0; background:var(--pill); border-radius:6px; overflow:hidden; }
 .background-task-row { display:flex; align-items:center; gap:6px; text-align:left; width:100%; min-height:30px; padding:7px 10px; border-radius:5px; box-sizing:border-box; }
 .background-task-row:hover { background:var(--pill-hover); }
+.flat { background:transparent; }
+.flat .background-task-row:hover { color:var(--fg); background:transparent; }
+.flat .background-task-title { font-size:var(--chat-text-size,var(--fs-lg)); }
+.flat .task-label { font-size:var(--fs-xs); padding:0; background:transparent; }
 .task-chevron { flex:none; color:var(--muted); transition:transform 220ms ease; }
 .task-chevron.expanded { transform:rotate(90deg); }
 .background-task-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }

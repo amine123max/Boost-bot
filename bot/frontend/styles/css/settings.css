@@ -80,7 +80,7 @@
 .tsk-box { height: var(--space-3); margin-top: var(--space-1); border-radius: var(--r-full); background: var(--pill-hover); }
 /* 文字预览：「文字」这组的最后一块，用对话页同样的字号与字体 token，跟着字体大小、字体、代码字体和代码换行实时变 */
 .text-sample { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--line-2); }
-.text-sample p { font-size: var(--fs-xl); line-height: var(--lh-relaxed); }
+.text-sample p { font-size: var(--fs-lg); line-height: var(--lh-relaxed); }
 .text-sample b { font-weight: var(--fw-semibold); }
 .text-sample pre { margin: 0; font: var(--fs-sm)/var(--lh-relaxed) var(--code); color: var(--fg-2); white-space: var(--code-wrap); overflow-wrap: anywhere; overflow-x: auto; }
 

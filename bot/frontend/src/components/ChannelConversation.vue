@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import type { Activity, ChannelConversation, Message } from "../types";
 import { api, enc, downloadFile } from "../api";
 import ConversationLabel from "./ConversationLabel.vue";
-import ConversationProgress from "./ConversationProgress.vue";
+import TurnTranscript from "./TurnTranscript.vue";
 import MessageBubble from "./MessageBubble.vue";
 import HelpTip from "./HelpTip.vue";
 import Icon from "./Icon.vue";
@@ -105,13 +105,7 @@ onBeforeUnmount(() => {
           :class="{ 'is-user': message.role === 'user' }"
         >
           <div class="message-body">
-            <ConversationProgress
-              v-if="message.steps"
-              :count="message.steps"
-              :conversation-id="conversation.id"
-              :message-id="message.id"
-            />
-            <MessageBubble framed :text="message.content" :role="message.role" :created-at="message.createdAt">
+            <TurnTranscript v-if="message.role === 'assistant'" framed :message="message" :conversation-id="conversation.id" :eager="message.id === messages.at(-1)?.id">
             <button
               v-for="f in message.files"
               :key="f.path"
@@ -121,13 +115,13 @@ onBeforeUnmount(() => {
             >
               <Icon name="file" />{{ f.name }}
             </button>
-            </MessageBubble>
+            </TurnTranscript>
+            <MessageBubble v-else framed :text="message.content" :role="message.role" :created-at="message.createdAt" />
           </div>
         </article>
         <section v-if="turn">
-          <ConversationProgress :steps="turn.steps" running /><MessageBubble framed
-            v-if="turn.interim.length" :text="turn.interim.join('\n\n')"
-          /><button class="danger-button" :disabled="stopping" @click="stop">
+          <TurnTranscript :live="{botId: '', text: '', startedAt:turn.since, steps:turn.steps, interim:turn.interim}" framed running :stopping="stopping" />
+          <button class="danger-button" :disabled="stopping" @click="stop">
             {{ stopping ? "正在停止" : "停止" }}
           </button>
         </section>

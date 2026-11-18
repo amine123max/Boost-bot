@@ -150,6 +150,7 @@ pub use auth::{
 };
 pub use auth::{rpc_auth_token, rpc_auth_token_matches};
 pub use bot::configure_bot_runtime;
+pub use bot::local_activity::read as read_local_agent_activity;
 pub use lifecycle::bootstrap::{initialize_storage_if_needed, portable};
 pub use lifecycle::shutdown::{clear_shutdown_flag, request_shutdown, shutdown_requested};
 pub use lifecycle::startup::{start_one_shot_server, start_server, ServerHandle};

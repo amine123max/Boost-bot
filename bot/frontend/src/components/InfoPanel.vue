@@ -14,6 +14,7 @@ import { type ChannelAccount as Account, type ChatChannel } from '../channel-acc
 import BotChannels from './BotChannels.vue';
 import PanelSection from './PanelSection.vue';
 import BotApprovals from './BotApprovals.vue';
+import HostToolsPane from './HostToolsPane.vue';
 const props = defineProps<{
   bot: Bot;
   bots: Bot[];
@@ -42,6 +43,8 @@ const conversations = ref<Conversation[]>([]),
   accounts = ref<Account[]>([]),
   error = ref("");
 const viewing = ref<Conversation | null>(null);
+const tab = ref<''|'tasks'|'channels'|'tools'|'history'>('');
+function select(value: typeof tab.value) { tab.value = tab.value === value ? '' : value; }
 const channelDialog = ref<InstanceType<typeof ChannelSettings>>();
 const channelError = ref('');
 const channelBusy = ref(false);
@@ -90,6 +93,7 @@ watch(
   [() => props.bot.id, () => props.configure],
   () => {
     generation++;
+    tab.value = '';
     clearTimeout(timer);
     conversations.value = [];
     accounts.value = [];
@@ -117,17 +121,27 @@ onBeforeUnmount(() => {
         <Icon name="close" />
       </button>
     </div>
+    <nav class="panel-views" aria-label="面板内容">
+      <button type="button" class="icon-btn" aria-label="任务与审批" title="任务与审批" :aria-pressed="tab==='tasks'" @click="select('tasks')"><Icon name="tasks" :size="17" /></button>
+      <button v-if="configure" type="button" class="icon-btn" aria-label="渠道" title="渠道" :aria-pressed="tab==='channels'" @click="select('channels')"><Icon name="link" :size="17" /></button>
+      <button v-if="configure" type="button" class="icon-btn" aria-label="宿主工具" title="宿主工具" :aria-pressed="tab==='tools'" @click="select('tools')"><Icon name="monitor" :size="17" /></button>
+      <button type="button" class="icon-btn" aria-label="历史与记忆" title="历史与记忆" :aria-pressed="tab==='history'" @click="select('history')"><Icon name="clock" :size="17" /></button>
+    </nav>
     <div class="panel-body">
       <p v-if="error" class="notice" role="alert">{{ error }}</p>
+      <template v-if="tab==='tasks'">
       <BackgroundTasks :key="bot.id" :bot="bot" :configure="configure" @open="emit('task', $event)" @saved="emit('saved')" />
-      <template v-if="configure">
+      <BotApprovals :key="bot.id" :bot-id="bot.id" :configure="configure" :pending="pending" @changed="emit('saved')" />
+      </template>
+      <template v-if="configure && tab==='channels'">
       <BotChannels :key="bot.id" :accounts="accounts" :busy="channelBusy" @connect="connect" @edit="channelDialog?.editAccount($event)" @more="channelDialog?.begin(undefined, undefined, bot.id)" />
       <p v-if="channelError" class="notice" role="alert">{{ channelError }}</p>
       <PanelSection title="管理聊天渠道" help="管理分配给当前智能体的渠道账号；工作台设置可查看所有账号。">
         <ChannelSettings :key="bot.id" :bots="bots" :scope-bot="bot.id" :account-list="accounts" embedded @changed="load" />
       </PanelSection>
       </template>
-      <BotApprovals :key="bot.id" :bot-id="bot.id" :configure="configure" :pending="pending" @changed="emit('saved')" />
+      <HostToolsPane v-if="configure && tab==='tools'" :key="bot.id" :bot-id="bot.id" @saved="emit('saved')" />
+      <template v-if="tab==='history'">
       <BotMemory v-if="configure" :key="bot.id" :bot="bot" @saved="emit('saved')" />
       <div class="list-head">最近会话</div>
       <div class="list">
@@ -153,6 +167,7 @@ onBeforeUnmount(() => {
           <span class="hint">暂无会话记录</span>
         </div>
       </div>
+      </template>
     </div>
   </aside>
   <ChannelSettings v-if="configure" :key="bot.id" ref="channelDialog" :bots="bots" :scope-bot="bot.id" dialog-only @changed="load" @error="channelError = $event" />
@@ -166,6 +181,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .panel-body { scrollbar-width: none; -ms-overflow-style: none; }
+.panel-views { display:flex; align-items:center; gap:5px; padding:5px 10px; }
+.panel-views button[aria-pressed="true"] { background:var(--pill); color:var(--fg); }
 .panel-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .panel-body > :deep(.background-tasks > .list-head) { margin-top: 4px; }
 .channel-manage-label { display:inline-flex; align-items:center; gap:5px; }

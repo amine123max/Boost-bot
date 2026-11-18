@@ -54,7 +54,7 @@ for (const language of ['en', 'zh-CN']) {
     lines.push(`| \`${method}\` | ${description} | [${source.split('/').at(-1)}](../../../${source}) |`);
   }
   lines.push('', chinese ? '## 调度与错误语义' : '## Scheduling and error semantics', '',
-    chinese ? '调度策略由显式 rpc_policy 分类，不以名称猜测只读。写任务全局 6 执行、最多 256 等待，每资源最多 32 等待；读通道 16 在途且满额直接拒绝。跨资源及未知方法使用全局屏障。排队超时表示未执行；开始后的断连不表示回滚。写请求禁止代理自动重放。' : 'An explicit rpc_policy classifies scheduling; names do not prove read-only behavior. Writes share 6 execution slots and at most 256 waiters, with at most 32 waiters per resource. Reads have 16 in-flight slots and no hidden queue. Cross-resource and unknown methods use a global barrier. Queue timeout means not executed; disconnection after execution begins does not imply rollback. Proxies must not replay writes.', '',
+    chinese ? '调度策略由显式 rpc_policy 分类，不以名称猜测只读。写任务全局 6 执行、最多 256 等待，每资源最多 32 等待；读通道最多 32 执行，含等待共 96 个，排队上限 2 秒。跨资源及未知方法使用全局屏障。排队超时表示未执行；开始后的断连不表示回滚。写请求禁止代理自动重放。' : 'An explicit rpc_policy classifies scheduling; names do not prove read-only behavior. Writes share 6 execution slots and at most 256 waiters, with at most 32 waiters per resource. Reads have 32 execution slots, at most 96 admitted requests including waiters, and a 2-second queue deadline. Cross-resource and unknown methods use a global barrier. Queue timeout means not executed; disconnection after execution begins does not imply rollback. Proxies must not replay writes.', '',
     chinese ? '## 维护依据' : '## Maintenance sources', '',
     '- [Typed clients](../../../frontend/src/lib/api/)',
     '- [Web mapping](../../../frontend/src/lib/api/transport-web-commands.ts)',

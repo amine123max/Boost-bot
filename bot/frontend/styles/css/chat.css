@@ -12,6 +12,7 @@
   --composer-h: calc(var(--space-3-5) + var(--composer-line) + var(--space-1) + var(--space-1-5) + var(--ctl-lg) + var(--composer-pad));
 }
 .chat {
+  --chat-text-size: var(--fs-lg);
   --col: min(var(--col-w), calc(100% - 2 * var(--page-gutter)));
   --dock-pb: var(--space-4);      /* 输入框离主区下沿 */
   position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column;
@@ -65,7 +66,7 @@ button.head-bot:active { background: var(--pill-press); }
 .msg-row.cont { margin-top: var(--space-1); }
 .msg-row.user { align-items: flex-end; }
 .msg-row.assistant { align-items: stretch; }
-.msg { font-size: var(--fs-xl); word-break: break-word; overflow-wrap: anywhere; cursor: text; }
+.msg { font-size: var(--chat-text-size, var(--fs-lg)); word-break: break-word; overflow-wrap: anywhere; cursor: text; }
 .msg-row.user .msg {
   max-width: min(var(--bubble-w), 80%); padding: var(--space-2-5) var(--space-4); border-radius: var(--r-bubble);
   background: var(--bubble-user); color: var(--fg); line-height: var(--lh-relaxed); white-space: pre-wrap;
@@ -310,7 +311,7 @@ a.file-card:active, .file-card:has(> .file-open:active) { background: var(--well
 .composer.drag { --composer-edge: var(--accent); --composer-edge-w: 1.5px; --composer-shadow: var(--ring); --composer-tint: var(--pill); }
 .composer textarea {
   display: block; width: 100%; min-width: 0; border: 0; outline: none; background: transparent; resize: none;
-  font-size: var(--fs-xl); line-height: var(--composer-line); padding: var(--space-3-5) var(--space-4) var(--space-1);
+  font-size: var(--chat-text-size, var(--fs-lg)); line-height: var(--composer-line); padding: var(--space-3-5) var(--space-4) var(--space-1);
   max-height: calc(var(--composer-line) * 8 + var(--space-3-5) + var(--space-1)); overflow-y: auto; color: var(--fg);
 }
 .composer textarea::placeholder { color: var(--placeholder); }

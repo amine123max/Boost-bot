@@ -23,6 +23,7 @@ import {
   isAdmin,
   notify,
   perform,
+  readForPage,
 } from "@/composables/useBoost";
 import { serviceClient } from "@/lib/api/service-client";
 import { getAppErrorMessage } from "@/lib/api/transport";
@@ -74,7 +75,7 @@ async function load() {
       new Date(startTime.value).getTime() > new Date(endTime.value).getTime()
     )
       throw new Error("开始时间不能晚于结束时间");
-    const data = await serviceClient.listRequestLogs({
+    const data = await readForPage(() => serviceClient.listRequestLogs({
       query: query.value,
       statusFilter: filter.value,
       page: page.value,
@@ -85,8 +86,8 @@ async function load() {
       endTs: endTime.value
         ? Math.floor(new Date(endTime.value).getTime() / 1000)
         : null,
-    });
-    if (current === request) result.value = data;
+    }), () => active && current === request);
+    if (data && current === request) result.value = data;
   } catch (e) {
     if (current === request) {
       error.value = getAppErrorMessage(e);

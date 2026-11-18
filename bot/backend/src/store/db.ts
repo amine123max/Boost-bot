@@ -79,6 +79,9 @@ export interface Message {
   createdAt: number;
   /** 代理回合的活动记录有几步（内容按需用 getActivity 取） */
   steps?: number;
+  elapsedMs?: number;
+  hasExecution?: boolean;
+  backgroundNotice?: boolean;
   /** 模型在回合中间说的话（按说的顺序），显示在 content 前面 */
   interim?: string[];
   /** 这条回复交付的文件（真实路径） */
@@ -89,7 +92,18 @@ export interface Message {
 export interface MessageExtra {
   interim?: string[];
   files?: string[];
+  backgroundNotice?: boolean;
 }
+
+const messageProgressColumns = `
+  CASE WHEN json_valid(activity) THEN json_array_length(activity) ELSE 0 END AS steps,
+  CASE WHEN json_valid(activity) THEN created_at - COALESCE(
+    json_extract(activity, '$[0].turnStartedAt'), json_extract(activity, '$[0].at')
+  ) END AS elapsed_ms,
+  CASE WHEN json_valid(activity) THEN EXISTS(
+    SELECT 1 FROM json_each(activity)
+    WHERE CASE WHEN type = 'object' THEN json_extract(value, '$.kind') END IN ('tool', 'job', 'subagent')
+  ) ELSE 0 END AS has_execution`;
 
 export interface WeixinAccount {
   botId: string;
@@ -603,6 +617,7 @@ const COLUMNS: Array<[string, string, string]> = [
   // 模型在回合中间说的话、交付的文件（JSON 字符串数组）；只在助手消息上
   ["messages", "interim", "TEXT NOT NULL DEFAULT ''"],
   ["messages", "files", "TEXT NOT NULL DEFAULT ''"],
+  ["messages", "background_notice", "INTEGER NOT NULL DEFAULT 0"],
   // 主动消息的送达规则（core/delivery.ts）
   ["outbox", "purpose", "TEXT NOT NULL DEFAULT ''"],
   ["outbox", "subject", "TEXT NOT NULL DEFAULT ''"],
@@ -931,7 +946,7 @@ export class Store {
     const replies = convs.length ? ` OR (conversation_id IN (${convs.map(() => "?").join(", ")}) AND role = 'assistant')` : "";
     const rows = this.db
       .prepare(
-          `SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, CASE WHEN json_valid(activity) THEN json_array_length(activity) ELSE 0 END AS steps FROM messages WHERE id > ? AND (conversation_id = ?${replies}) ORDER BY id ${oldestFirst ? 'ASC' : 'DESC'} LIMIT ?) ORDER BY id`,
+          `SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, background_notice, ${messageProgressColumns} FROM messages WHERE id > ? AND (conversation_id = ?${replies}) ORDER BY id ${oldestFirst ? 'ASC' : 'DESC'} LIMIT ?) ORDER BY id`,
       )
       .all(afterId, groupPeer(groupId), ...convs.map((c) => c.id), limit) as Row[];
     return rows.map((r) => ({ ...this.toMessage(r), botId: botOf.get(String(r.conversation_id)) ?? "" }));
@@ -942,8 +957,8 @@ export class Store {
     const now = Date.now();
     const json = (a: unknown[] | undefined) => (a?.length ? JSON.stringify(a) : "");
     const res = this.db
-      .prepare("INSERT INTO messages(conversation_id, role, content, created_at, activity, interim, files) VALUES(?, ?, ?, ?, ?, ?, ?)")
-      .run(conversationId, role, content, now, json(activity), json(extra.interim), json(extra.files));
+      .prepare("INSERT INTO messages(conversation_id, role, content, created_at, activity, interim, files, background_notice) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(conversationId, role, content, now, json(activity), json(extra.interim), json(extra.files), extra.backgroundNotice ? 1 : 0);
     this.db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(now, conversationId);
     return Number(res.lastInsertRowid);
   }
@@ -974,7 +989,7 @@ export class Store {
   listMessages(conversationId: string, limit = 500, throughId = Number.MAX_SAFE_INTEGER): Message[] {
     const rows = this.db
       .prepare(
-        "SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, CASE WHEN json_valid(activity) THEN json_array_length(activity) ELSE 0 END AS steps FROM messages WHERE conversation_id = ? AND id <= ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC",
+        `SELECT * FROM (SELECT id, conversation_id, role, content, created_at, interim, files, background_notice, ${messageProgressColumns} FROM messages WHERE conversation_id = ? AND id <= ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC`,
       )
       .all(conversationId, throughId, limit) as Row[];
     return rows.map((r) => this.toMessage(r));
@@ -989,6 +1004,9 @@ export class Store {
       content: String(r.content),
       createdAt: Number(r.created_at),
       ...(Number(r.steps) ? { steps: Number(r.steps) } : {}),
+      ...(typeof r.elapsed_ms === 'number' && r.elapsed_ms >= 0 ? { elapsedMs: r.elapsed_ms } : {}),
+      ...(Number(r.has_execution) ? { hasExecution: true } : {}),
+      ...(Number(r.background_notice) ? { backgroundNotice: true } : {}),
       ...(interim.length ? { interim } : {}),
       ...(files.length ? { files } : {}),
     };
@@ -1015,11 +1033,12 @@ export class Store {
    * 滑动窗口上下文：从最新往回取，直到条数或字符数超限；保证以 user 消息开头。
    */
   contextWindow(conversationId: string, maxMessages: number, maxChars: number, throughId = Number.MAX_SAFE_INTEGER): Array<Pick<Message, "role" | "content">> {
-    const recent = this.listMessages(conversationId, maxMessages, throughId);
+    const recent = this.db.prepare(
+      "SELECT role, content FROM messages WHERE conversation_id = ? AND id <= ? ORDER BY id DESC LIMIT ?",
+    ).all(conversationId, throughId, maxMessages) as Array<Pick<Message, "role" | "content">>;
     const picked: Array<Pick<Message, "role" | "content">> = [];
     let chars = 0;
-    for (let i = recent.length - 1; i >= 0; i--) {
-      const m = recent[i];
+    for (const m of recent) {
       if (picked.length > 0 && chars + m.content.length > maxChars) break;
       chars += m.content.length;
       picked.unshift({ role: m.role, content: m.content });
@@ -1135,8 +1154,16 @@ export class Store {
       .prepare("INSERT INTO agent_segments(conversation_id, session_id, reason, handoff, ended_at) VALUES(?, ?, ?, ?, ?)")
       .run(conversationId, sessionId, reason, handoff, Date.now());
   }
-  listSegments(conversationId: string): Array<{ sessionId: string; reason: string; handoff: string; endedAt: number }> {
-    return (this.db.prepare("SELECT * FROM agent_segments WHERE conversation_id = ? ORDER BY id").all(conversationId) as Row[]).map((r) => ({
+  archiveCompaction(conversationId: string, sessionId: string, eventId: string, summary: string): void {
+    const reason = `compaction:${eventId}`;
+    this.db.prepare(`INSERT INTO agent_segments(conversation_id, session_id, reason, handoff, ended_at)
+      SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS(
+        SELECT 1 FROM agent_segments WHERE conversation_id = ? AND session_id = ? AND reason = ?
+      )`).run(conversationId, sessionId, reason, summary, Date.now(), conversationId, sessionId, reason);
+  }
+  listSegments(conversationId: string, limit = 50): Array<{ id: number; sessionId: string; reason: string; handoff: string; endedAt: number }> {
+    return (this.db.prepare("SELECT * FROM agent_segments WHERE conversation_id = ? ORDER BY id DESC LIMIT ?").all(conversationId, limit) as Row[]).map((r) => ({
+      id: Number(r.id),
       sessionId: String(r.session_id),
       reason: String(r.reason),
       handoff: String(r.handoff),

@@ -47,20 +47,50 @@ Boost 是面向 [Linux DO](https://linux.do/) 社区分享与交流的独立开�
 | 账号管理 | 授权、导入、可用性检测与额度窗口 |
 | 模型网关 | Responses / Chat Completions、JSON / SSE、工具调用、来源映射与故障切换 |
 | 访问与计量 | 密钥归属、模型权限、Token 预算、速率/并发准入和幂等结算 |
-| 智能体工作台 | 对话、任务、审批、工具与签名消息渠道 |
+| 智能体工作台 | 可续传 SSE 对话、持久消息队列、会话任务、审批与独立绑定的消息渠道 |
 | 运行维护 | 来源熔断、请求诊断、有界队列、上游代理、受管 sing-box 与原生监控 |
 
 协议能力取决于上游支持。主库 SQLCipher 和每身份 Bot 加密显式启用，工作文件/日志不属于数据库加密范围；技术边界与验证见[系统架构](ARCHITECTURE.zh-CN.md)。
+
+### Bot 工作台
+
+打开 Bot，选择有权使用的模型来源，即可开始对话。输入 `/task` 可在当前会话安排任务；后续消息按顺序等待，刷新后自动续接正在输出的回复。右侧四个按钮分别展开任务与审批、渠道、宿主工具、历史与记忆，每次只展开一组。
+
+当前源码新增本机进程和外部 Agent 状态查看（需有兼容的 Codex、Claude Code 或 DeepSeek Harness 日志）、支持平台上的电脑操作审批、每个 Bot 最多八个可信本机 MCP 插件，以及微信、飞书与受支持的 Telegram 语音转写。Bot 收到语音后以文字回复。安装方法和环境要求见 [Bot 集成指南](bot/INTEGRATION.zh-CN.md#宿主工具与语音)。系统观察和驱动层设计参考 [OpenMausBot](https://github.com/milind-soni/OpenMausBot)。
 
 ## 技术架构
 
 ```mermaid
 flowchart LR
-  Client["桌面 / Web / 模型客户端"] --> Access["身份认证与接入"]
-  Access --> Service["管理与推理服务"]
-  Service --> Models["模型上游"]
-  Service <-->|"状态持久化"| DB[("SQLite")]
-  Service <-->|"任务 / 执行结果"| Bot["Bot 运行时"]
+  subgraph Entry["使用入口"]
+    UI["Vue · Tauri / Web"]
+    IM["微信 · 飞书 · Telegram"]
+    API["模型 API 客户端"]
+  end
+  subgraph Boost["Boost 运行时"]
+    Access["Rust · 会话认证、身份与准入"]
+    Gateway["Rust · 模型路由"]
+    Voice["本机语音 · SILK / FFmpeg → Whisper"]
+    Bot["Node · Bot Harness"]
+    Db[("SQLite · 会话、队列与任务")]
+  end
+  subgraph Host["宿主能力"]
+    Monitor["只读观察 · 本机进程与 Agent 状态"]
+    Tools["内置 DSH · 隔离执行"]
+    Approval{"工具策略与审批"}
+    Extras["电脑操作驱动 / 本机 MCP 插件"]
+  end
+  UI --> Access --> Bot
+  IM -->|"需要转写的语音"| Voice -->|"转写文本"| Bot
+  IM -->|"文字"| Bot
+  API --> Gateway
+  Bot --> Gateway --> Models["已配置的模型提供商"]
+  Bot <--> Db
+  Bot -->|"公开增量与任务事件"| UI
+  Bot -->|"回复至绑定渠道"| IM
+  Bot --> Tools
+  Tools --> Approval --> Extras
+  Bot -->|"系统管理员身份认证"| Monitor
 ```
 
 Web 直接入口为 **12000**。桌面版管理本机 Rust/Node 运行时，不依赖 Nginx 或 FastAPI。RPC 资源预算、身份边界、持久化与流式代理详见[系统架构](ARCHITECTURE.zh-CN.md)。
@@ -77,7 +107,7 @@ Web 直接入口为 **12000**。桌面版管理本机 Rust/Node 运行时，不�
 
 | 资源边界 | 默认策略 |
 | --- | --- |
-| 管理 RPC | 6 个写执行位、有界资源队列、16 个读许可和跨领域屏障 |
+| 管理 RPC  | 6 个写执行位；32 路并发读、最多接纳 96 个读请求、等待最多 2 秒；按资源排队与跨领域屏障 |
 | 推理 | 20 QPS、突发 20、全局 24 / 每模型 8 在途，为管理保留存储余量 |
 | 输入内存 | 单体 32 MiB、推理输入缓冲 64 MiB，前置代理背压转发 |
 | 上游故障 | 按来源隔离熔断、有界半开探测和健康来源切换 |

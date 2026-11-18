@@ -1,5 +1,5 @@
 <script lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import BotAvatar from "./BotAvatar.vue";
 import HelpTip from "./HelpTip.vue";
 import Icon from "./Icon.vue";
@@ -7,7 +7,7 @@ import SettingsButton from './SettingsButton.vue';
 import ComposerModelMenu from './ComposerModelMenu.vue';
 import BotPermissionControl from './BotPermissionControl.vue';
 import Markdown from "./Markdown.vue";
-import ConversationProgress from "./ConversationProgress.vue";
+import TurnTranscript from "./TurnTranscript.vue";
 import ComposerQuestion from "./ComposerQuestion.vue";
 import QueuedMessages from "./QueuedMessages.vue";
 import ChatTasks from "./ChatTasks.vue";
@@ -18,7 +18,7 @@ import { defineComponent, type PropType } from "vue";
 import { downloadFile } from "../api";
 
 export default defineComponent({
-  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, ConversationProgress, ComposerQuestion, QueuedMessages, ChatTasks, MessageBubble },
+  components: { BotAvatar, HelpTip, Icon, SettingsButton, ComposerModelMenu, BotPermissionControl, Markdown, TurnTranscript, ComposerQuestion, QueuedMessages, ChatTasks, MessageBubble },
   props: {
     chat: { type: Object as PropType<Conversation>, required: true },
     bot: Object as PropType<Bot>,
@@ -36,8 +36,10 @@ export default defineComponent({
     const taskDock = ref<InstanceType<typeof ChatTasks>>();
     const commandsDismissed = ref(false);
     const taskIntent = ref('');
-    const question = computed(() => props.chat.pending.find(item => item.kind === 'question'));
-    const approvals = computed(() => props.chat.pending.filter(item => item.kind !== 'question'));
+    const question = computed(() => props.chat.pending.find(item => item.kind === 'question' && !item.taskId) ??
+      (!props.chat.running ? props.chat.pending.find(item => item.kind === 'question') : undefined));
+    const approvals = computed(() => props.chat.pending.filter(item => item.kind !== 'question' && (!item.taskId || !props.chat.running)));
+    const deferredPrompts = computed(() => props.chat.running ? props.chat.pending.filter(item => item.taskId).length : 0);
     const commands = computed(() => {
       const query = props.chat.draft.trim();
       if (props.group || commandsDismissed.value || !/^\/[a-z]*$/i.test(query)) return [];
@@ -77,20 +79,15 @@ export default defineComponent({
     const title = computed(
       () => props.group?.name || props.bot?.name || "智能体",
     );
-    async function scroll() {
-      await nextTick();
-      if (nearBottom.value && scroller.value)
-        scroller.value.scrollTop = scroller.value.scrollHeight;
+    const transcript = ref<HTMLElement>();
+    let scrollFrame = 0;
+    function scroll() {
+      if (scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        if (nearBottom.value && scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight;
+      });
     }
-    watch(
-      () => [
-        props.chat.messages.length,
-        props.chat.messages.at(-1)?.id,
-        props.chat.live?.text,
-        props.chat.live?.steps?.length,
-      ],
-      scroll,
-    );
     watch(
       () => props.group?.id || props.bot?.id,
       () => {
@@ -98,7 +95,13 @@ export default defineComponent({
         void scroll();
       },
     );
+    watch([
+      () => props.chat.messages.at(-1)?.id,
+      () => props.chat.live?.text,
+      () => props.chat.live?.interim?.length,
+    ], scroll, { flush:'post' });
     onMounted(scroll);
+    onBeforeUnmount(() => cancelAnimationFrame(scrollFrame));
     function mention(bot: Bot | null) {
       props.chat.draft += `${props.chat.draft && !props.chat.draft.endsWith(" ") ? " " : ""}@${bot ? bot.id : "所有人"} `;
       composer.value?.focus();
@@ -129,6 +132,7 @@ export default defineComponent({
     }
     return {
       scroller,
+      transcript,
       composer,
       members,
       botOf,
@@ -136,7 +140,7 @@ export default defineComponent({
       mention,
       keydown,
       file,
-      question, approvals, commands, chooseCommand, submit, taskDock, taskCreated,
+      question, approvals, deferredPrompts, commands, chooseCommand, submit, taskDock, taskCreated,
       nearBottom,
     };
   },
@@ -164,6 +168,7 @@ export default defineComponent({
           :size="22"
         /><span class="name">{{ title }}</span>
       </button>
+      <ChatTasks v-if="bot && !group" :key="bot.id" ref="taskDock" :bot-id="bot.id" :tasks="chat.tasks" :configure="configure" @created="taskCreated" @updated="chat.tasks = $event" />
       <span class="grow" />
       <button
         v-if="!group"
@@ -246,6 +251,7 @@ export default defineComponent({
       </div>
       <div v-if="chat.refreshing && chat.messages.length" class="chat-refresh-status" role="status" aria-label="正在刷新会话"><span class="loading-ring" /></div>
       <div
+        ref="transcript"
         class="chat-col ready"
         role="log"
         aria-label="消息记录"
@@ -258,6 +264,7 @@ export default defineComponent({
           :class="{
             'is-user': m.role === 'user',
             'is-system': m.role === 'system',
+            'background-notice': m.backgroundNotice,
           }"
         >
           <BotAvatar
@@ -266,6 +273,7 @@ export default defineComponent({
             :size="30"
           />
           <div class="message-body">
+            <div v-if="m.backgroundNotice" class="background-label"><Icon name="tasks" :size="14" />后台任务通知</div>
             <div v-if="group || m.role === 'system'" class="message-meta">
               <strong>{{
                 m.role === "user"
@@ -275,13 +283,7 @@ export default defineComponent({
                     : botOf(m.botId)?.name || "智能体"
               }}</strong>
             </div>
-            <ConversationProgress
-              v-if="m.steps"
-              :count="m.steps"
-              :conversation-id="m.conversationId || chat.conversationId"
-              :message-id="m.id"
-            />
-            <MessageBubble :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="!group && m.role === 'user' && typeof m.id === 'number'" :edit-disabled="chat.submitting || chat.loading" :send-edit="text => chat.edit(m, text)">
+            <TurnTranscript v-if="m.role === 'assistant'" :message="m" :conversation-id="chat.conversationId" :eager="m.id === chat.messages.at(-1)?.id">
             <button
               v-for="f in m.files"
               :key="f.path"
@@ -292,11 +294,12 @@ export default defineComponent({
               <Icon name="file" />{{ f.name
               }}{{ f.gone === true ? "（文件已移除）" : "" }}
             </button>
-            </MessageBubble>
+            </TurnTranscript>
+            <MessageBubble v-else :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="!group && m.role === 'user' && typeof m.id === 'number'" :edit-disabled="chat.submitting || chat.loading" :send-edit="text => chat.edit(m, text)" />
           </div>
         </article>
         <template v-if="chat.live">
-          <article class="message is-live">
+          <article :key="chat.live.id" class="message is-live">
             <BotAvatar
               v-if="group"
               :bot="botOf(chat.live.botId)"
@@ -304,33 +307,15 @@ export default defineComponent({
               :size="30"
             />
             <div class="message-body">
-              <div class="message-meta">
-                <strong>{{ botOf(chat.live.botId)?.name || "智能体" }}</strong
-                ><span role="status">{{
-                  chat.stopping
-                    ? "正在停止"
-                    : chat.running
-                      ? "处理中"
-                      : "连接已断开"
-                }}</span>
-              </div>
-              <ConversationProgress
-                v-if="chat.live.steps?.length"
-                :steps="chat.live.steps || []"
-                :running="chat.running"
-              />
-              <MessageBubble v-if="chat.live.text || chat.live.interim?.length || chat.live.files?.length" :text="chat.live.text" :interim="chat.live.interim" :streaming="chat.running">
+              <div v-if="group" class="message-meta"><strong>{{ botOf(chat.live.botId)?.name || "智能体" }}</strong></div>
+              <TurnTranscript :live="chat.live" :running="chat.running" :stopping="chat.stopping" :recovering="chat.recovering">
               <button
                 v-for="f in chat.live.files"
                 :key="f.path"
                 class="file-button"
                 @click="file(chat.live.conversationId || chat.conversationId, f)"
               ><Icon name="file" />{{ f.name }}</button>
-              </MessageBubble><span
-                v-else
-                class="stream-placeholder"
-                >{{ chat.stopping ? "正在结束当前处理…" : "等待回复…" }}</span
-              >
+              </TurnTranscript>
             </div>
           </article>
         </template>
@@ -358,8 +343,8 @@ export default defineComponent({
       </div>
     </div>
     <div class="conversation-dock">
-      <ChatTasks v-if="bot && !group" :key="bot.id" ref="taskDock" :bot-id="bot.id" :tasks="chat.tasks" :configure="configure" @created="taskCreated" @updated="chat.tasks = $event" />
       <QueuedMessages :key="chat.conversationId || bot?.id || group?.id" :chat="chat" />
+      <p v-if="deferredPrompts" class="deferred-prompts" role="status"><Icon name="tasks" :size="14" />{{ deferredPrompts }} 个后台任务需要处理，当前回复继续生成</p>
       <ComposerQuestion v-if="question && configure" :key="question.id" :item="question" :submit="answer => chat.answer(question!, 'answer', answer)" />
       <p v-else-if="question" class="hint" role="status">有待回答的问题，请联系管理员处理。</p>
       <div v-if="commands.length" class="composer-commands" aria-label="可用命令">
@@ -425,9 +410,12 @@ export default defineComponent({
 .stop-button:disabled { opacity:.5; }
 .conversation-dock { display:grid; flex:none; width:var(--col); margin:0 auto; gap:6px; padding:4px 0 var(--dock-pb); z-index:var(--z-float); }
 .conversation-dock .composer-dock { position:static; padding:0; overflow:visible; scrollbar-gutter:auto; }
-.conversation-dock .composer { width:100%; }
+.conversation-dock .composer { width:100%; position:relative; }
+.conversation-dock:has(.deferred-prompts, .composer-commands) :deep(.queued-messages) { margin-bottom:0; }
 .conversation-view .chat-scroll { mask-image:none; }
 .conversation-view .chat-col { padding-bottom:var(--space-5); }
+.background-notice .message-body { padding:9px 12px; border-radius:13px; border:1px solid var(--line); background:var(--pill); }
+.background-label, .deferred-prompts { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:var(--fs-xs); margin:0; }
 .conversation-view > .error-banner { margin-top:var(--head-h); }
 .conversation-view:has(> .member-strip) > .error-banner { margin-top:0; }
 .composer-commands { display:grid; gap:2px; padding:4px; border:1px solid var(--line); border-radius:12px; background:var(--surface-solid); }

@@ -334,3 +334,17 @@ Copyright (c) 2023 LobeHub. MIT License; the full license is included in [LICENS
 ## Chat channel brand SVGs
 
 WeChat, Telegram, Discord, Slack and QQ marks are from Simple Icons (CC0); DingTalk is from Ant Design Icons (MIT); Feishu is from AnyModelBot (MIT). Full notices are included in [LICENSES/channel-icons.txt](LICENSES/channel-icons.txt). Brand marks remain the property of their respective owners.
+
+## Lucide 图标
+
+铅笔、终端、展开箭头、更多、引导、删除和文件变更图标： [Lucide v0.468.0](https://github.com/lucide-icons/lucide/tree/0.468.0) (ISC).
+
+Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+
+Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+## 本地语音转写
+
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp)（MIT）和 [Whisper Tiny 多语言模型](https://huggingface.co/ggerganov/whisper.cpp)（源自 OpenAI Whisper，MIT）可通过 `scripts/prepare-voice.mjs` 按固定校验和选装。Bot 使用 [silk-wasm 3.7.1](https://github.com/idranme/silk-wasm)（MIT）解码 SILK。

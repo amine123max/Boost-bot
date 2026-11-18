@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, useId, watch } from 'vue';
 import { api, enc } from '../api';
 import { backgroundWork } from '../lib/background-work';
 import type { Task } from '../types';
@@ -8,9 +8,19 @@ import Icon from './Icon.vue';
 import Modal from './Modal.vue';
 const props = defineProps<{ botId: string; tasks: Task[]; configure: boolean }>();
 const emit = defineEmits<{ created: [task: Task]; updated: [tasks: Task[]] }>();
-const open = ref(true), creating = ref(false), busy = ref(false), title = ref(''), brief = ref(''), requestId = ref(''), budget = ref(1), error = ref('');
-const items = computed(() => backgroundWork(props.tasks, []));
-const active = computed(() => items.value.some(item => item.state === 'pending' || item.state === 'working'));
+const open = ref(false), creating = ref(false), busy = ref(false), title = ref(''), brief = ref(''), requestId = ref(''), budget = ref(1), error = ref('');
+const items = computed(() => backgroundWork(props.tasks, []).filter(item => item.state === 'working' || item.state === 'pending'));
+const active = computed(() => items.value.length > 0);
+const multiple = computed(() => items.value.length > 1);
+const first = computed(() => items.value[0]);
+const status = computed(() => first.value?.task?.stage?.key === 'working/asking' ? first.value.label
+  : first.value?.state === 'working' ? '进行中' : '排队中');
+const panel = useId();
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
+function show() { clearTimeout(closeTimer); open.value = multiple.value; }
+function keepOpen() { clearTimeout(closeTimer); }
+function leave() { clearTimeout(closeTimer); closeTimer = setTimeout(() => { open.value = false; }, 140); }
+watch(multiple, value => { if (!value) open.value = false; });
 let timer: ReturnType<typeof setTimeout> | undefined, poll: AbortController | undefined, disposed = false;
 function stopPolling() { clearTimeout(timer); poll?.abort(); poll = undefined; }
 function schedule() {
@@ -28,7 +38,7 @@ function schedule() {
   }, 3000);
 }
 watch(active, schedule, { immediate: true });
-onBeforeUnmount(() => { disposed = true; stopPolling(); });
+onBeforeUnmount(() => { disposed = true; stopPolling(); clearTimeout(closeTimer); });
 function create(text = '') {
   if (!props.configure || creating.value) return;
   title.value = Array.from(text.trim()).slice(0, 40).join('');
@@ -48,7 +58,6 @@ async function submit() {
       body:{ title:title.value, brief:brief.value, budgetUsd:budget.value, requestId:requestId.value } });
     if (disposed) return;
     creating.value = false;
-    open.value = true;
     emit('created', result.task);
   } catch (e) { error.value = (e as Error).message; }
   finally { busy.value = false; schedule(); }
@@ -56,14 +65,22 @@ async function submit() {
 defineExpose({ create });
 </script>
 <template>
-  <section v-if="items.length" class="chat-tasks" aria-label="任务列表">
-    <button type="button" class="tasks-heading" :aria-expanded="open" @click="open = !open">
-      <strong>任务</strong><span>{{ items.filter(item => item.state === 'working').length }} 进行中 · {{ items.filter(item => item.state === 'pending').length }} 待处理</span>
-      <Icon name="chevron" :size="13" />
+  <section v-if="first" class="chat-tasks" aria-label="当前任务"
+    @pointerenter="event => { if (event.pointerType === 'mouse') show(); }" @pointerleave="leave"
+    @focusin="keepOpen" @focusout="event => { if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) leave(); }" @keydown.esc.stop="open = false">
+    <button v-if="multiple" type="button" class="tasks-heading" :aria-expanded="open" :aria-controls="panel" @click="show">
+      <span class="task-ring" :class="{ idle:first.state !== 'working' }" aria-hidden="true" />
+      <span class="current-task" :title="first.title">{{ first.title }}</span>
+      <span class="current-status">{{ status }}</span>
+      <span class="task-count">+{{ items.length - 1 }}</span>
     </button>
-    <div v-if="open" class="tasks-list">
-      <BackgroundTaskItem v-for="item in items" :key="item.key" :work="item" :title="item.title" :active="open" />
-      <button v-if="configure" type="button" class="quiet-button add-task" @click="create()"><Icon name="plus" :size="14" /> 新增任务</button>
+    <div v-else class="tasks-heading">
+      <span class="task-ring" :class="{ idle:first.state !== 'working' }" aria-hidden="true" />
+      <span class="current-task" :title="first.title">{{ first.title }}</span>
+      <span class="current-status">{{ status }}</span>
+    </div>
+    <div v-if="multiple && open" :id="panel" class="tasks-list">
+      <BackgroundTaskItem v-for="item in items" :key="item.key" :work="item" :title="item.title" :active="open" flat />
     </div>
   </section>
   <Modal v-if="creating" compact :busy="busy" title="新增任务" @close="creating = false">
@@ -77,10 +94,16 @@ defineExpose({ create });
   </Modal>
 </template>
 <style scoped>
-.chat-tasks { border:1px solid var(--line); border-radius:12px; background:var(--pill); min-width:0; overflow:hidden; }
-.tasks-heading { display:flex; gap:9px; align-items:center; width:100%; min-height:32px; padding:5px 10px; font-size:12px; }
-.tasks-heading span { color:var(--muted); flex:1; text-align:left; }
-.tasks-heading[aria-expanded="true"] > :last-child { transform:rotate(90deg); }
-.tasks-list { display:grid; max-height:min(25dvh, 216px); overflow:auto; padding:0 4px 4px; }
-.add-task { justify-self:start; margin:4px 5px 1px; }
+.chat-tasks { position:relative; min-width:0; max-width:min(38vw, 340px); }
+.tasks-heading { display:flex; gap:7px; align-items:center; width:100%; min-height:30px; padding:4px 2px; color:var(--muted); font-size:var(--chat-text-size,var(--fs-lg)); }
+.tasks-heading:hover,.tasks-heading[aria-expanded="true"] { color:var(--fg); }
+.current-task { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.current-status,.task-count { flex:none; white-space:nowrap; font-size:var(--fs-xs); }
+.current-status { color:var(--amber,#d5a94b); }
+.task-ring { flex:none; width:13px; height:13px; border:1.5px solid var(--line); border-top-color:currentColor; border-radius:50%; animation:task-spin .9s linear infinite; }
+.task-ring.idle { animation:none; }
+.tasks-list { position:absolute; inset-block-start:100%; inset-inline-start:0; z-index:30; display:grid; gap:1px; width:min(320px, 48vw); max-height:min(45dvh,320px); overflow:auto; padding:4px; border-radius:10px; background:color-mix(in srgb,var(--surface-solid) 76%,transparent); backdrop-filter:blur(18px) saturate(1.15); }
+@media(max-width:650px) { .tasks-list { inset-inline-start:auto; inset-inline-end:0; width:min(280px,68vw); } }
+@keyframes task-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .task-ring { animation:none; } }
 </style>

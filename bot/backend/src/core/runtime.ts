@@ -94,6 +94,7 @@ export function storeInbound(workspace: string, ev: InboundEvent, now = new Date
 }
 
 export interface RuntimeOptions {
+  voice?: import('./local-voice.js').LocalVoice;
   store: Store;
   chatHarness: ConversationHarness;
   models: ModelClient;
@@ -174,7 +175,7 @@ export class TurnSaid {
       if (this.provisional || this.streamed) {
         this.provisional = false;
         this.streamed = "";
-        void this.out.apply({ type: "stream.update", text: "" });
+        if (!this.streamText) void this.out.apply({ type: "stream.update", text: "" });
       }
       this.interim.push(text);
       void this.out.apply({ type: "interim", text });
@@ -351,6 +352,19 @@ export class BotRuntime {
       log.warn("dropped a message from a sender who is not allowed", { bot: ev.botId, channel: ev.channel });
       return;
     }
+    const voiceParts = ev.parts.filter(part => part.type === "voice");
+    for (const part of voiceParts) {
+      if (!part.transcript?.trim() && part.data && this.opts.voice?.ready && !opts.signal?.aborted) {
+        try { part.transcript = await this.opts.voice.transcribe(part.data); }
+        catch { /* A failed transcription must not send audio or invented text to the model. */ }
+      }
+      delete part.data;
+      if (part.transcript?.trim()) part.transcript = '[语音转写] ' + part.transcript.trim();
+    }
+    if (voiceParts.length && !voiceParts.some(part => part.transcript) && !ev.parts.some(part => part.type === "text" && part.text.trim())) {
+      await out.apply({ type:"text",text:"这条语音没有可用转写。请重发或改发文字；若渠道没有提供转写，请检查 Boost 的本机语音模型。" });
+      return;
+    }
     const bot = store.getBot(ev.botId);
     if (!bot) throw new Error(`unknown bot ${ev.botId}`);
     const conv = store.ensureConversation(bot.id, ev.channel, ev.conversation.id, ev.sender.name || ev.sender.id, ev.conversation.kind === "group" ? "group" : "dm");
@@ -386,6 +400,8 @@ export class BotRuntime {
       }
     }
   }
+
+  get voiceAvailable(): boolean { return this.opts.voice?.ready ?? false; }
 
   /**
    * 登记一条正在处理的消息（或代理自己醒来的一轮）：/stop 能停它；排进会话的先后（prior 是它前面那些都处理完）。
@@ -517,7 +533,6 @@ export class BotRuntime {
     const call = () =>
       this.opts.models.streamChat({ botId: bot.id, model: routed, messages, signal, protocol: bot.settings.modelProtocol, ...modelOptions, stream: bot.settings.modelStreaming,
         onTrace: trace => {
-          if (trace.summary !== undefined) modelStep.output = trace.summary;
           modelStep.tokens = { ...modelStep.tokens, ...(trace.inputTokens !== undefined ? { input: trace.inputTokens } : {}), ...(trace.outputTokens !== undefined ? { output: trace.outputTokens } : {}) };
           if (trace.outputTokens !== undefined) monitored.sampledAt = Date.now();
           void out.apply({ type: 'activity', step: { ...modelStep } });
@@ -703,8 +718,9 @@ export class BotRuntime {
     // 活动记录：网页对话实时显示（其它渠道忽略这个操作），回合结束后随回复存下来，信息面板里能看
     const steps = new Map<string, ActivityStep>();
     const onStep = (step: ActivityStep) => {
-      steps.set(step.id, step);
-      void out.apply({ type: "activity", step });
+      const projected = { ...step, section: steps.get(step.id)?.section ?? said.interim.length, turnStartedAt: inflight.since };
+      steps.set(step.id, projected);
+      void out.apply({ type: "activity", step: projected });
     };
     const unbind = agent.approvals.bindSink(convId, async (row) => {
       visible = true;
@@ -717,7 +733,7 @@ export class BotRuntime {
     // 代理进程还没就绪（第一次启动可能要几分钟）：先说清楚在等什么，而不是一直"思考中"。模型说的第一段话或最终回复会替换这段文字
     const host = agent.host(botId);
     let startup: NodeJS.Timeout | undefined;
-    if (host.state !== "running") {
+    if (host.state !== "running" && place.channel !== 'web') {
       const since = Date.now();
       const show = () => {
         said.provisional = true;
@@ -790,7 +806,7 @@ export class BotRuntime {
               if (delta && place.channel === 'web') visible = true;
               said.observer.onText(delta);
             },
-            // 工具调用不进入聊天：只用于判断代理已开始工作（不再回退到纯对话），正在输入状态由渠道维持
+            // 实际工作开始后不再回退到纯对话；公开的工具状态由 onStep 提供。
             onProgress: () => {
               visible = true;
             },

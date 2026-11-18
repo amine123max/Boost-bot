@@ -61,7 +61,7 @@ const effort = computed(
 const liveContext = computed(() => {
   let used: number | null = null;
   for (const step of props.chat.live?.steps || [])
-    if (step.kind === "model" && step.title === model.value) {
+    if (step.kind === "model" && (step.modelKey || step.title) === model.value) {
       if (typeof step.tokens?.input === "number") {
         used = step.tokens.input + (step.tokens.output || 0);
       }
@@ -190,7 +190,7 @@ watch(
   },
 );
 watch(
-  () => model.value,
+  () => props.chat.model || props.bot.defaultModel || '',
   () => {
     if (open.value) {
       metrics.value = undefined;
@@ -306,11 +306,11 @@ onBeforeUnmount(() => {
           <div class="context-estimates"
             ><p class="model-menu-caption">
               上下文构成<HelpTip
-                text="分段颜色与下方分类一致，分类按文本估算。灰色为实测总量与已识别分类的差额，不能当作已知工具或技能用量。未计量的分类显示横线；分类超过实测时按估算总量展示。"
+                text="分段颜色与下方分类一致，分类按文本估算。灰色为实测总量与已识别分类的差额。没有单独计量的项目不分配 Token；分类超过实测时按估算总量展示。"
               />
             </p>
             <div
-              v-for="item in breakdown"
+              v-for="item in breakdown.filter(part => part.value !== null)"
               :key="item.label"
               class="context-breakdown-row"
             >
@@ -319,7 +319,15 @@ onBeforeUnmount(() => {
                 :style="{ background: item.color }"
               /><span>{{ item.label }}</span
               ><span>{{ item.derived ? '≈ ' : '' }}{{ format(item.value) }}</span>
-            </div></div
+            </div>
+            <p class="model-menu-note" v-if="breakdown.some(part => part.value === null)">工具、技能与项目上下文未单独计量。</p>
+            <p class="model-menu-caption">上下文归档</p>
+            <p v-if="!metrics?.context.archives?.length" class="model-menu-note">暂无归档。只有实际压缩或切换会话段后才会出现记录。</p>
+            <details v-for="archive in metrics?.context.archives" :key="archive.id" class="context-archive">
+              <summary>{{ archive.kind === 'compaction' ? '上下文压缩' : '会话段交接' }} · {{ new Date(archive.endedAt).toLocaleString('zh-CN') }}</summary>
+              <p>{{ archive.summary || '这条历史记录未保存摘要。' }}</p>
+            </details>
+          </div
           ></SpringDisclosure
         >
       </div>
@@ -441,6 +449,9 @@ onBeforeUnmount(() => {
 .context-toggle-icon.expanded {
   transform: rotate(-90deg);
 }
+.context-archive { padding:5px 0; font-size:var(--fs-xs); }
+.context-archive summary { cursor:pointer; }
+.context-archive p { margin:6px 0; max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
 .model-menu-section {
   border-top: 1px solid var(--line);
   margin-top: 8px;

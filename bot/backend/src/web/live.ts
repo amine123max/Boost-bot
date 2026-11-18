@@ -3,6 +3,7 @@ import type { ActivityStep } from "../agent/activity.js";
 import type { OutboundOp, ReplySession } from "../core/types.js";
 import { opEvent, publicActivity } from "./sse-reply.js";
 import { describeFile, type ShownFile } from "./files.js";
+import { ReplyReplay, type ReplyFrame } from "./reply-replay.js";
 
 export interface LivePrompt {
   kind: string;
@@ -55,6 +56,8 @@ export class LiveTurn implements ReplySession {
   /** 停止按钮：交给 runtime.handle 的 signal（排队中的也能停） */
   readonly abort = new AbortController();
   private subs = new Set<Listener>();
+  private deltaSubs = new Set<(frame: ReplyFrame) => void>();
+  readonly replay = new ReplyReplay();
   private textTimer: ReturnType<typeof setTimeout> | undefined;
   private publishedText = '';
 
@@ -70,7 +73,14 @@ export class LiveTurn implements ReplySession {
     if (this.done) return;
     if (op.type === "text" && op.ack) this.steered = true;
     if (op.type === "stream.update" || op.type === "stream.finish" || op.type === "text") this.text = op.text;
-    else if (op.type === "interim") this.interim.push(op.text);
+    else if (op.type === "interim") {
+      this.interim.push(op.text);
+      this.text = this.publishedText = '';
+      clearTimeout(this.textTimer);
+      this.textTimer = undefined;
+      this.emit("interim", { text: op.text, replace: true });
+      return;
+    }
     else if (op.type === "activity") this.steps.set(op.step.id, op.step);
     else if (op.type === "file" || op.type === "presented") {
       // 回合中已经显示过的（presented），结束时的 file 不再显示一遍
@@ -128,8 +138,19 @@ export class LiveTurn implements ReplySession {
     this.subs.add(fn);
     return () => this.subs.delete(fn);
   }
+  subscribeDelta(fn: (frame: ReplyFrame) => void): () => void {
+    this.deltaSubs.add(fn);
+    return () => this.deltaSubs.delete(fn);
+  }
+
+  flushText(): void { this.publishText(); }
 
   emit(event: string, data: unknown): void {
+    const frame = this.replay.append(event, data);
+    for (const fn of this.deltaSubs) {
+      try { fn(frame); }
+      catch { this.deltaSubs.delete(fn); }
+    }
     for (const fn of [...this.subs]) {
       try {
         fn(event, data);
@@ -155,6 +176,7 @@ export class LiveTurn implements ReplySession {
     clearTimeout(this.textTimer); this.textTimer = undefined;
     this.emit(event, data);
     this.subs.clear();
+    this.deltaSubs.clear();
     this.resolveSettled();
   }
 }

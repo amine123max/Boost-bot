@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { lineLogger, logger } from "../log.js";
+import { lineLogger, logger, redactText } from "../log.js";
+import { pluginAllowed } from './local-plugins.js';
 import type { Store } from "../store/db.js";
 import { BOT_HEADER, type AgentBridge, type Rejection } from "./bridge.js";
 import { ApiFallbacks, shapeRejection, type ApiFallback } from "./api-fallback.js";
@@ -756,6 +757,14 @@ export class AgentHost {
       "# 由 Boost 每次启动生成；请勿手改。",
       // 接口按模型选（agentApi）：Responses / Anthropic Messages / Chat Completions，各一个 provider
       ...providerPatchLines(providerProfiles(list, this.o.bridge.url, this.o.botId)),
+      // Keep one native overflow recovery path. Large fixed headroom made ordinary
+      // mid-size sessions compact very early, even on the initial tool turn.
+      "- id: compaction-basic",
+      "  config:",
+      "    thresholdRatio: 0.90",
+      "    headroomTokens: 4096",
+      "    retainRatio: 0.35",
+      "    compactionRetries: 0",
       // 长命令转后台；Windows：命令用检测到的 PowerShell 7（DSH 自己只看 Program Files\PowerShell\7 和 PATH，找不到就退回 5.1）
       ...shellPatchLines(pwshPath),
       // web_search 用 amb-web-search 插件注册的 amb（经 bridge 由宿主搜索），不用 DeepSeek 自带的搜索（要 DeepSeek 的 Key）；
@@ -805,6 +814,7 @@ export class AgentHost {
       // 后台任务：聊天会话的 task_start / task_message / task_list；任务会话的限定工具、任务规则、task_report、收尾
       "    - id: amb-tasks",
       `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-tasks.mjs"))}`,
+      ...this.localPluginLines(),
       ...this.computerUseLines(apps),
       ...this.fullAccessLines(),
       "",
@@ -812,6 +822,28 @@ export class AgentHost {
     const f = path.join(this.home, "amb.patch.yml");
     fs.writeFileSync(f, text, { mode: 0o600 });
     return f;
+  }
+
+  private localPluginLines(): string[] {
+    if (!pluginAllowed(this.o.store.getBot(this.o.botId))) return [];
+    const plugins = this.settings().localPlugins;
+    if (!plugins.length) return [];
+    return [
+      "    - id: amb-local-plugin-gate",
+      `      name: ${yamlStr(path.join(this.o.runtimeDir, "plugins", "amb-local-plugin-gate.mjs"))}`,
+      ...plugins.flatMap(plugin => [
+        `    - id: amb-local-${plugin.id}`,
+        "      name: '@deepseek-ai/dsh-mcp-client'",
+        "      config:",
+        "        transport: streamable-http",
+        `        serverName: boost-local-${plugin.id}`,
+        `        url: ${yamlStr(plugin.url)}`,
+        "        toolCallTimeoutMs: 20000",
+        "        failOnStartupError: false",
+        "        reconnect:",
+        "          maxAttempts: 2",
+      ]),
+    ];
   }
 
   /**
@@ -872,14 +904,14 @@ export class AgentHost {
   }
   /** 本机器人实际是否启用 Computer Use：系统支持且设置里开着。 */
   private computerUseActive(): CuResolved | undefined {
-    if (!this.settings().computerUse.enabled) return undefined;
+    if (!this.settings().computerUse.enabled || this.o.store.getBot(this.o.botId)?.origin === "catalog") return undefined;
     const st = this.computerUseStatus();
     return st.available ? st : undefined;
   }
   private cuReadTools = "";
   /**
    * Computer Use：插入 mcp-client（Cua Driver 经 amb-cua-mcp.mjs，或 macOS 上的 Codex 桥；都用宿主自己的
-   * node/Electron 运行），并写入对应的 SKILL.md。默认所有操作自动执行；只有设置为 ask-input 时才加载审批闸门。
+   * node/Electron 运行），并写入对应的 SKILL.md。默认启用时需审批输入操作，保留用户显式选择的自动模式。
    */
   private computerUseLines(apps: CuaApp[]): string[] {
     const skillDir = path.join(this.home, "skills", "computer-use");
@@ -1053,7 +1085,7 @@ exec "$REAL" "$@"
    */
   private settingsSig(pwsh = pwshProbe.cachedDshPath): string {
     const st = this.settings();
-    return `${st.permission}|${st.memory.enabled}|${st.computerUse.enabled}|${st.computerUse.backend}|${st.computerUse.approval}|${this.connectionsEnv()}|${pwsh ?? ""}`;
+    return `${st.permission}|${st.memory.enabled}|${st.computerUse.enabled}|${st.computerUse.backend}|${st.computerUse.approval}|${this.connectionsEnv()}|${pwsh ?? ""}|${JSON.stringify(st.localPlugins)}`;
   }
   private sig = "";
 
@@ -1675,6 +1707,14 @@ exec "$REAL" "$@"
       accept?.();
       const ev = n.params.event;
       const data = ev?.data ?? {};
+      if (ev?.type === "compaction/summary" && typeof data.summary === "string" && data.summary.trim()) {
+        const conversation = this.o.store.conversationForSession(sessionId);
+        const eventId = data.compactionId ?? ev.seq ?? ev.time;
+        if (conversation && eventId != null) {
+          try { this.o.store.archiveCompaction(conversation, sessionId, String(eventId).slice(0, 128), redactText(data.summary).slice(0, 16_000)); }
+          catch { log.warn("could not save context archive", { bot: this.o.botId }); }
+        }
+      }
       if (ev?.type === "tool/call") {
         st.toolCalls++;
         this.calls.set(String(data.callId), { name: String(data.name), args: String(data.arguments ?? ""), at: Date.now() });

@@ -1,6 +1,7 @@
 //! Managed, actor-scoped Boost Bot host. Model calls use ordinary owned gateway keys.
 pub(crate) mod activity;
 pub(crate) mod http;
+pub(crate) mod local_activity;
 pub(crate) mod model_sources;
 
 use crate::RpcActor;

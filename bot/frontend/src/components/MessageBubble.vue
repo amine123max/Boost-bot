@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import Markdown from "./Markdown.vue";
 import Icon from "./Icon.vue";
 import HelpTip from './HelpTip.vue';
+import StreamingReply from './StreamingReply.vue';
 
 const props = withDefaults(defineProps<{
   text: string;
@@ -73,11 +74,11 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
     </form>
     <div v-else class="message-bubble">
       <Markdown v-for="(value, index) in interim" :key="index" :text="value" />
-      <div v-if="text && streaming" class="message-stream-text">{{ text }}</div>
+      <StreamingReply v-if="text && streaming" :text="text" />
       <Markdown v-else-if="text" :text="text" />
       <slot />
     </div>
-    <div v-if="!editing && (date || text)" class="message-actions">
+    <div v-if="!streaming && !editing && (date || text)" class="message-actions">
       <button
         v-if="text"
         type="button"
@@ -97,7 +98,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 <style scoped>
 .message-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; }
 .message-bubble { min-width: 0; max-width: 100%; padding: var(--space-1) 0; }
-.message-stream-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--lh-relaxed, 1.6); }
 .framed-content .message-bubble, .user-content .message-bubble { padding: var(--space-2-5) var(--space-4); border-radius: var(--r-bubble); }
 .framed-content .message-bubble { background: var(--accent-soft); box-shadow: none; }
 .user-content { align-items: flex-end; }

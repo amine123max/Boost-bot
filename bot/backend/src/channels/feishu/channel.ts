@@ -8,6 +8,7 @@ import type { Delivery } from "../../core/delivery.js";
 import type { Store } from "../../store/db.js";
 import { logger } from "../../log.js";
 import { t } from "../../i18n/index.js";
+import { VOICE_BYTES } from '../../core/local-voice.js';
 
 /** 离线补消息：只看这么久之内有过来往的会话、这么久之内发的消息，每个会话最多这么多条 */
 export const CATCH_UP_ACTIVE_MS = 7 * 86400_000;
@@ -157,19 +158,20 @@ export class FeishuChannel {
       const reply = new FeishuReply(this.transport, ev.messageId, this.throttleMs, { outbox: this.outbox, botId: this.botOf(ev.chatId), account: this.account, chatId: ev.chatId, key: ev.messageId });
       try {
         let remaining = 20 * 1024 * 1024;
-        const media = inbound.parts.filter(part => part.type === 'image' || part.type === 'file');
+        const media = inbound.parts.filter(part => part.type === 'image' || part.type === 'file' || (part.type === 'voice' && this.runtime.voiceAvailable));
         for (const [index, part] of media.entries()) {
-          if (part.type !== 'image' && part.type !== 'file') continue;
+          if (part.type !== 'image' && part.type !== 'file' && part.type !== 'voice') continue;
           try {
             if (index >= 8 || remaining <= 0) throw new Error('单条消息最多分析8个附件，总计不超过20 MB');
             if (!part.ref || !this.transport.downloadResource) throw new Error('当前飞书连接不支持读取附件，请检查消息资源权限');
-            part.data = await this.transport.downloadResource(ev.messageId, part.ref, part.type, remaining);
+            part.data = await this.transport.downloadResource(ev.messageId, part.ref, part.type === 'voice' ? 'file' : part.type,
+              part.type === 'voice' ? Math.min(VOICE_BYTES, remaining) : remaining);
             remaining -= part.data.length;
             if (part.type === 'image') {
               const { sniffImageMime } = await import('../weixin/api.js');
               part.mime = sniffImageMime(part.data);
             }
-          } catch (error) { part.error = error instanceof Error ? error.message : '附件下载失败'; }
+          } catch (error) { if (part.type !== 'voice') part.error = error instanceof Error ? error.message : '附件下载失败'; }
         }
         await this.runtime.handle(inbound, reply);
       } catch (e) {

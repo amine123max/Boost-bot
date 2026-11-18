@@ -67,7 +67,7 @@ export const MAX_INBOUND_MEDIA_BYTES = 50 * 1024 * 1024;
 const CDN_TIMEOUT_MS = 60_000;
 
 export interface InboundMedia {
-  kind: "image" | "file" | "video";
+  kind: "image" | "file" | "video" | "voice";
   data: Buffer;
   /** 文件条目的原始文件名 */
   name?: string;
@@ -75,10 +75,11 @@ export interface InboundMedia {
   mime?: ImageMime;
 }
 
-/** 图片/文件/视频条目带有可下载的 CDN 引用。语音不下载：有转写文字，原始音频是 SILK。 */
+/** 媒体条目的 CDN 引用。语音已有转写时不再下载原音。 */
 export function hasDownloadableMedia(item: MessageItem | undefined): boolean {
   const media =
-    item?.type === MessageItemType.IMAGE ? item.image_item?.media : item?.type === MessageItemType.FILE ? item.file_item?.media : item?.type === MessageItemType.VIDEO ? item.video_item?.media : undefined;
+    item?.type === MessageItemType.IMAGE ? item.image_item?.media : item?.type === MessageItemType.FILE ? item.file_item?.media : item?.type === MessageItemType.VIDEO ? item.video_item?.media
+      : item?.type === MessageItemType.VOICE && !item.voice_item?.text?.trim() ? item.voice_item?.media : undefined;
   return !!(media?.encrypt_query_param || media?.full_url);
 }
 export const SESSION_EXPIRED_ERRCODE = -14;
@@ -401,6 +402,10 @@ export class IlinkClient {
       media = kind === "file" ? item.file_item?.media : item.video_item?.media;
       if (!media?.aes_key) throw new Error(t("channel.aes_key_missing"));
       key = parseAesKey(media.aes_key);
+    } else if (item.type === MessageItemType.VOICE) {
+      kind = "voice";
+      media = item.voice_item?.media;
+      if (media?.aes_key) key = parseAesKey(media.aes_key);
     } else {
       throw new Error(t("channel.item_unsupported", { type: item.type }));
     }

@@ -47,20 +47,50 @@ Thanks to Linux DO for providing a place for technical discussion and open-sourc
 | Account management | Authorization, import, availability checks and usage windows |
 | Model gateway | Responses / Chat Completions, JSON / SSE, tools, source mapping and failover |
 | Access and accounting | Key ownership, model access, token budgets, rate/concurrency admission and idempotent settlement |
-| Agent workspace | Conversations, tasks, approvals, tools and signed messaging channels |
+| Agent workspace | Resumable SSE chat, durable message queues, conversation tasks, approvals and bound messaging channels |
 | Operations | Source circuits, request diagnostics, bounded queues, upstream proxies, managed sing-box and native monitoring |
 
 Protocol support depends on the configured upstream. Main SQLCipher and per-actor Bot encryption are explicitly enabled; workspaces/logs are outside database encryption. Implementation boundaries and validation are described in the [system architecture](ARCHITECTURE.md).
+
+### The Bot workspace
+
+Open a Bot, choose an authorized model source, and send a message. Use `/task` to plan work in that conversation. Follow-ups wait in order and refreshing the page resumes the active response. The four buttons on the right open Tasks & Approvals, Channels, Host Tools, or History & Memory one at a time.
+
+The current source adds system and local-agent inspection (Codex, Claude Code and DeepSeek Harness where compatible logs exist), approved desktop actions on supported hosts, up to eight trusted local MCP servers per Bot, and local voice transcription for WeChat, Feishu and supported Telegram voice messages. A voice message receives a text reply. See the [Bot integration guide](bot/INTEGRATION.md#host-tools-and-voice) for setup and platform limits. The system observation and driver approach is inspired by [OpenMausBot](https://github.com/milind-soni/OpenMausBot).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Client["Desktop / Web / model clients"] --> Access["Authenticated access"]
-  Access --> Service["Management / inference service"]
-  Service --> Models["Model upstreams"]
-  Service <-->|"persistent state"| DB[("SQLite")]
-  Service <-->|"tasks / results"| Bot["Bot runtime"]
+  subgraph Entry["Entry points"]
+    UI["Vue · Tauri / Web"]
+    IM["WeChat · Feishu · Telegram"]
+    API["Model API clients"]
+  end
+  subgraph Boost["Boost runtime"]
+    Access["Rust · sessions, actor and admission"]
+    Gateway["Rust · model routing"]
+    Voice["Local voice · SILK / FFmpeg → Whisper"]
+    Bot["Node · Bot Harness"]
+    Db[("SQLite · conversations, queues and tasks")]
+  end
+  subgraph Host["Host capabilities"]
+    Monitor["Read-only · processes and agent status"]
+    Tools["Bundled DSH · isolated execution"]
+    Approval{"Tool policy and approval"}
+    Extras["Desktop driver / local MCP servers"]
+  end
+  UI --> Access --> Bot
+  IM -->|"voice, if needed"| Voice -->|"transcript"| Bot
+  IM -->|"text"| Bot
+  API --> Gateway
+  Bot --> Gateway --> Models["Configured model providers"]
+  Bot <--> Db
+  Bot -->|"public deltas / task events"| UI
+  Bot -->|"reply to bound channel"| IM
+  Bot --> Tools
+  Tools --> Approval --> Extras
+  Bot -->|"authenticated system admin"| Monitor
 ```
 
 Direct Web access uses port **12000**. Desktop runs its own managed Rust/Node runtime; Nginx and FastAPI are optional. See [system architecture](ARCHITECTURE.md) for RPC budgets, identity boundaries, persistence and stream handling.
@@ -77,7 +107,7 @@ Direct Web access uses port **12000**. Desktop runs its own managed Rust/Node ru
 
 | Resource boundary | Default policy |
 | --- | --- |
-| Management RPC | 6 executing writes, bounded resource queues, 16 read slots, cross-domain barrier |
+| Management RPC  | 6 executing writes; 32 concurrent reads, up to 96 admitted, 2 s maximum read wait; resource queues and cross-domain barrier |
 | Inference | 20 QPS / burst 20, 24 global and 8 per-model in-flight; storage headroom preserved |
 | Input memory | 32 MiB per body, 64 MiB buffered inference input; front-proxy backpressure |
 | Upstream faults | Source-isolated circuits, bounded half-open probing and healthy-source failover |

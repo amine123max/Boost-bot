@@ -94,13 +94,16 @@ jobs:
       - name: Prepare embedded Bot runtime
         env:
           npm_config_python: ${{ steps.python.outputs.python-path }}
+          BOOST_BOT_BUNDLE_VOICE: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: node scripts/prepare-boost-bot.mjs
       - name: Verify desktop storage and updater regressions
         if: ${{ !inputs.portable_only }}
         run: |
           cargo test --manifest-path backend/desktop/Cargo.toml --lib app_storage -- --test-threads=1
           cargo test --manifest-path backend/desktop/Cargo.toml --lib commands::updater
-          cargo test --manifest-path backend/desktop/Cargo.toml --locked --lib local_activity -- --test-threads=1
+          cargo test -p boost-service --locked --lib local_activity -- --test-threads=1
+          cargo test -p boost-service --locked --lib http::rpc_queue::tests
+          cargo test -p boost-service --locked --lib host_activity_requires_a_system_admin_lease
           cargo test --manifest-path backend/desktop/Cargo.toml --locked --lib embedded_bot -- --test-threads=1
           cargo test -p boost-service --locked bot::http::tests -- --test-threads=1
       - name: Prepare packaging config

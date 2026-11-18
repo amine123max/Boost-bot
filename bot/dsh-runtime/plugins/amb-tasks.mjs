@@ -34,7 +34,7 @@ export const inject = ['tools']
 
 /** Shared with amb-control: control-channel ops this plugin answers. */
 export const HANDLERS = Symbol.for('amb.control.handlers')
-export const CHAT_TOOLS = ['task_start', 'task_message', 'task_list', 'rule_create', 'rule_update', 'background_pause']
+export const CHAT_TOOLS = ['task_start', 'task_message', 'task_list', 'task_inspect', 'host_activity', 'rule_create', 'rule_update', 'background_pause']
 /** Tools a task session never gets (filtered to registered names before tools.restrict). */
 export const TASK_DENY = ['present', 'ask_user_question', ...CHAT_TOOLS]
 /** Shared with amb-permission: sessionId → DSH permission preset for rule sessions (and their subagents). */
@@ -137,6 +137,23 @@ export function apply(ctx) {
       parameters: {},
       output: TEXT_OUT,
       execute: tool('list'),
+    }))
+    ctx.tools.register(defineTool({
+      name: 'task_inspect',
+      description: 'Read task IDs, titles, stages and measured progress across this Bot’s chats. Use workspace scope only when the user explicitly requests other Bots’ progress; host access is required. This never starts, stops or redirects a task. No other conversation’s result or files are disclosed.',
+      parameters: {
+        task: { type: 'string', description: 'Optional exact task ID.' },
+        scope: { type: 'string', enum: ['bot', 'workspace'] },
+      },
+      output: TEXT_OUT,
+      execute: tool('inspect'),
+    }))
+    ctx.tools.register(defineTool({
+      name: 'host_activity',
+      description: 'Read the Boost host’s running process names and PIDs, and observed Codex, Claude and DeepSeek activity. Running processes do not imply task progress; use only progress reported by the observer. This tool cannot stop, control or inject into any process. Requires explicit full access in the trusted web console.',
+      parameters: { name: { type: 'string', description: 'Optional process-name substring.' } },
+      output: TEXT_OUT,
+      execute: tool('inspect-host'),
     }))
     ctx.tools.register(defineTool({
       name: 'rule_create',

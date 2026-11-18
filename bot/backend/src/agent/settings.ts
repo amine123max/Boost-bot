@@ -1,6 +1,7 @@
 /** 每个机器人的身份与行为设置（存在 bots.settings JSON 列，网页可编辑）。 */
 import { DEFAULT_QUIET, minuteOf, type QuietHours } from "../core/quiet.js";
 import { normalizeBotAppearance, type BotAppearance } from "../../../shared/appearance/preferences.js";
+import { localPlugins, type LocalPlugin } from './local-plugins.js';
 export type PermissionPreset = "readonly" | "workspace" | "full";
 export type CuBackend = "cua" | "codex";
 export type CuApproval = "auto" | "ask-input";
@@ -11,6 +12,7 @@ export const BOT_AVATARS = ["blue", "yellow", "green", "red", "purple", "orange"
 export type BotAvatarKey = (typeof BOT_AVATARS)[number];
 
 export interface BotSettings {
+  localPlugins: LocalPlugin[];
   /** Allow application-local collaboration tools; writes still require a writable permission preset. */
   collaboration: { enabled: boolean };
   /**
@@ -72,11 +74,12 @@ export interface BotSettings {
 }
 
 export const DEFAULT_SETTINGS: BotSettings = {
+  localPlugins: [],
   collaboration: { enabled: true },
   permission: "workspace",
   memory: { enabled: true, review: true, teamWrite: false },
   steward: { enabled: true },
-  computerUse: { enabled: true, backend: "cua", approval: "auto" },
+  computerUse: { enabled: false, backend: "cua", approval: "ask-input" },
   media: { confirm: "auto" },
   utilityModel: "",
   avatar: "",
@@ -103,7 +106,10 @@ export function normalizeSettings(raw: unknown): BotSettings {
   const limit = Number(bg.limitUsd);
   const slots = Number(r.taskSlots);
   const b = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
+  let plugins: LocalPlugin[] = [];
+  try { if (r.localPlugins !== undefined) plugins = localPlugins(r.localPlugins); } catch { /* Ignore invalid saved endpoints. */ }
   return {
+    localPlugins: plugins,
     collaboration: { enabled: b(r.collaboration?.enabled, true) },
     permission: r.permission === "readonly" || r.permission === "full" ? r.permission : "workspace",
     memory: {
@@ -115,8 +121,7 @@ export function normalizeSettings(raw: unknown): BotSettings {
     computerUse: {
       enabled: b(cu.enabled, DEFAULT_SETTINGS.computerUse.enabled),
       backend: cu.backend === "codex" ? "codex" : "cua",
-      // 旧值（always / readonly-free）一律迁移为自动执行
-      approval: cu.approval === "ask-input" ? "ask-input" : "auto",
+      approval: cu.approval === "auto" ? "auto" : "ask-input",
     },
     // 以前每次都问；升级后默认只在花费高时问
     media: { confirm: md.confirm === "always" ? "always" : "auto" },

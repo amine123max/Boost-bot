@@ -1,12 +1,12 @@
 <script lang="ts">
 import { defineComponent, h } from "vue";
+import { lucide } from '../lib/lucide-icons';
 const icons: Record<string, string> = {
-  chevron: "m9 5 7 7-7 7",
-  more: "M5 12h.01M12 12h.01M19 12h.01",
   model: "M8 3h8l5 9-5 9H8L3 12l5-9ZM8 3l8 18M16 3 8 21M3 12h18",
   bot: "M8 4h8l4 5v9l-4 3H8l-4-3V9l4-5ZM12 4V2M9 11v3M15 11v3",
   link: "M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2",
   activity: "M3 12h4l3-8 4 16 3-8h4",
+  voice: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8",
   panel: "M3 5h18v14H3ZM15 5v14",
   'panel-open': "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM15 4v16",
   'panel-closed': "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM17 7v10",
@@ -18,11 +18,9 @@ const icons: Record<string, string> = {
   stop: "M6 6h12v12H6Z",
   close: "m6 6 12 12M6 18 18 6",
   settings: "M9.7 2.8h4.6l.5 2a7.5 7.5 0 0 1 1.7 1l2-.6 2.3 4-1.5 1.4a8 8 0 0 1 0 2l1.5 1.4-2.3 4-2-.6a7.5 7.5 0 0 1-1.7 1l-.5 2H9.7l-.5-2a7.5 7.5 0 0 1-1.7-1l-2 .6-2.3-4 1.5-1.4a8 8 0 0 1 0-2L3.2 9.2l2.3-4 2 .6a7.5 7.5 0 0 1 1.7-1l.5-2ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
-  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   tasks: "M9 5h11M9 12h11M9 19h11m-7-1 2 2 3-3M3 5h.01M3 12h.01",
   check: "m5 12 4 4L19 6",
   copy: "M9 5V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1M4 7h9a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z",
-  edit: "m14.5 5.5 4 4M4 20l1.1-4.8L16.8 3.5a2.8 2.8 0 0 1 4 4L9.1 19.2 4 20ZM5.1 15.2l4 4",
   info: "M12 7v6M12 16h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
   refresh:
     "M20 7v5h-5M4 17v-5h5M6.1 6a8 8 0 0 1 13.2 3M4.7 15a8 8 0 0 0 13.2 3",
@@ -55,9 +53,11 @@ export default defineComponent({
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         "aria-hidden": "true",
+        "data-icon": props.name,
         focusable: "false",
       },
-      [h("path", { d: icons[props.name || "info"] || icons.info })],
+      lucide[props.name || '']?.map(([tag,attrs]) => h(tag,attrs))
+        ?? [h("path", { d: icons[props.name || "info"] || icons.info })],
     ),
 });
 </script>

@@ -32,4 +32,11 @@ for (const [source, destination] of [
 }
 run('vue-tsc/bin/vue-tsc.js', ['--noEmit', '-p', 'frontend/tsconfig.json']);
 run('vite/bin/vite.js', ['build', '--config', 'frontend/vite.config.ts']);
+if (process.env.BOOST_BOT_BUNDLE_VOICE === '1') {
+  const result = spawnSync(process.execPath, [resolve(root, 'scripts/prepare-voice.mjs'), resolve(output, 'voice')], {
+    cwd: root, env: process.env, stdio: 'inherit', windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error('Bot voice asset preparation failed');
+}
 console.log('Bot backend and Vue workspace built in bot/dist/');

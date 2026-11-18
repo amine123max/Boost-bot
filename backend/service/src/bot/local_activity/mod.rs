@@ -27,6 +27,8 @@ struct Observer {
     sources: Vec<&'static str>,
 }
 static OBSERVER: OnceLock<Mutex<Observer>> = OnceLock::new();
+type ProcessRows = (Instant, Vec<(String, u32)>);
+static PROCESS_ROWS: Mutex<Option<ProcessRows>> = Mutex::new(None);
 
 fn root(variable: &str, fallback: &str, home: &Path) -> PathBuf {
     std::env::var_os(variable)
@@ -254,7 +256,11 @@ impl Observer {
             .or_else(|| active.iter().max_by_key(|l| l.task.at).copied())
             .or_else(|| tasks.iter().max_by_key(|l| l.task.at));
         let percent = if active.len() > 1 {
-            active.iter().map(|log| log.task.percent).collect::<Option<Vec<_>>>().map(|values| values.iter().sum::<u64>() / values.len() as u64)
+            active
+                .iter()
+                .map(|log| log.task.percent)
+                .collect::<Option<Vec<_>>>()
+                .map(|values| values.iter().sum::<u64>() / values.len() as u64)
         } else {
             selected.and_then(|l| l.task.percent)
         };
@@ -284,19 +290,45 @@ impl Observer {
         } else {
             Some(rates.iter().sum::<f64>())
         };
-        let rate_at = rate_tasks.iter().filter_map(|log| log.task.rate.sampled_at()).max();
-        let rate_stale = rate_tasks.iter().any(|log| log.task.rate.retained(now).is_some() && log.task.rate.value(now).is_none());
-        let rate_kind = if rate_tasks.iter().filter(|log| log.task.rate.retained(now).is_some()).all(|log| log.task.rate.kind == "counter") { "counter" } else { "request" };
+        let rate_at = rate_tasks
+            .iter()
+            .filter_map(|log| log.task.rate.sampled_at())
+            .max();
+        let rate_stale = rate_tasks
+            .iter()
+            .any(|log| log.task.rate.retained(now).is_some() && log.task.rate.value(now).is_none());
+        let rate_kind = if rate_tasks
+            .iter()
+            .filter(|log| log.task.rate.retained(now).is_some())
+            .all(|log| log.task.rate.kind == "counter")
+        {
+            "counter"
+        } else {
+            "request"
+        };
+        let providers: Vec<_> = self.sources.iter().map(|provider| {
+            let current: Vec<_> = active.iter().filter(|log| log.provider == *provider).collect();
+            let mut sessions: Vec<_> = tasks.iter().filter(|log| log.provider == *provider).collect();
+            sessions.sort_unstable_by_key(|log| std::cmp::Reverse(log.task.at));
+            let sessions: Vec<_> = sessions.into_iter().take(8).map(|log| json!({
+                "state":log.task.state,"progress":log.task.percent,"updatedAt":log.task.at,
+            })).collect();
+            json!({"provider":provider,"running":current.iter().filter(|log| log.task.state == "working").count(),
+                "waiting":current.iter().filter(|log| log.task.state == "waiting").count(),
+                "progress":if current.len() == 1 { current[0].task.percent } else { None },
+                "updatedAt":current.iter().map(|log| log.task.at).max(),
+                "sessions":sessions})
+        }).collect();
         json!({"available":true,"state":selected.map(|l| l.task.state).unwrap_or("idle"),"percent":percent,
             "tokensPerSecond":tokens_per_second,"updatedAt":now,
             "rateUpdatedAt":rate_at,"rateKind":rate_kind,"rateStale":rate_stale,
             "activeTasks":active.len(),"waitingTasks":waiting,"sources":self.sources,
-            "activeSources":active_sources,
+            "activeSources":active_sources,"providers":providers,
             "stale":selected.is_some_and(|l| l.task.state == "working" && l.task.reported_at > 0 && now - l.task.reported_at > 120_000)})
     }
 }
 
-pub(crate) fn read() -> Result<Value, String> {
+pub fn read() -> Result<Value, String> {
     OBSERVER
         .get_or_init(|| Mutex::new(Observer::default()))
         .lock()
@@ -304,10 +336,75 @@ pub(crate) fn read() -> Result<Value, String> {
         .map(|mut observer| observer.read())
 }
 
+fn list_processes(name: Option<&str>) -> Result<(usize, Vec<Value>), String> {
+    use sysinfo::{ProcessRefreshKind, RefreshKind, System};
+    let query = name.unwrap_or_default().to_lowercase();
+    let result = {
+        let mut cache = PROCESS_ROWS.lock().map_err(|_| "本机进程状态暂不可用")?;
+        if cache
+            .as_ref()
+            .is_none_or(|(at, _)| at.elapsed() >= Duration::from_secs(2))
+        {
+            let system = System::new_with_specifics(
+                RefreshKind::new().with_processes(ProcessRefreshKind::new()),
+            );
+            let mut rows: Vec<_> = system
+                .processes()
+                .iter()
+                .filter_map(|(pid, proc)| {
+                    let name: String = proc
+                        .name()
+                        .chars()
+                        .filter(|ch| !ch.is_control())
+                        .take(120)
+                        .collect();
+                    (!name.is_empty()).then(|| (name, pid.as_u32()))
+                })
+                .collect();
+            rows.sort_unstable();
+            *cache = Some((Instant::now(), rows));
+        }
+        let mut matching = 0;
+        let mut list = Vec::new();
+        if let Some((_, rows)) = cache.as_ref() {
+            for (name, pid) in rows
+                .iter()
+                .filter(|(name, _)| name.to_lowercase().contains(&query))
+            {
+                matching += 1;
+                if list.len() < 50 {
+                    list.push(json!({"name": name, "pid": pid}));
+                }
+            }
+        }
+        (matching, list)
+    };
+    Ok(result)
+}
+
+pub(crate) fn host_snapshot(name: Option<&str>) -> Result<Value, String> {
+    let (matching, list) = list_processes(name)?;
+    Ok(json!({"agents":read()?, "processes":list, "matchingProcesses":matching}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Write;
+    #[test]
+    fn host_process_rows_contain_only_names_and_pids() {
+        let (count, processes) = list_processes(None).unwrap();
+        assert!(!processes.is_empty());
+        assert!(processes.len() <= 50);
+        assert!(count >= processes.len());
+        for process in processes {
+            let row = process.as_object().unwrap();
+            assert_eq!(row.len(), 2);
+            assert!(row["name"].is_string());
+            assert!(row["pid"].is_u64());
+        }
+    }
+
     fn fixture(provider: &'static str, extension: &str, bytes: &[u8]) -> (Observer, PathBuf) {
         let path = std::env::temp_dir().join(format!(
             "boost-activity-{}-{}.{}",
@@ -340,7 +437,9 @@ mod tests {
         let start =
             b"{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"a\"}}\n";
         let (mut observer, path) = fixture("codex", "jsonl", start);
-        assert_eq!(observer.read()["state"], "working");
+        let active = observer.read();
+        assert_eq!(active["state"], "working");
+        assert_eq!(active["providers"][0]["sessions"][0]["state"], "working");
         let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
         file.write_all(b"{\"type\":\"event_msg\",\"payload\":")
             .unwrap();

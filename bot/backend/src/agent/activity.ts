@@ -8,6 +8,7 @@ import { localProxyFailureHint } from "../network-error.js";
 import { displayModel } from "../account/newapi-types.js";
 import { redactText } from "../log.js";
 import { reportedProgress } from "./progress.js";
+import { fileChange, type FileChange } from "./file-change.js";
 
 export interface ActivityStep {
   /** 同一步的更新沿用同一个 id（工具调用 id、m<回合>.<步>…） */
@@ -25,7 +26,13 @@ export interface ActivityStep {
   cut?: boolean;
   at: number;
   ms?: number;
+  section?: number;
+  turnStartedAt?: number;
+  fileChange?: FileChange;
   tokens?: { input?: number; output?: number };
+  modelKey?: string;
+  commandPreview?: string;
+  shellOutput?: string;
 }
 
 const MAX_STEPS = 120;
@@ -100,7 +107,7 @@ export class ActivityLog {
         if (!data.model) return true;
         this.model = String(data.model);
         const cur = this.steps.findLast((s) => s.kind === "model" && s.status === "running");
-        if (cur && cur.title !== this.model) this.put({ ...cur, title: this.model });
+        if (cur && cur.modelKey !== this.model) this.put({ ...cur, title: this.model, modelKey: this.model });
         return true;
       }
       case "step/start":
@@ -126,7 +133,7 @@ export class ActivityLog {
           kind: "model",
           title: model || tr("activity.model"),
           summary: said ? callLine || undefined : text ? oneLine(text) : callLine || (thinking ? tr("activity.thinkingOnly") : tr("activity.emptyReply")),
-          output: clip([thinking && `${tr("activity.thinkingTag")}\n${thinking}`, said ? "" : text].filter(Boolean).join("\n\n"), MAX_OUTPUT) || undefined,
+          output: this.opts.chat ? undefined : clip([thinking && `${tr("activity.thinkingTag")}\n${thinking}`, said ? "" : text].filter(Boolean).join("\n\n"), MAX_OUTPUT) || undefined,
           status: "ok",
           at,
           ms: Math.max(0, time - at),
@@ -137,6 +144,16 @@ export class ActivityLog {
       case "tool/call": {
         const name = String(data.name ?? "tool");
         const args = String(data.arguments ?? "");
+        let commandPreview: string | undefined;
+        if (this.opts.chat && /^(?:bash|shell|terminal|exec|run_command|pwsh|powershell)$/i.test(name)) {
+          try {
+            const parsed = JSON.parse(args);
+            const command = parsed.command ?? parsed.cmd;
+            if (typeof command === 'string' && !/password|secret|credential|api[_-]?key|bearer|token/i.test(command)) {
+              commandPreview = redactText(command).slice(0, 1200);
+            }
+          } catch { /* The tool label remains available for nonstandard payloads. */ }
+        }
         const progress = reportedProgress(name, args);
         if (progress !== null && this.pendingProgress.size < 128) this.pendingProgress.set(String(data.callId),progress);
         const sum = summarizeCall(name, args);
@@ -146,6 +163,7 @@ export class ActivityLog {
           title: name,
           summary: sum === name ? undefined : sum.slice(name.length + 2),
           input: clip(prettyArgs(args), MAX_INPUT),
+          commandPreview,
           status: "running",
           at: time,
         });
@@ -158,7 +176,11 @@ export class ActivityLog {
         const progress = this.pendingProgress.get(String(msg.toolCallId));
         if (progress !== undefined && !msg.isError) this.progress = progress;
         this.pendingProgress.delete(String(msg.toolCallId));
-        this.put({ ...prev, status: msg.isError ? "error" : "ok", ms: Math.max(0, time - prev.at), output: clip(textOf(msg.content), MAX_OUTPUT) || undefined });
+        const output = clip(textOf(msg.content), MAX_OUTPUT);
+        const shellOutput = prev.commandPreview && !/password|secret|credential|api[_-]?key|bearer|token|-----BEGIN|\.env\b/i.test(output)
+          ? redactText(output).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "") : undefined;
+        this.put({ ...prev, status: msg.isError ? "error" : "ok", ms: Math.max(0, time - prev.at), output: output || undefined, shellOutput,
+          ...(!msg.isError && this.opts.chat ? { fileChange: fileChange(prev.title, data.meta, true) } : {}) });
         // 命令跑得太久，转到了后台：单独记一步，结束时（job/settled 或结束通知）更新
         const job = promotedJob(data);
         if (job) this.put({ id: `j:${job}`, kind: "job", title: tr("activity.job"), summary: prev.summary, input: prev.input, status: "running", at: time });
@@ -271,7 +293,10 @@ export class ActivityLog {
   }
 
   private put(step: ActivityStep): void {
-    if (step.kind === "model") step.title = displayModel(step.title);
+    if (step.kind === "model") {
+      step.modelKey ??= step.title;
+      step.title = displayModel(step.title);
+    }
     for (const k of Object.keys(step) as Array<keyof ActivityStep>) if (step[k] === undefined) delete step[k];
     const i = this.steps.findIndex((s) => s.id === step.id);
     if (i >= 0) this.steps[i] = step;

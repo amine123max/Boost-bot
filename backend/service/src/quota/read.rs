@@ -117,10 +117,10 @@ fn model_price_rule_result(rule: ModelPriceRule) -> ModelPriceRuleResult {
 
 pub(crate) fn read_model_price_rules() -> Result<Vec<ModelPriceRuleResult>, String> {
     let storage = open_storage().ok_or_else(|| "open storage failed".to_string())?;
-    model_pricing::remove_builtin_price_rules(&storage)?;
-    Ok(storage
+    let rules = storage
         .list_model_price_rules()
-        .map_err(|err| format!("list model price rules failed: {err}"))?
+        .map_err(|err| format!("list model price rules failed: {err}"))?;
+    Ok(model_pricing::visible_price_rules(rules)
         .into_iter()
         .map(model_price_rule_result)
         .collect())
@@ -919,8 +919,7 @@ fn seed_model_pools(
     api_models: &[String],
 ) {
     for model in api_models {
-        let price = model_pricing::resolve_model_price_from_rules(price_rules, model, 0)
-            .or_else(|| model_pricing::resolve_model_price(model, 0));
+        let price = model_pricing::resolve_model_price_from_rules(price_rules, model, 0);
         let entry = pools
             .entry(model.clone())
             .or_insert_with(|| PoolAccumulator {
@@ -973,7 +972,6 @@ fn add_aggregate_api_pools(
                 continue;
             }
             let provider = model_pricing::resolve_model_price_from_rules(price_rules, &model, 0)
-                .or_else(|| model_pricing::resolve_model_price(&model, 0))
                 .map(|price| price.provider);
             let remaining_tokens = balance.remaining.and_then(|remaining| {
                 if is_usd_unit(balance_unit.as_str()) {
@@ -1127,7 +1125,6 @@ fn add_account_pools(
                 continue;
             }
             let provider = model_pricing::resolve_model_price_from_rules(price_rules, &model, 0)
-                .or_else(|| model_pricing::resolve_model_price(&model, 0))
                 .map(|price| price.provider)
                 .or_else(|| Some("openai".to_string()));
             let source = QuotaPoolSourceBreakdown {

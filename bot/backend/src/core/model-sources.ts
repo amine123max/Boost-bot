@@ -23,9 +23,10 @@ export class ModelSources {
   ) {
     if (broker) registerSecret(broker.token);
   }
-  private async request<T>(body?: Record<string, unknown>): Promise<T> {
+  private async request<T>(body?: Record<string, unknown>, hostQuery?: string): Promise<T> {
     if (!this.broker) throw new Error("当前运行环境未连接Boost模型来源服务");
-    const response = await fetch(this.broker.url, {
+    const url = hostQuery === undefined ? this.broker.url : this.broker.url.replace(/model-sources$/, 'host-activity') + '?name=' + encodeURIComponent(hostQuery.slice(0,80));
+    const response = await fetch(url, {
       method: body ? "POST" : "GET",
       headers: {
         "x-boost-bot-source-token": this.broker.token,
@@ -37,8 +38,12 @@ export class ModelSources {
     });
     const value = await response.json().catch(() => ({}));
     if (!response.ok)
-      throw new Error(value.error || "无法读取当前账号的模型来源");
+      throw new Error(value.error || (hostQuery === undefined ? "无法读取当前账号的模型来源" : "本机监控仅在 Boost 系统管理员运行环境可用"));
     return value as T;
+  }
+  async hostActivity(name = ''): Promise<unknown> {
+    if (!this.broker) throw new Error("当前运行环境未连接 Boost 本机监控");
+    return this.request(undefined, name);
   }
   async list(force = false): Promise<ModelSource[]> {
     if (!this.broker) return [];

@@ -122,7 +122,7 @@ pub async fn app_local_agent_activity(window: tauri::Window) -> Result<serde_jso
     if !matches!(window.label(), "main" | "tray-preview") {
         return Err("当前窗口不可读取本机任务".into());
     }
-    tauri::async_runtime::spawn_blocking(crate::local_activity::read)
+    tauri::async_runtime::spawn_blocking(boost_service::read_local_agent_activity)
         .await
         .map_err(|e| e.to_string())?
 }

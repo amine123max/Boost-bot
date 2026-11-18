@@ -64,6 +64,7 @@ import { SearchService, loadWebSearch, saveWebSearch, type SearchProvider, type 
 import { ConnectionService } from "./agent/connections.js";
 import { UpdateChecker } from "./update-check.js";
 import { COMPACT_ENDPOINT, serverCompactionEnabled, type CompactEndpoint } from "./agent/server-compaction.js";
+import { LocalVoice } from './core/local-voice.js';
 import type { BotSettings } from "./agent/settings.js";
 import { TaskService } from "./tasks/service.js";
 import { RuleEvents } from "./tasks/rule-events.js";
@@ -345,6 +346,7 @@ export class App {
       approvals: this.agent.approvals,
       onChange: () => this.attention.kick(),
       onConversationMessage: id => this.chatHarness.announce(id),
+      readHostActivity: name => this.modelSources.hostActivity(name),
       defaultModel: () => this.config.llm.defaultModel,
       route: (botId, model) => this.routeModel(botId, model),
       maxBackground: config.agent.maxBackground,
@@ -375,6 +377,7 @@ export class App {
     // 出站队列的变化（结果留着等微信、发出去了、放弃了）：任务的"未送达"随之出现、消失
     this.delivery.onChange(() => this.attention.kick());
     this.runtime = new BotRuntime({
+      voice: new LocalVoice(config.dataDir),
       agent: this.agent,
       store: this.store,
       chatHarness: this.chatHarness,

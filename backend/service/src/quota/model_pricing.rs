@@ -23,10 +23,17 @@ pub(crate) fn remove_builtin_price_rules(storage: &Storage) -> Result<(), String
 }
 
 pub(crate) fn load_enabled_price_rules(storage: &Storage) -> Result<Vec<ModelPriceRule>, String> {
-    remove_builtin_price_rules(storage)?;
     storage
         .list_enabled_model_price_rules()
+        .map(visible_price_rules)
         .map_err(|err| format!("list enabled model price rules failed: {err}"))
+}
+
+pub(crate) fn visible_price_rules(mut rules: Vec<ModelPriceRule>) -> Vec<ModelPriceRule> {
+    // Older databases can still contain the retired seeds. Ignore them on reads;
+    // the explicit price sync already performs the on-disk cleanup.
+    rules.retain(|rule| !matches!(rule.source.as_str(), "official_seed" | "builtin" | "built_in"));
+    rules
 }
 
 pub(crate) fn wildcard_matches(pattern: &str, value: &str) -> bool {
@@ -220,8 +227,7 @@ fn matching_price_rule<'a>(
 
 pub(crate) fn resolve_model_price(model: &str, input_tokens: i64) -> Option<ModelPriceMatch> {
     let storage = crate::storage_helpers::open_storage()?;
-    remove_builtin_price_rules(&storage).ok()?;
-    let rules = storage.list_enabled_model_price_rules().ok()?;
+    let rules = load_enabled_price_rules(&storage).ok()?;
     resolve_model_price_from_rules(&rules, model, input_tokens)
 }
 
@@ -361,8 +367,7 @@ pub(crate) fn estimate_cost_usd_for_log(
     let cached = cached_input_tokens.unwrap_or(0);
     let output = output_tokens.unwrap_or(0);
     let reasoning = reasoning_output_tokens.unwrap_or(0);
-    let _ = remove_builtin_price_rules(storage);
-    let rules = storage.list_enabled_model_price_rules().unwrap_or_default();
+    let rules = load_enabled_price_rules(storage).unwrap_or_default();
     let cost = estimate_cost_with_rules_and_reasoning_for_service_tier(
         &rules,
         model,
@@ -474,7 +479,7 @@ mod tests {
         );
     }
     #[test]
-    fn custom_rules_override_downloads_and_old_builtin_rules_are_removed() {
+    fn price_reads_use_custom_rules_and_exclude_old_builtin_rules_without_deleting() {
         let storage = Storage::open_in_memory().unwrap();
         storage.init().unwrap();
         let mut old = test_rule("old", "test-*", "glob", 0, 1.0, None, 2.0);
@@ -485,6 +490,7 @@ mod tests {
         storage.upsert_model_price_rule(&custom).unwrap();
         let rules = load_enabled_price_rules(&storage).unwrap();
         assert_eq!(rules.len(), 1);
+        assert_eq!(storage.list_model_price_rules().unwrap().len(), 2);
         assert_close(
             resolve_model_price_from_rules(&rules, "test-model", 0)
                 .unwrap()

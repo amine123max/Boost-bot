@@ -11,6 +11,7 @@ import { WeixinQuota } from "./quota.js";
 import type { Delivery } from "../../core/delivery.js";
 import { logger } from "../../log.js";
 import { t, t as tr, tl, TARGET_LANGS } from "../../i18n/index.js";
+import { VOICE_BYTES } from '../../core/local-voice.js';
 
 export const WEIXIN_CAPS: ChannelCapabilities = {
   streaming: false,
@@ -48,7 +49,7 @@ export function weixinParts(items: MessageItem[] | undefined, media?: WeixinMedi
         const t = it.text_item?.text ?? "";
         const quoted = it.ref_msg?.message_item;
         // 引用了一张图片/一个文件：把它本身交给运行时，而不是只给标题
-        if (quoted && hasDownloadableMedia(quoted)) parts.push(mediaPart(quoted, media?.get(quoted), true));
+        if (quoted?.type !== MessageItemType.VOICE && quoted && hasDownloadableMedia(quoted)) parts.push(mediaPart(quoted, media?.get(quoted), true));
         else {
           const ref = quoted?.text_item?.text || it.ref_msg?.title;
           if (ref) parts.push({ type: "quote", text: ref });
@@ -56,9 +57,11 @@ export function weixinParts(items: MessageItem[] | undefined, media?: WeixinMedi
         if (t) parts.push({ type: "text", text: t });
         break;
       }
-      case MessageItemType.VOICE:
-        parts.push({ type: "voice", transcript: it.voice_item?.text });
+      case MessageItemType.VOICE: {
+        const got = media?.get(it);
+        parts.push({ type: "voice", transcript: it.voice_item?.text, ...(got && !(got instanceof Error) ? { data: got.data } : {}) });
         break;
+      }
       case MessageItemType.IMAGE:
       case MessageItemType.FILE:
       case MessageItemType.VIDEO:
@@ -490,7 +493,7 @@ export class WeixinChannel {
       void p.finally(() => this.pending.delete(p));
     }
     if (intercepted.handled) return;
-    const media = mediaItems(m.item_list);
+    const media = mediaItems(m.item_list).filter(it => it.type !== MessageItemType.VOICE || this.runtime.voiceAvailable);
     const p = this.queue.run(`weixin:${this.account}:${userId}`, async () => {
       const reply = new WeixinReply(this.client!, userId, this.store.getWeixinPeer(this.account, userId)?.contextToken ?? peer.contextToken, this.quota, { outbox: this.outbox, botId: this.botOf(userId), account: this.account, key: id });
       try {
@@ -527,7 +530,7 @@ export class WeixinChannel {
     for (const [index, it] of items.entries()) {
       try {
         if (index >= 8 || remaining <= 0) throw new Error('单条消息最多8个附件，总计不超过20 MB');
-        const media = await this.client!.downloadMedia(it, remaining);
+        const media = await this.client!.downloadMedia(it, it.type === MessageItemType.VOICE ? Math.min(VOICE_BYTES,remaining) : remaining);
         remaining -= media.data.length;
         out.set(it, media);
       } catch (e) {

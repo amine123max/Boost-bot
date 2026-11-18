@@ -16,6 +16,7 @@ export interface ModelMetrics {
     outputComplete: boolean;
   };
   context: {
+    archives?: { id: number; kind: 'compaction' | 'segment'; summary: string; endedAt: number }[];
     usedTokens: number | null;
     measuredAt: number | null;
     basis: string;

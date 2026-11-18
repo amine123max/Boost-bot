@@ -1,7 +1,6 @@
 use serde::Serialize;
 use tauri::{Emitter, Manager};
 
-mod local_activity;
 mod app_shell;
 mod app_storage;
 mod commands;

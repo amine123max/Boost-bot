@@ -293,15 +293,44 @@ fn resolve(
         json!({"baseUrl":super::gateway_base_url()?,"apiKey":crate::apikey_read_secret::read_api_key_secret(&key_id)?.key}),
     )
 }
-pub(crate) async fn handle(request: Request) -> Response {
-    let token = request
-        .headers()
+fn actor_for_headers(headers: &axum::http::HeaderMap) -> Option<RpcActor> {
+    let token = headers
         .get("x-boost-bot-source-token")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let actor = LEASES
+    LEASES
         .get()
-        .and_then(|leases| leases.lock().ok()?.get(token).cloned());
+        .and_then(|leases| leases.lock().ok()?.get(token).cloned())
+}
+
+pub(crate) async fn handle_host_activity(
+    headers: axum::http::HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<HashMap<String, String>>,
+) -> Response {
+    let Some(actor) = actor_for_headers(&headers) else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    if actor.role != crate::ROLE_SYSTEM_ADMIN {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let name = query
+        .get("name")
+        .map(|v| v.chars().take(80).collect::<String>());
+    let result =
+        tokio::task::spawn_blocking(move || super::local_activity::host_snapshot(name.as_deref()))
+            .await;
+    match result {
+        Ok(Ok(value)) => (
+            [(axum::http::header::CACHE_CONTROL, "no-store")],
+            Json(value),
+        )
+            .into_response(),
+        _ => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+    }
+}
+
+pub(crate) async fn handle(request: Request) -> Response {
+    let actor = actor_for_headers(request.headers());
     let Some(actor) = actor else {
         return (
             StatusCode::UNAUTHORIZED,
@@ -352,6 +381,56 @@ pub(crate) async fn handle(request: Request) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn host_activity_requires_a_system_admin_lease() {
+        use axum::{
+            extract::Query,
+            http::{HeaderMap, HeaderValue},
+        };
+        let query = || {
+            Query(HashMap::from([(
+                "name".into(),
+                "boost-never-matches".into(),
+            )]))
+        };
+        assert_eq!(
+            handle_host_activity(HeaderMap::new(), query())
+                .await
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        for role in ["member", "admin"] {
+            let lease =
+                Lease::new(&RpcActor::from_parts(Some(role), Some("host-test-user"))).unwrap();
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                "x-boost-bot-source-token",
+                HeaderValue::from_str(&lease.token).unwrap(),
+            );
+            assert_eq!(
+                handle_host_activity(headers, query()).await.status(),
+                StatusCode::FORBIDDEN
+            );
+        }
+        let lease = Lease::new(&RpcActor::system_admin()).unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-boost-bot-source-token",
+            HeaderValue::from_str(&lease.token).unwrap(),
+        );
+        assert_eq!(
+            handle_host_activity(headers.clone(), query())
+                .await
+                .status(),
+            StatusCode::OK
+        );
+        drop(lease);
+        assert_eq!(
+            handle_host_activity(headers, query()).await.status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
     #[test]
     fn host_source_lease_is_distinct_revocable_and_preserves_actor() {
         let actor = RpcActor::from_parts(Some("member"), Some("source-user"));

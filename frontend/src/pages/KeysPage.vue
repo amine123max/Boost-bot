@@ -28,6 +28,7 @@ import {
   formatNumber,
   notify,
   perform,
+  readForPage,
 } from "@/composables/useBoost";
 import { accountClient } from "@/lib/api/account-client";
 import { appClient } from "@/lib/api/app-client";
@@ -44,7 +45,7 @@ const usage = ref<ApiKeyUsageStat[] | null>(null),
   usageLoading = ref(false);
 const users = ref<AppUser[]>([]);
 const keyOwners = ref<ApiKeyOwner[]>([]);
-const distributionEnabled = ref(false);
+const distributionEnabled = computed(() => boost.session?.distributionEnabled ?? false);
 const memberOwnershipEnabled = computed(
   () => isAdmin.value && boost.session?.mode === "accounts",
 );
@@ -86,9 +87,9 @@ async function loadUsage() {
   if (!boost.ready || usageLoading.value) return;
   usageLoading.value = true;
   try {
-    usage.value = await accountClient.listApiKeyUsageStats();
+    const result = await readForPage(() => accountClient.listApiKeyUsageStats(), () => active);
+    if (result) usage.value = result;
   } catch (e) {
-    usage.value = null;
     notify(`读取密钥用量失败: ${getAppErrorMessage(e)}`, true);
   } finally {
     usageLoading.value = false;
@@ -96,7 +97,7 @@ async function loadUsage() {
 }
 onActivated(() => {
   active = true;
-  if (boost.ready) void perform(reload);
+  if (boost.ready) void reloadOnActivation();
 });
 onDeactivated(() => {
   active = false;
@@ -109,7 +110,7 @@ onDeactivated(() => {
 watch(
   () => boost.ready,
   (ready) => {
-    if (ready && active) void perform(reload);
+    if (ready && active) void reloadOnActivation();
   },
 );
 watch(
@@ -144,22 +145,26 @@ const visible = computed(() =>
       .includes(query.value.toLowerCase()),
   ),
 );
+let activationRead: Promise<void | undefined> | undefined;
+function reloadOnActivation() {
+  return activationRead ??= perform(reload).finally(() => { activationRead = undefined; });
+}
 async function reload() {
   const jobs: Promise<unknown>[] = [
-    accountClient.listApiKeys().then((items) => {
-      boost.keys = items;
+    readForPage(() => accountClient.listApiKeys(), () => active).then((items) => {
+      if (items) boost.keys = items;
     }),
     loadUsage(),
     usageOverview.value?.reload() ?? Promise.resolve(),
   ];
   if (memberOwnershipEnabled.value)
     jobs.push(
-      Promise.all([
-        appClient.getAccountManagerStatus(),
+      readForPage(() => Promise.all([
         appClient.listAppUsers(),
         appClient.listApiKeyOwners(),
-      ]).then(([status, nextUsers, owners]) => {
-        distributionEnabled.value = status.distributionEnabled;
+      ]), () => active).then((result) => {
+        if (!result) return;
+        const [nextUsers, owners] = result;
         users.value = nextUsers;
         keyOwners.value = owners;
       }),

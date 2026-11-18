@@ -181,7 +181,7 @@
     font-weight: var(--fw-medium);
   }
   .message-markdown {
-    font-size: var(--fs-xl);
+    font-size: var(--chat-text-size, var(--fs-lg));
     line-height: var(--lh-prose);
     user-select: text;
     -webkit-user-select: text;

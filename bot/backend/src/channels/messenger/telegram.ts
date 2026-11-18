@@ -2,6 +2,7 @@ import path from "node:path";
 import { logger } from "../../log.js";
 import { toTelegramHtml } from "./format.js";
 import { PlatformError, fetchFile, readForUpload, type MessengerFile, type MessengerMessage, type MessengerTransport, type StateFn } from "./transport.js";
+import { VOICE_BYTES } from "../../core/local-voice.js";
 
 const log = logger("telegram");
 /** 官方上限 4096（按解析后的文字算），留点余量 */
@@ -15,12 +16,12 @@ const POLL_SECONDS = 30;
 const BACKOFF_MS = [2000, 5000, 15_000, 30_000];
 
 /** getUpdates 的一条消息 → 归一化。不是消息、没有发送者时返回 undefined */
-export function telegramMessage(u: any, download: (fileId: string) => Promise<Buffer>): MessengerMessage | undefined {
+export function telegramMessage(u: any, download: (fileId: string, maxBytes?: number) => Promise<Buffer>): MessengerMessage | undefined {
   const m = u?.message;
   if (!m?.chat || !m.from || m.from.is_bot) return undefined;
   const files: MessengerFile[] = [];
   const file = (type: MessengerFile["type"], fileId: string | undefined, name?: string) => {
-    if (fileId) files.push({ type, ...(name ? { name } : {}), download: () => download(fileId) });
+    if (fileId) files.push({ type, ...(name ? { name } : {}), download: () => download(fileId, type === "voice" ? VOICE_BYTES : undefined) });
   };
   // 照片有好几种尺寸，最后一个最大
   if (Array.isArray(m.photo) && m.photo.length) file("image", m.photo.at(-1).file_id);
@@ -121,7 +122,7 @@ export class TelegramTransport implements MessengerTransport {
         onState("connected");
         for (const u of updates) {
           offset = Math.max(offset, Number(u.update_id) + 1);
-          const m = telegramMessage(u, (id) => this.download(id));
+          const m = telegramMessage(u, (id, maxBytes) => this.download(id, maxBytes));
           if (m) onMessage(m);
         }
         if (updates.length) this.o.offset?.set(offset);
@@ -139,9 +140,9 @@ export class TelegramTransport implements MessengerTransport {
     }
   }
 
-  private async download(fileId: string): Promise<Buffer> {
+  private async download(fileId: string, maxBytes = MAX_DOWNLOAD): Promise<Buffer> {
     const f = await this.call("getFile", { file_id: fileId });
-    return (await fetchFile(this.fetch, `${this.base}/file/bot${this.token}/${f.file_path}`, {}, MAX_DOWNLOAD)).buffer;
+    return (await fetchFile(this.fetch, `${this.base}/file/bot${this.token}/${f.file_path}`, {}, maxBytes)).buffer;
   }
 
   /** 发 HTML；转出来的格式 Telegram 不认（标签嵌套不对之类）就发原文 */

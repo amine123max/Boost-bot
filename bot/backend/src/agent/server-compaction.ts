@@ -61,6 +61,7 @@ export interface ServerCompactionOptions {
   limits(model: string): Promise<{ window: number; maxTokens: number }>;
   /** 一次压缩结束（成功或失败）；session 是 DSH 会话 id（不知道时为空） */
   onEvent?(e: CompactionEvent): void;
+  skipSession?(id: string): boolean;
   fetchImpl?: typeof fetch;
   now?(): number;
 }
@@ -475,7 +476,7 @@ export class ServerCompaction {
     if (st.usage && st.usage.mapping === (mapping?.id ?? "")) tokens = Math.max(tokens, st.usage.tokens);
     const growing = !!st.last && st.last.model === model && rest.length > st.last.len && hashes[st.last.len] === st.last.hash;
     st.last = { len: rest.length, hash: hashes[rest.length], model };
-    if (ep) {
+    if (ep && (!session || !this.o.skipSession?.(session))) {
       try {
         this.consider({ st, key, session, model, ep, fp, verdict, tokens, est, growing, input, lead, tools: j.tools, instructions: j.instructions, k: rest.length, hash: hashes[rest.length] });
       } catch (e) {

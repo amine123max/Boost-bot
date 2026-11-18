@@ -281,6 +281,7 @@ fn build_front_proxy_app(state: ProxyState) -> Router {
             any(crate::bot::model_sources::handle),
         )
         .route("/boost-bot/", any(crate::bot::http::proxy))
+        .route("/_boost/bot/host-activity", get(crate::bot::model_sources::handle_host_activity))
         .route("/boost-bot/{*path}", any(crate::bot::http::proxy))
         .route("/rpc", post(crate::http::rpc_endpoint::handle_rpc_http))
         .route(

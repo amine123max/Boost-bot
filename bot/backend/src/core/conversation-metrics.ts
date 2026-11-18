@@ -1,5 +1,6 @@
 import type { Store, Bot } from "../store/db.js";
 import type { ActivityStep } from "../agent/activity.js";
+import { displayModel } from "../account/newapi-types.js";
 
 /** Text-only estimate; tool schemas, images and hidden agent context are unknown. */
 export function estimateTextTokens(text: string): number {
@@ -33,7 +34,9 @@ export function conversationMetrics(
     for (const raw of store.getActivity(conversationId, message.id)) {
       const step = raw as Partial<ActivityStep>;
       // Historical model aliases remain separate; never charge another model to this one.
-      if (!step || step.kind !== "model" || step.title !== model) continue;
+      if (!step || step.kind !== "model" || (step.modelKey
+        ? step.modelKey !== model
+        : step.title !== model && step.title !== displayModel(model))) continue;
       const input = step.tokens?.input,
         output = step.tokens?.output;
       if (!count(input) && !count(output)) continue;
@@ -61,6 +64,9 @@ export function conversationMetrics(
       outputComplete: requests > 0 && outputSamples === requests,
     },
     context: {
+      archives: store.listSegments(conversationId, 12).map(({id, reason, handoff, endedAt}) => ({
+        id, kind: reason.startsWith("compaction:") ? "compaction" : "segment", summary: handoff, endedAt,
+      })),
       usedTokens: lastInput === null ? null : lastInput + (lastOutput || 0),
       measuredAt,
       basis:

@@ -7,6 +7,7 @@ import { AgentBridge } from "./bridge.js";
 import path from "node:path";
 import { AgentHost, TurnStopped, callDetail, modelLimits, type ModelApiInfo, type TurnImage, type TurnInput, type TurnObserver, type TurnResult, type TurnUsage } from "./host.js";
 import { ServerCompaction, type CompactEndpoint, type CompactionEvent } from "./server-compaction.js";
+import { pluginAllowed } from './local-plugins.js';
 import { ActivityLog, promotedJob, type ActivityStep } from "./activity.js";
 import type { TaskProgress } from "./progress.js";
 import { ApiFallbacks, type ApiFallback } from "./api-fallback.js";
@@ -193,6 +194,10 @@ export class AgentManager {
           endpoint: (model) => sc.endpoint(model),
           listed: (model) => sc.listed(model),
           limits: async (model) => modelLimits(model, await o.contextWindow?.(model).catch(() => undefined)),
+          skipSession: session => {
+            const id = this.o.store.conversationForSession(session);
+            return !!id && this.o.store.getConversation(id)?.channel === "web";
+          },
           onEvent: (e) => this.onServerCompaction(e),
         })
       : undefined;
@@ -238,7 +243,19 @@ export class AgentManager {
         if (!t || !this.hosts.has(String(b?.botId ?? ""))) return { error: "background tasks are not available" };
         if (route === "report") return t.report(b);
         if (route === "settled") return t.settled(b);
-        if (route === "tool") return t.chatTool(b);
+        if (route === "tool") {
+          if (b?.op === "plugin-policy") {
+            const botId = String(b.botId ?? ""), bot = this.o.store.getBot(botId);
+            const conv = this.o.store.conversationForSession(String(b.sessionId ?? ""));
+            return { allowed: pluginAllowed(bot) && conv === `${botId}:web:console` &&
+              !!this.activeConvs.get(botId)?.has(conv) && !!bot?.settings.localPlugins.some(plugin => plugin.id === b.args?.plugin) };
+          }
+          if (b?.op === "inspect" || b?.op === "inspect-host") {
+            const id = this.o.store.conversationForSession(String(b?.sessionId ?? ""));
+            if (!id || !this.activeConvs.get(String(b?.botId ?? ""))?.has(id)) return { error: "Task inspection is only available in an active chat." };
+          }
+          return t.chatTool(b);
+        }
         if (route === "config") return t.sessionConfig(b);
         return { error: "unknown route" };
       },
@@ -624,7 +641,10 @@ export class AgentManager {
     const st = this.settings(botId);
     if (st.memory.enabled && st.memory.review && this.o.complete) this.scheduleReview(botId, conv, model);
     const lines = linesFor(usage.window, usage.maxTokens);
-    if (!st.steward.enabled || !this.o.complete || !shouldJudge(usage.tokens, lines, this.judgedAt.get(sessionId))) {
+    // Web chat relies on the engine's measured pressure/overflow recovery.
+    // A second model and idle-time compaction used to delay the next queued turn.
+    if (this.o.store.getConversation(conv)?.channel === "web" ||
+        !st.steward.enabled || !this.o.complete || !shouldJudge(usage.tokens, lines, this.judgedAt.get(sessionId))) {
       d.resolve(false);
       return;
     }

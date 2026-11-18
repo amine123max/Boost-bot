@@ -34,7 +34,7 @@ export type Part =
       /** 来自被引用的消息 */
       quoted?: boolean;
     }
-  | { type: "voice"; ref?: string; transcript?: string }
+  | { type: "voice"; ref?: string; transcript?: string; data?: Buffer }
   | { type: "quote"; text: string };
 
 export interface InboundEvent {

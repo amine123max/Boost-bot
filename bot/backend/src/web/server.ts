@@ -5,6 +5,7 @@ import { cachedMemoryTitle, generateMemoryTitles } from './memory-titles.js';
 import { generateTaskTitles } from './task-titles.js';
 import { createPanelTask, rememberPanelEntry, PanelActionError } from './panel-actions.js';
 import { memberRequestAllowed } from "../boost-permissions.js";
+import { localPlugins } from '../agent/local-plugins.js';
 import { conversationMetrics } from "../core/conversation-metrics.js";
 import { workspaceRoot } from "../core/workspace-storage.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../../shared/context-window.js";
@@ -258,13 +259,18 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
     const convId = consoleConvId(botId);
     if (editingConversations.has(convId)) throw new HttpError(409, '会话正在更新，请稍后重试');
     const last = app.store.getConversation(convId) ? (app.store.listMessages(convId, 1).at(-1)?.id ?? 0) : 0;
-    return live.start(convId, botId, text, last);
+    const turn = live.start(convId, botId, text, last);
+    app.chatHarness.announce(convId);
+    return turn;
   }
   // 代理自己醒来的一轮（后台命令结束）：像一条进行中的消息那样登记（没有用户消息），界面接上就能看到；结束时移出登记
   app.runtime.registerReplier("*", "web", (conv) => {
     if (conv.id !== consoleConvId(conv.botId)) return undefined;
     const t = startLive(conv.botId, "");
-    return { out: t, done: () => live.end(t, "done", { conversationId: conv.id }) };
+    return { out: t, done: () => {
+      live.end(t, "done", { conversationId: conv.id });
+      app.chatHarness.announce(conv.id);
+    } };
   });
 
   /** 排进会话队列交给运行时；结束时先移出登记，再通知发消息的请求和所有接上的界面。不抛错 */
@@ -287,6 +293,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       log.warn("web chat failed", { message: err.message.slice(0, 300) });
       live.end(t, "error", { message: err.message });
     } else live.end(t, "done", { conversationId: t.conversationId });
+    app.chatHarness.announce(t.conversationId);
     const model = [...t.steps.values()].findLast(step => step.kind === 'model');
     return !err && (t.stopping || (model?.status !== 'error' && !t.text.startsWith('⚠️')));
   }
@@ -1333,7 +1340,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         if (m === "GET") {
           // 正在答的那一轮由 live 显示；它开始之后存下的回复先不列，免得重复
           const turn = groupTurns.get(groupId);
-          const messages = app.store.listGroupMessages(groupId).filter((x) => !(turn && x.conversationId === turn.conversationId && x.id > turn.afterMessageId));
+          const messages = app.store.listGroupMessages(groupId).filter((x) => x.backgroundNotice || !(turn && x.conversationId === turn.conversationId && x.id > turn.afterMessageId));
           return send(res, 200, {
             group: publicGroup(group),
             messages: messages.map(publicMessage),
@@ -1406,12 +1413,21 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       // 一条回复的代理活动记录（展开时才取）
       if (seg.length === 5 && seg[2] === "messages" && seg[4] === "activity" && m === "GET") {
         const steps = app.store.getActivity(decodeURIComponent(seg[1]), Number(seg[3]));
-        return send(res, 200, { steps: url.searchParams.get('summary') === '1' ? (steps as ActivityStep[]).map(publicActivity) : steps });
+        const admin = process.env.BOOST_BOT_HOSTED !== "1" || process.env.BOOST_BOT_ALLOW_TOOLS === "1";
+        if (url.searchParams.get('summary') !== '1' && admin) return send(res, 200, { steps });
+        const includeDiff = admin && url.searchParams.get('changes') === '1';
+        return send(res, 200, { steps: (steps as ActivityStep[]).map(step => {
+          const view = publicActivity(step);
+          if (includeDiff && view.fileChange && step.fileChange?.diff) view.fileChange.diff = step.fileChange.diff;
+          if (includeDiff && step.commandPreview) view.commandPreview = step.commandPreview;
+          if (includeDiff && step.shellOutput) view.shellOutput = step.shellOutput;
+          return view;
+        }) });
       }
       // 正在处理的回合：处理了多久、最近一次进展、到目前为止的步骤（信息面板轮询）
       if (seg.length === 3 && seg[2] === "turn" && m === "GET") {
         const t = app.agent.turnsInProgress.get(decodeURIComponent(seg[1]));
-        return send(res, 200, { turn: t ? { since: t.since, lastProgress: t.lastProgress, steps: t.activity.steps, interim: t.interim } : null });
+        return send(res, 200, { turn: t ? { since: t.since, lastProgress: t.lastProgress, steps: t.activity.steps.map(publicActivity), interim: t.interim } : null });
       }
       // 停止：网页消息（排队的也算）、纯对话、还在等代理启动的、代理回合，都在这里停
       if (seg.length === 3 && seg[2] === "stop" && m === "POST") {
@@ -1480,10 +1496,30 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         }
       }
       const sub = seg.slice(2).join("/");
+      if (sub === "host-activity" && m === "GET") {
+        try { return send(res,200,await app.modelSources.hostActivity(url.searchParams.get('name') || '')); }
+        catch { throw new HttpError(403,"本机监控需要连接 Boost 系统管理员会话。"); }
+      }
+      if (sub === "workspace-tools" && m === "GET") {
+        return send(res, 200, { voiceModel: app.runtime.voiceAvailable, computer: app.agent.computerUse(id),
+          localPlugins: bot.settings.localPlugins, permission: bot.settings.permission, computerEnabled: bot.settings.computerUse.enabled,
+          trustedBot: bot.origin !== 'catalog' });
+      }
       if (sub === "settings" && m === "GET") return send(res, 200, { settings: bot.settings, computerUse: app.agent.computerUse(id) });
       if (sub === "settings" && m === "PUT") {
         const b = await readJson(req);
+        if (bot.origin === "catalog" && b.computerUse?.enabled === true) {
+          throw new HttpError(403, "目录 Bot 不能启用电脑控制");
+        }
+        let plugins;
+        if (b.localPlugins !== undefined) {
+          if (bot.origin === 'catalog') throw new HttpError(403,'目录 Bot 不能接入自定义本机插件');
+          try { plugins = localPlugins(b.localPlugins); }
+          catch (error) { throw new HttpError(400,(error as Error).message); }
+          if (plugins.length && (b.permission ?? bot.settings.permission) !== 'full') throw new HttpError(403,'请先明确授权该 Bot 的完全访问权限');
+        }
         if (b.permission !== undefined && !["readonly", "workspace", "full"].includes(b.permission)) throw new HttpError(400, "执行权限无效");
+        if (b.permission === "full" && bot.settings.permission !== "full" && b.confirmFullAccess !== true) throw new HttpError(400, "请明确确认此 Bot 可使用宿主完全访问权限");
         if (b.reasoningEffort !== undefined && !REASONING_EFFORTS.includes(b.reasoningEffort)) throw new HttpError(400, "推理强度无效");
         if(bot.settings.modelSource!=='default'&&typeof b.utilityModel==='string'&&b.utilityModel&&!(await app.modelSources.models(bot.settings.modelSource)).includes(b.utilityModel))throw new HttpError(400,'辅助模型不在当前来源目录中');
         if (b.taskSlots !== undefined && (!Number.isInteger(b.taskSlots) || b.taskSlots < 1 || b.taskSlots > 8)) throw new HttpError(400, '后台并行任务数必须是 1–8 的整数');
@@ -1492,6 +1528,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         const cur = bot.settings;
         const merged = normalizeSettings({
           ...cur,
+          ...(plugins ? {localPlugins:plugins} : {}),
           ...(b.permission !== undefined ? { permission: b.permission } : {}),
           ...(b.reasoningEffort !== undefined ? { reasoningEffort: b.reasoningEffort } : {}),
           ...(b.utilityModel !== undefined ? { utilityModel: b.utilityModel } : {}),
@@ -1597,7 +1634,7 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
         return send(res, 200, {
           conversationId: consoleConvId(id),
           model: conv?.model ?? "",
-          messages: conv ? app.store.listMessages(conv.id, 200).filter((x) => x.role === 'user' || x.id <= cut).map(publicMessage) : [],
+          messages: conv ? app.store.listMessages(conv.id, 200).filter((x) => x.backgroundNotice || x.role === 'user' || x.id <= cut).map(publicMessage) : [],
           pending: app.store.listApprovals({ status: "pending", conversationId: consoleConvId(id), limit: 50 }).map((r) => publicApproval(r, app.store)),
           live: turns.map((t) => t.snapshot()),
           queued: consoleMessages.list(id),
@@ -1618,8 +1655,22 @@ export async function startWebServer(app: App, opts: { port?: number; host?: str
       // turn 不给就接正在处理的那条；已经结束了直接 done
       if (sub === "chat/live" && m === "GET") {
         const t = live.get(consoleConvId(id), url.searchParams.get("turn"));
-        const out = new SseReply(res, url.searchParams.get('format') === 'delta');
+        const format = url.searchParams.get('format');
+        const out = new SseReply(res, format === 'delta');
         if (!t) return out.end("done", { conversationId: consoleConvId(id), ended: true });
+        if (format === 'replay') {
+          t.flushText();
+          const replay = url.searchParams.get('turn') === t.id ? t.replay.after(url.searchParams.get('since')) : undefined;
+          if (!replay) out.send('snapshot', t.snapshot(), t.replay.sequence);
+          else for (const frame of replay) out.send(frame.event, frame.data, frame.seq);
+          out.send('ready', {});
+          const off = t.subscribeDelta(({event, data, seq}) => {
+            if (event === 'done' || event === 'error') out.end(event, data, seq);
+            else out.send(event, data, seq);
+          });
+          res.on('close', off);
+          return;
+        }
         out.send("snapshot", t.snapshot());
         const off = t.subscribe((e, d) => (e === "done" || e === "error" ? out.end(e, d) : out.send(e, d)));
         res.on("close", off);

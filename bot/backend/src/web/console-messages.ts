@@ -8,7 +8,7 @@ export class ConsoleMessageError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 interface Receipt { conversationId: string; turnId?: string; messageId?: number; reply?: string }
-interface Input { text?: unknown; requestId?: unknown; editMessageId?: unknown; expectedContent?: unknown }
+interface Input { text?: unknown; requestId?: unknown; editMessageId?: unknown; expectedContent?: unknown; expectedTurnId?: unknown }
 interface Options {
   app: App;
   live: LiveTurns;
@@ -53,7 +53,10 @@ export class ConsoleMessages {
   private save(botId: string, entries: QueuedMessage[]) {
     this.options.app.store.setKV(this.prefix + botId, JSON.stringify(entries));
     if (this.groups) this.groups.changed(botId);
-    else this.options.live.get(`${botId}:web:console`)?.emit('queue', {});
+    else {
+      const conversation = `${botId}:web:console`;
+      this.options.app.chatHarness.announce(conversation);
+    }
   }
   list(botId: string) {
     return this.entries(botId).filter(row => ['queued', 'guiding', 'failed'].includes(row.state))
@@ -136,7 +139,11 @@ export class ConsoleMessages {
     const entries = this.entries(botId), row = entries.find(item => item.id === id);
     if (!row || !['queued', 'failed'].includes(row.state)) throw new ConsoleMessageError(409, '该消息已开始处理或不在队列中');
     if (action === 'guide') {
-      if (row.state !== 'queued' || (!this.groups && !live.get(conv)) || row.text.startsWith('/')) throw new ConsoleMessageError(409, '当前消息不能用于引导');
+      const current = live.get(conv);
+      if (row.state !== 'queued' || (!this.groups && (!current || current.stopping ||
+          (input.expectedTurnId !== undefined && input.expectedTurnId !== current.id))) || row.text.startsWith('/')) {
+        throw new ConsoleMessageError(409, '当前回复已变化，消息仍在队列中');
+      }
       row.state = 'guiding';
       this.save(botId, entries);
       let guided = false, uncertain = false;

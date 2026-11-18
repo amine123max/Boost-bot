@@ -9,27 +9,47 @@ pub(super) struct OutputRate {
 }
 impl OutputRate {
     pub fn cumulative(&mut self, tokens: u64, at: i64) {
-        let Some((previous, since)) = self.baseline else { self.baseline = Some((tokens, at)); return; };
-        if at < since || tokens == previous { return; }
-        if tokens < previous { self.reset(); self.baseline = Some((tokens, at)); return; }
-        let waiting = self.wait_started.map(|start| (at - start.max(since)).max(0)).unwrap_or(0);
+        let Some((previous, since)) = self.baseline else {
+            self.baseline = Some((tokens, at));
+            return;
+        };
+        if at < since || tokens == previous {
+            return;
+        }
+        if tokens < previous {
+            self.reset();
+            self.baseline = Some((tokens, at));
+            return;
+        }
+        let waiting = self
+            .wait_started
+            .map(|start| (at - start.max(since)).max(0))
+            .unwrap_or(0);
         let elapsed = at - since - self.blocked_ms - waiting;
-        if elapsed < 250 { return; }
+        if elapsed < 250 {
+            return;
+        }
         if elapsed <= 120_000 {
             self.sample(tokens - previous, elapsed, at);
             self.kind = "counter";
         }
         self.baseline = Some((tokens, at));
         self.blocked_ms = 0;
-        if self.wait_started.is_some() { self.wait_started = Some(at); }
+        if self.wait_started.is_some() {
+            self.wait_started = Some(at);
+        }
     }
     fn sample(&mut self, tokens: u64, elapsed: i64, at: i64) {
         self.samples.retain(|(_, _, end)| at - end <= 30_000);
         self.samples.push((tokens, elapsed, at));
-        if self.samples.len() > 60 { self.samples.remove(0); }
+        if self.samples.len() > 60 {
+            self.samples.remove(0);
+        }
         let total: u64 = self.samples.iter().map(|sample| sample.0).sum();
         let duration: i64 = self.samples.iter().map(|sample| sample.1).sum();
-        if duration > 0 { self.latest = Some((total as f64 * 1000.0 / duration as f64, at)); }
+        if duration > 0 {
+            self.latest = Some((total as f64 * 1000.0 / duration as f64, at));
+        }
     }
     pub fn response(&mut self, tokens: u64, since: i64, at: i64) {
         let elapsed = at - since;
@@ -38,19 +58,32 @@ impl OutputRate {
             self.kind = "request";
         }
     }
-    pub fn has_baseline(&self) -> bool { self.baseline.is_some() }
-    pub fn waiting(&mut self, waiting: bool, at: i64) {
-        if waiting { self.wait_started.get_or_insert(at); }
-        else if let Some(start) = self.wait_started.take() { self.blocked_ms += (at - start).max(0); }
+    pub fn has_baseline(&self) -> bool {
+        self.baseline.is_some()
     }
-    pub fn sampled_at(&self) -> Option<i64> { self.latest.map(|(_, at)| at) }
+    pub fn waiting(&mut self, waiting: bool, at: i64) {
+        if waiting {
+            self.wait_started.get_or_insert(at);
+        } else if let Some(start) = self.wait_started.take() {
+            self.blocked_ms += (at - start).max(0);
+        }
+    }
+    pub fn sampled_at(&self) -> Option<i64> {
+        self.latest.map(|(_, at)| at)
+    }
     pub fn value(&self, now: i64) -> Option<f64> {
-        self.latest.filter(|(_, at)| (0..15_000).contains(&(now - at))).map(|(value, _)| value)
+        self.latest
+            .filter(|(_, at)| (0..15_000).contains(&(now - at)))
+            .map(|(value, _)| value)
     }
     pub fn retained(&self, now: i64) -> Option<f64> {
-        self.latest.filter(|(_, at)| (0..60_000).contains(&(now - at))).map(|(value, _)| value)
+        self.latest
+            .filter(|(_, at)| (0..60_000).contains(&(now - at)))
+            .map(|(value, _)| value)
     }
-    pub fn reset(&mut self) { *self = Self::default(); }
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 #[cfg(test)]
 mod tests {

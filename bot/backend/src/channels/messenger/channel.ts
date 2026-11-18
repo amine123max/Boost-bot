@@ -204,7 +204,8 @@ export function messengerParts(m: MessengerMessage, got?: Map<MessengerMessage["
   if (m.unsupported) parts.push({ type: "text", text: t("channel.unsupported_message", { type: m.unsupported }) });
   for (const f of m.files) {
     if (f.type === "voice") {
-      parts.push({ type: "voice" });
+      const voice = got?.get(f);
+      parts.push({ type: "voice", ...(Buffer.isBuffer(voice) ? {data:voice} : {}) });
       continue;
     }
     const base = { type: f.type, ...(f.name ? { name: f.name } : {}) };
@@ -337,7 +338,7 @@ export class MessengerChannel {
   private async download(m: MessengerMessage): Promise<Map<MessengerMessage["files"][number], Buffer | Error>> {
     const out = new Map<MessengerMessage["files"][number], Buffer | Error>();
     for (const f of m.files) {
-      if (f.type === "voice") continue;
+      if (f.type === "voice" && !this.runtime.voiceAvailable) continue;
       try {
         out.set(f, await f.download());
       } catch (e) {
