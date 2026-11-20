@@ -118,7 +118,7 @@ impl Storage {
     /// # 返回
     /// 返回函数执行结果
     pub fn find_api_key_by_hash(&self, key_hash: &str) -> Result<Option<ApiKey>> {
-        let mut stmt = self.conn.prepare(&format!(
+        let mut stmt = self.conn.prepare_cached(&format!(
             "{API_KEY_SELECT_SQL}
              WHERE k.key_hash = ?1
              LIMIT 1"

@@ -184,7 +184,7 @@ impl Storage {
     }
 
     pub fn list_enabled_model_price_rules(&self) -> Result<Vec<ModelPriceRule>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT
                 id, provider, model_pattern, match_type, billing_mode,
                 currency, unit, input_price_per_1m, cached_input_price_per_1m,

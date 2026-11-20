@@ -328,8 +328,9 @@ pub(crate) fn write_request_log_with_attempts(
         );
     }
     // 记录请求最终结果（而非内部重试明细），保证 UI 一次请求只展示一条记录。
-    let (request_log_id, token_stat_error) = match storage.insert_request_log_with_token_stat(
-        &RequestLog {
+    let (request_log_id, token_stat_error) = match super::request_settlement::persist(
+        storage,
+        RequestLog {
             trace_id: trace_context.trace_id.map(|v| v.to_string()),
             key_id: key_id.map(|v| v.to_string()),
             account_id: account_id.map(|v| v.to_string()),
@@ -373,7 +374,7 @@ pub(crate) fn write_request_log_with_attempts(
             error: error.map(|v| v.to_string()),
             created_at,
         },
-        &RequestTokenStat {
+        RequestTokenStat {
             request_log_id: 0,
             key_id: key_id.map(|v| v.to_string()),
             account_id: account_id.map(|v| v.to_string()),

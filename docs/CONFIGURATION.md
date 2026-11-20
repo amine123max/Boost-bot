@@ -21,10 +21,19 @@ Copy only the needed entries from [.env.example](../.env.example) into the execu
 | `BOOST_STORAGE_MAX_CONNECTIONS` | positive integer | `32` | No | Connection cap per database-path bucket |
 | `BOOST_STORAGE_MAX_IDLE_CONNECTIONS` | nonnegative integer | `16` | No | Idle storage connections |
 | `BOOST_STORAGE_ACQUIRE_TIMEOUT_MS` | integer, ms | `30000` | No | Pool acquisition deadline |
+| `BOOST_FRONT_PROXY_MAX_INFLIGHT` | integer, 1–4096 | `64` | No | Concurrent proxied HTTP requests, including open streams. Requires restart. |
 | `BOOST_BOT_ROOT` | path | Discovered prepared runtime | No | Bot runtime override |
 | `BOOST_BOT_NODE` | executable path | Bundled/discovered Node executable | No | Bot Node override |
 
 Bootstrap values must be available before storage opens. A key file takes precedence over system-credential metadata. Existing encrypted databases require their original key; setting encryption off does not decrypt them. Key files must have private Unix permissions; restrict Windows ACLs in the deployment. See [runtime loading](../backend/service/src/runtime/process_env.rs), [encryption](../backend/core/src/storage/encryption.rs), [storage pool](../backend/service/src/storage/storage_helpers.rs), [listeners](../backend/service/src/app_settings/service.rs) and [Bot discovery](../backend/service/src/bot/mod.rs).
+
+## Single-model concurrency
+
+The gateway settings accept global and per-model limits from 1 to 2,048. Existing settings and desktop defaults are preserved. To allow 1,000 in-flight requests to one model on a dedicated service, set **Per-model concurrency** to 1,000 and **Global concurrency** to at least 1,000. The admission gate reserves a quarter of storage connections for management, and open streams retain a worker and a storage connection.
+
+For the isolated SSE test, use `BOOST_STORAGE_MAX_CONNECTIONS=1400`, `BOOST_FRONT_PROXY_MAX_INFLIGHT=1200` and both `BOOST_HTTP_STREAM_WORKER_MIN` and `BOOST_HTTP_STREAM_WORKER_MAX` set to `1024`. For 1,000 simultaneous JSON requests, the regular worker settings (`BOOST_HTTP_WORKER_MIN` / `BOOST_HTTP_WORKER_MAX`) govern that workload instead. These service environment values take effect on restart. Size workers, connections, and the global QPS, burst and per-key RPM limits for the expected traffic and upstream quota. This profile can consume substantial memory and sockets.
+
+After building the release binaries, run `node scripts/probe-resource-limits.mjs --model-concurrency` for the isolated 1,000-stream check, or add `--json` to test concurrent non-streaming requests. Use `node scripts/probe-resource-limits.mjs --throughput --tuned --protocols --qps=2200 --assert-target` to check successful throughput and P95 completion time separately. The test uses a local mock upstream and does not measure a real model's latency.
 
 ## Advanced settings catalog
 

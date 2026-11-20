@@ -769,7 +769,6 @@ pub(super) fn reload_from_env() {
 /// # 返回
 /// 返回函数执行结果
 pub(crate) fn next_trace_id() -> String {
-    trace_writer().reset_path(trace_file_path_from_env());
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|v| v.as_millis())

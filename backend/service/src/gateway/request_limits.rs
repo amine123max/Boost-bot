@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 pub(crate) const SETTINGS_KEY: &str = "gateway.resource_limits.v1";
 const MAX_RATE_KEYS: usize = 4096;
+const MAX_CONFIGURED_INFLIGHT: usize = 2048;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
@@ -38,8 +39,8 @@ impl ResourceLimits {
         if self.global_qps > 100_000
             || !(1..=100_000).contains(&self.burst)
             || self.key_rpm > 1_000_000
-            || !(1..=512).contains(&self.max_inflight)
-            || !(1..=512).contains(&self.model_max_inflight)
+            || !(1..=MAX_CONFIGURED_INFLIGHT).contains(&self.max_inflight)
+            || !(1..=MAX_CONFIGURED_INFLIGHT).contains(&self.model_max_inflight)
             || !(1024..=256 * 1024 * 1024).contains(&self.max_request_body_bytes)
             || self.buffered_body_budget_bytes < self.max_request_body_bytes
             || self.buffered_body_budget_bytes > 1024 * 1024 * 1024

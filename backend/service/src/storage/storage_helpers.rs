@@ -368,6 +368,13 @@ fn open_storage_at_path(path: &str) -> Option<StorageHandle> {
     acquire_storage_from_pool(path).map(|storage| StorageHandle::new(path.to_string(), storage))
 }
 
+/// Settlement callers already hold a connection. The batch writer must never
+/// wait for their connections to be returned before it can acknowledge them.
+pub(crate) fn try_open_settlement_storage(path: &str) -> Option<StorageHandle> {
+    acquire_storage_with_wait(path, None)
+        .map(|storage| StorageHandle::new(path.to_string(), storage))
+}
+
 fn open_fresh_storage(path: &str) -> Option<Storage> {
     if !Path::new(&path).exists() {
         log::warn!("storage path missing: {}", path);
@@ -385,9 +392,12 @@ fn open_fresh_storage(path: &str) -> Option<Storage> {
 }
 
 fn acquire_storage_from_pool(path: &str) -> Option<Storage> {
+    acquire_storage_with_wait(path, Some(storage_acquire_timeout()))
+}
+
+fn acquire_storage_with_wait(path: &str, wait: Option<Duration>) -> Option<Storage> {
     let pool = storage_pool();
     let max_connections = storage_max_connections();
-    let timeout = storage_acquire_timeout();
     let started_at = Instant::now();
     let mut state = lock_storage_pool_state(pool);
 
@@ -406,6 +416,7 @@ fn acquire_storage_from_pool(path: &str) -> Option<Storage> {
             return storage;
         }
 
+        let timeout = wait?;
         let elapsed = started_at.elapsed();
         if elapsed >= timeout {
             log::error!(

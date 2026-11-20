@@ -267,7 +267,7 @@ impl Storage {
         source_id: &str,
     ) -> Result<Option<ModelSourceMapping>> {
         self.conn
-            .query_row(
+            .prepare_cached(
                 "SELECT id, platform_model_slug, source_kind, source_id, upstream_model,
                         enabled, priority, weight, billing_model_slug, created_at, updated_at
                  FROM model_source_mappings
@@ -277,6 +277,8 @@ impl Storage {
                    AND enabled = 1
                  ORDER BY priority DESC, weight DESC, upstream_model ASC
                  LIMIT 1",
+            )?
+            .query_row(
                 params![
                     normalize_text(platform_model_slug),
                     normalize_text(source_kind),

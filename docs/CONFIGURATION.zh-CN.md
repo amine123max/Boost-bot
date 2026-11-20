@@ -21,10 +21,19 @@ Rust 进程在可执行文件目录依次查找 `boost.env`、`Boost.env`、`.en
 | `BOOST_STORAGE_MAX_CONNECTIONS` | 正整数 | `32` | 否 | 每数据库路径分桶的连接上限 |
 | `BOOST_STORAGE_MAX_IDLE_CONNECTIONS` | 非负整数 | `16` | 否 | 空闲连接上限 |
 | `BOOST_STORAGE_ACQUIRE_TIMEOUT_MS` | 毫秒 | `30000` | 否 | 获取连接期限 |
+| `BOOST_FRONT_PROXY_MAX_INFLIGHT` | 整数，1–4096 | `64` | 否 | 入口代理同时处理的 HTTP 请求数，包含未结束的流；重启生效。 |
 | `BOOST_BOT_ROOT` | 路径 | 自动发现已准备运行时 | 否 | Bot 运行目录 |
 | `BOOST_BOT_NODE` | 可执行文件路径 | 内置/自动发现 Node | 否 | Bot Node 路径 |
 
 启动参数须在打开存储前提供。显式密钥文件优先于系统凭据元数据；既有加密库必须使用原密钥，设置 off 不会解密。Unix 密钥文件权限必须私有，Windows 部署需限制 ACL。依据：[加载](../backend/service/src/runtime/process_env.rs)、[加密](../backend/core/src/storage/encryption.rs)、[连接池](../backend/service/src/storage/storage_helpers.rs)、[监听](../backend/service/src/app_settings/service.rs)、[Bot 发现](../backend/service/src/bot/mod.rs)。
+
+## 单模型并发
+
+网关设置中的全局并发和每模型并发均支持 1–2,048，保留既有设置与桌面默认值。在专用服务上启用单模型 1,000 并发时，将**每模型并发**设为 1,000，**全局并发**设为至少 1,000。网关会为管理操作预留四分之一的数据库连接；未结束的流会占用一个工作线程和一个数据库连接。
+
+隔离 SSE 验证使用 `BOOST_STORAGE_MAX_CONNECTIONS=1400`、`BOOST_FRONT_PROXY_MAX_INFLIGHT=1200`，并将 `BOOST_HTTP_STREAM_WORKER_MIN` 和 `BOOST_HTTP_STREAM_WORKER_MAX` 都设为 `1024`。若需承载 1,000 条同时运行的 JSON 请求，则需要调整普通工作线程设置（`BOOST_HTTP_WORKER_MIN` / `BOOST_HTTP_WORKER_MAX`）。这些服务环境变量在重启后生效。根据流量和上游额度配置线程、连接数，以及全局 QPS、突发上限和每密钥 RPM。此配置可能消耗较多内存和套接字。
+
+编译 release 程序后，运行 `node scripts/probe-resource-limits.mjs --model-concurrency` 检查 1,000 条同模型流是否能保持并发；加上 `--json` 可测试非流式请求。单独运行 `node scripts/probe-resource-limits.mjs --throughput --tuned --protocols --qps=2200 --assert-target`，验证成功请求吞吐量和 P95 完成耗时。探针使用本机模拟上游，无法衡量真实模型的生成耗时。
 
 ## 高级设置目录
 

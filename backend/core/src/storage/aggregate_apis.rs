@@ -393,7 +393,7 @@ impl Storage {
     /// # 返回
     /// 返回函数执行结果
     pub fn find_aggregate_api_secret_by_id(&self, api_id: &str) -> Result<Option<String>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT secret_value FROM aggregate_api_secrets WHERE aggregate_api_id = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query([api_id])?;

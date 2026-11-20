@@ -1,4 +1,4 @@
-use axum::body::Body;
+use axum::body::{to_bytes, Body, HttpBody};
 use axum::extract::State;
 use axum::http::{header, Request as HttpRequest, Response, StatusCode};
 use axum::routing::{any, get, post};
@@ -17,11 +17,18 @@ const DEFAULT_FRONT_PROXY_MAX_BLOCKING_THREADS: usize = 32;
 const DEFAULT_FRONT_PROXY_WORKER_THREADS: usize = 2;
 const ENV_FRONT_PROXY_MAX_BLOCKING_THREADS: &str = "BOOST_FRONT_PROXY_MAX_BLOCKING_THREADS";
 const ENV_FRONT_PROXY_WORKER_THREADS: &str = "BOOST_FRONT_PROXY_WORKER_THREADS";
-const FRONT_PROXY_MAX_INFLIGHT: usize = 64;
+const DEFAULT_FRONT_PROXY_MAX_INFLIGHT: usize = 64;
+const ENV_FRONT_PROXY_MAX_INFLIGHT: &str = "BOOST_FRONT_PROXY_MAX_INFLIGHT";
+// tiny_http reads fixed-length bodies up to this size before dispatch.
+const BACKEND_INLINE_BODY_BYTES: usize = 1024;
 
 fn proxy_admission() -> &'static Arc<Semaphore> {
     static LIMIT: OnceLock<Arc<Semaphore>> = OnceLock::new();
-    LIMIT.get_or_init(|| Arc::new(Semaphore::new(FRONT_PROXY_MAX_INFLIGHT)))
+    LIMIT.get_or_init(|| {
+        let capacity = env_usize_or(ENV_FRONT_PROXY_MAX_INFLIGHT, DEFAULT_FRONT_PROXY_MAX_INFLIGHT)
+            .clamp(1, 4096);
+        Arc::new(Semaphore::new(capacity))
+    })
 }
 
 #[derive(Clone)]
@@ -77,7 +84,11 @@ fn build_backend_base_url(backend_addr: &str) -> String {
 /// # 返回
 /// 返回函数执行结果
 fn build_local_backend_client() -> Result<Client, reqwest::Error> {
-    Client::builder().no_proxy().build()
+    Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .pool_idle_timeout(std::time::Duration::from_secs(10))
+        .build()
 }
 
 fn env_usize_or(name: &str, default: usize) -> usize {
@@ -169,36 +180,57 @@ async fn proxy_handler(
     }
 
     let outbound_headers = filter_request_headers(&parts.headers);
-    // Forward with backpressure instead of buffering every request twice.
-    // The backend reads a complete, budgeted body before any model side effect.
-    let body_stream = body.into_data_stream().scan(0usize, move |seen, chunk| {
-        let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e));
-        let result = chunk.and_then(|bytes| {
-            if bytes.len() > max_body_bytes.saturating_sub(*seen) {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "boost_request_body_limit_exceeded",
-                ));
-            }
-            *seen += bytes.len();
-            Ok(bytes)
+    let mut builder = state
+        .client
+        .request(parts.method, target_url.as_str())
+        .headers(outbound_headers);
+    if body
+        .size_hint()
+        .exact()
+        .is_some_and(|len| len <= BACKEND_INLINE_BODY_BYTES.min(max_body_bytes) as u64)
+    {
+        // Fixed framing lets the backend reject a request without leaving
+        // unread chunk framing on a reused connection.
+        let bytes = match to_bytes(body, BACKEND_INLINE_BODY_BYTES.min(max_body_bytes)).await {
+            Ok(bytes) => bytes,
+            Err(_) => return text_error_response(StatusCode::BAD_REQUEST, "invalid request body"),
+        };
+        if !bytes.is_empty() {
+            builder = builder.body(bytes);
+        }
+    } else {
+        // An early backend rejection can leave an unfinished streamed body.
+        // Limit this connection to one request so the next one starts clean.
+        builder = builder.header(header::CONNECTION, "close");
+        // Forward with backpressure instead of buffering every request twice.
+        // The backend reads a complete, budgeted body before any model side effect.
+        let body_stream = body.into_data_stream().scan(0usize, move |seen, chunk| {
+            let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e));
+            let result = chunk.and_then(|bytes| {
+                if bytes.len() > max_body_bytes.saturating_sub(*seen) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "boost_request_body_limit_exceeded",
+                    ));
+                }
+                *seen += bytes.len();
+                Ok(bytes)
+            });
+            futures_util::future::ready(Some(result))
         });
-        futures_util::future::ready(Some(result))
-    });
 
-    let mut builder = state.client.request(parts.method, target_url.as_str());
-    builder = builder.headers(outbound_headers);
-    builder = builder.body(reqwest::Body::wrap_stream(body_stream));
+        builder = builder.body(reqwest::Body::wrap_stream(body_stream));
+    }
 
     let upstream = match builder.send().await {
         Ok(response) => response,
         Err(err) => {
             let mut cause: Option<&(dyn std::error::Error + 'static)> = Some(&err);
             let mut oversized = false;
+            let mut transport_cause = String::new();
             while let Some(error) = cause {
-                oversized |= error
-                    .to_string()
-                    .contains("boost_request_body_limit_exceeded");
+                transport_cause = error.to_string();
+                oversized |= transport_cause.contains("boost_request_body_limit_exceeded");
                 cause = error.source();
             }
             if oversized {
@@ -211,6 +243,7 @@ async fn proxy_handler(
                 "后端代理请求失败",
                 format!("backend proxy error: {err}"),
             );
+            log::debug!("loopback proxy transport cause: {transport_cause}");
             log_proxy_error(
                 StatusCode::BAD_GATEWAY,
                 target_url.as_str(),

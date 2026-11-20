@@ -39,7 +39,7 @@ impl Storage {
     /// # 返回
     /// 返回函数执行结果
     pub fn get_app_setting(&self, key: &str) -> rusqlite::Result<Option<String>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT value
              FROM app_settings
              WHERE key = ?1

@@ -34,26 +34,30 @@ pub(crate) fn handle_gateway_request(mut request: Request) -> Result<(), String>
         {
             Ok(v) => v,
             Err(err) => {
-                super::trace_log::log_request_start(
-                    trace_id.as_str(),
-                    "-",
-                    request_method_for_log.as_str(),
-                    request_path_for_log.as_str(),
-                    None,
-                    None,
-                    None,
-                    false,
-                    "http",
-                    "-",
-                );
-                super::trace_log::log_request_final(
-                    trace_id.as_str(),
-                    err.status_code,
-                    None,
-                    None,
-                    Some(err.message.as_str()),
-                    0,
-                );
+                // Admission rejections are counted below and never persisted.
+                // Do not leave their pending traces in memory under sustained overload.
+                if err.retry_after.is_none() {
+                    super::trace_log::log_request_start(
+                        trace_id.as_str(),
+                        "-",
+                        request_method_for_log.as_str(),
+                        request_path_for_log.as_str(),
+                        None,
+                        None,
+                        None,
+                        false,
+                        "http",
+                        "-",
+                    );
+                    super::trace_log::log_request_final(
+                        trace_id.as_str(),
+                        err.status_code,
+                        None,
+                        None,
+                        Some(err.message.as_str()),
+                        0,
+                    );
+                }
                 super::record_gateway_request_outcome(
                     request_path_for_log.as_str(),
                     err.status_code,

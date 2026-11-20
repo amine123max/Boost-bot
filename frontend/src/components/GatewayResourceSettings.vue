@@ -18,8 +18,8 @@ const fields = computed(() => [
   { key: "globalQps", label: english.value ? "Global QPS" : "全局 QPS", hint: english.value ? "Requests per second for this process. 0 disables this rate limit." : "当前进程每秒请求数；0 关闭此速率限制。", min: 0, max: 100000 },
   { key: "burst", label: english.value ? "Burst requests" : "突发请求数", hint: english.value ? "Maximum token-bucket burst capacity." : "令牌桶允许的最大突发请求数。", min: 1, max: 100000 },
   { key: "keyRpm", label: english.value ? "Per-key RPM" : "每密钥 RPM", hint: english.value ? "Requests per minute per API key. 0 disables this rate limit." : "每个 API 密钥每分钟请求数；0 关闭此速率限制。", min: 0, max: 1000000 },
-  { key: "maxInflight", label: english.value ? "Global concurrency" : "全局并发", hint: english.value ? "Includes active streams; effective capacity also reserves storage connections for management." : "包含尚未结束的流式请求；实际名额同时受存储连接预留约束。", min: 1, max: 512 },
-  { key: "modelMaxInflight", label: english.value ? "Per-model concurrency" : "每模型并发", hint: english.value ? "Concurrent requests per model, subject to the global cap." : "每个模型同时处理的请求数，同时受全局并发上限约束。", min: 1, max: 512 },
+  { key: "maxInflight", label: english.value ? "Global concurrency" : "全局并发", hint: english.value ? "Includes active streams. Actual capacity also depends on the proxy, HTTP workers, and available database connections." : "包含尚未结束的流式请求；实际容量还取决于入口代理、HTTP 工作线程和可用的数据库连接。", min: 1, max: 2048 },
+  { key: "modelMaxInflight", label: english.value ? "Per-model concurrency" : "每模型并发", hint: english.value ? "Concurrent requests per model, subject to the global cap." : "每个模型同时处理的请求数，同时受全局并发上限约束。", min: 1, max: 2048 },
   { key: "maxRequestBodyBytes", label: english.value ? "Request body limit" : "请求体上限", hint: english.value ? "Bytes per request; 1 MiB = 1,048,576 bytes." : "单请求字节数；1 MiB = 1,048,576 字节。", min: 1024, max: 268435456 },
   { key: "bufferedBodyBudgetBytes", label: english.value ? "Body buffer budget" : "缓冲预算", hint: english.value ? "Total reserved request-body bytes for this process." : "当前进程请求体缓冲预留的总字节数。", min: 1024, max: 1073741824 },
 ] as const);

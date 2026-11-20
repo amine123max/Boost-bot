@@ -393,8 +393,17 @@ fn should_bypass_queue(path: &str) -> bool {
 /// # 返回
 /// 返回函数执行结果
 pub(crate) fn start_backend_server() -> io::Result<BackendServer> {
-    let server =
-        Server::http("127.0.0.1:0").map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+    // std's listener backlog can be smaller than the configured proxy admission
+    // on Windows. Keep the TCP accept queue independent of the bounded work queue.
+    let socket = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::STREAM, None)?;
+    // Avoid delayed ACK/Nagle interactions for small responses on the local hop.
+    // Some TCP stacks don't accept this option on a listener.
+    let _ = socket.set_tcp_nodelay(true);
+    socket.bind(&std::net::SocketAddr::from(([127, 0, 0, 1], 0)).into())?;
+    socket.listen(4096)?;
+    let listener: std::net::TcpListener = socket.into();
+    let server = Server::from_listener(listener, None)
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
     let addr = server
         .server_addr()
         .to_ip()

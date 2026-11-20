@@ -34,14 +34,13 @@ impl Storage {
 
     pub fn find_api_key_quota_limit(&self, key_id: &str) -> Result<Option<i64>> {
         self.conn
-            .query_row(
+            .prepare_cached(
                 "SELECT quota_limit_tokens
                  FROM api_key_quota_limits
                  WHERE key_id = ?1
                  LIMIT 1",
-                [key_id],
-                |row| row.get(0),
-            )
+            )?
+            .query_row([key_id], |row| row.get(0))
             .optional()
     }
 

@@ -107,6 +107,8 @@ mod request_helpers;
 pub(crate) mod request_limits;
 #[path = "observability/request_log.rs"]
 mod request_log;
+#[path = "observability/request_settlement.rs"]
+mod request_settlement;
 #[path = "request/request_rewrite.rs"]
 mod request_rewrite;
 #[path = "routing/route_hint.rs"]

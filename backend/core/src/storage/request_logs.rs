@@ -5,6 +5,37 @@ mod settlement_tests {
     use super::*;
 
     #[test]
+    fn a_failed_batch_rolls_back_every_row_and_retries_deduplicate() {
+        let db = Storage::open_in_memory().unwrap();
+        db.init().unwrap();
+        let log = |trace: &str| RequestLog {
+            trace_id: Some(trace.into()),
+            request_path: "/v1/responses".into(),
+            method: "POST".into(),
+            created_at: 100,
+            ..Default::default()
+        };
+        let first = log("first");
+        let second = log("second");
+        let good = RequestTokenStat { total_tokens: Some(42), ..Default::default() };
+        let bad = RequestTokenStat { total_tokens: Some(99), ..Default::default() };
+        db.conn.execute_batch(
+            "CREATE TRIGGER fail_second_usage BEFORE INSERT ON request_token_stats
+             WHEN NEW.total_tokens = 99
+             BEGIN SELECT RAISE(ABORT, 'injected failure'); END;",
+        ).unwrap();
+        assert!(db.insert_request_settlement_batch(&[(&first, &good), (&second, &bad)]).is_err());
+        let rows = [(&first, &good), (&second, &good)];
+        let ids = db.insert_request_settlement_batch(&rows).unwrap();
+        assert_ne!(ids[0], ids[1]);
+        assert_eq!(db.insert_request_settlement_batch(&rows).unwrap(), ids);
+        assert_eq!(
+            db.conn.query_row("SELECT SUM(total_tokens) FROM request_token_stats", [], |row| row.get::<_, i64>(0)).unwrap(),
+            84
+        );
+    }
+
+    #[test]
     fn repeated_finalize_has_one_usage_record_and_failed_usage_rolls_back_identity() {
         let db = Storage::open_in_memory().unwrap();
         db.init().unwrap();
@@ -94,6 +125,9 @@ fn request_log_retention_days() -> i64 {
 }
 
 impl Storage {
+    pub fn request_settlement_database_path(&self) -> Option<&str> {
+        self.conn.path().filter(|path| !path.is_empty())
+    }
     /// 函数 `ensure_request_logs_indexes`
     ///
     ///
@@ -212,6 +246,32 @@ impl Storage {
             &self.conn,
             rusqlite::TransactionBehavior::Immediate,
         )?;
+        let id = Self::insert_settlement(&tx, log, stat)?;
+        tx.commit()?;
+        Ok((id, None))
+    }
+
+    /// Persist a batch atomically. Callers may retry rows individually if the whole batch rolls back.
+    pub fn insert_request_settlement_batch(
+        &self,
+        rows: &[(&RequestLog, &RequestTokenStat)],
+    ) -> Result<Vec<i64>> {
+        let tx = rusqlite::Transaction::new_unchecked(
+            &self.conn,
+            rusqlite::TransactionBehavior::Immediate,
+        )?;
+        let ids = rows.iter()
+            .map(|(log, stat)| Self::insert_settlement(&tx, log, stat))
+            .collect::<Result<Vec<_>>>()?;
+        tx.commit()?;
+        Ok(ids)
+    }
+
+    fn insert_settlement(
+        tx: &rusqlite::Transaction<'_>,
+        log: &RequestLog,
+        stat: &RequestTokenStat,
+    ) -> Result<i64> {
         let settlement_key = log
             .trace_id
             .as_deref()
@@ -219,23 +279,21 @@ impl Storage {
             .map(|trace| format!("{}:{trace}", log.key_id.as_deref().unwrap_or("<none>")));
         if let Some(identity) = &settlement_key {
             if let Some(id) = tx
-                .query_row(
-                    "SELECT id FROM request_logs WHERE settlement_key = ?1",
-                    [identity],
-                    |row| row.get::<_, i64>(0),
-                )
+                .prepare_cached("SELECT id FROM request_logs WHERE settlement_key = ?1")?
+                .query_row([identity], |row| row.get::<_, i64>(0))
                 .optional()?
             {
-                return Ok((id, None));
+                return Ok(id);
             }
         }
-        tx.execute(
+        tx.prepare_cached(
             "INSERT INTO request_logs (
                 trace_id, key_id, account_id, initial_account_id, attempted_account_ids_json, initial_aggregate_api_id, attempted_aggregate_api_ids_json,
                 request_path, original_path, adapted_path,
-                method, request_type, gateway_mode, transparent_mode, enhanced_mode, model, upstream_model, actual_source_kind, actual_source_id, reasoning_effort, service_tier, effective_service_tier, response_adapter, upstream_url, aggregate_api_supplier_name, aggregate_api_url, status_code, duration_ms, first_response_ms, error, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31)",
-            params![
+                method, request_type, gateway_mode, transparent_mode, enhanced_mode, model, upstream_model, actual_source_kind, actual_source_id, reasoning_effort, service_tier, effective_service_tier, response_adapter, upstream_url, aggregate_api_supplier_name, aggregate_api_url, status_code, duration_ms, first_response_ms, error, created_at, settlement_key
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32)",
+        )?
+        .execute(params![
                 &log.trace_id,
                 &log.key_id,
                 &log.account_id,
@@ -267,38 +325,32 @@ impl Storage {
                 log.first_response_ms,
                 &log.error,
                 log.created_at,
-            ],
-        )?;
+                &settlement_key,
+            ])?;
         let request_log_id = tx.last_insert_rowid();
-        tx.execute(
-            "UPDATE request_logs SET settlement_key = ?1 WHERE id = ?2",
-            (&settlement_key, request_log_id),
-        )?;
 
         // A settlement identity must never commit without its corresponding usage.
-        let token_stat_error: Option<String> = None;
-        tx
-            .execute(
+        tx.prepare_cached(
                 "INSERT INTO request_token_stats (
                     request_log_id, key_id, account_id, model,
                     input_tokens, cached_input_tokens, output_tokens, total_tokens, reasoning_output_tokens,
                     estimated_cost_usd, created_at
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                (
-                    request_log_id,
-                    &stat.key_id,
-                    &stat.account_id,
-                    &stat.model,
-                    stat.input_tokens,
-                    stat.cached_input_tokens,
-                    stat.output_tokens,
-                    stat.total_tokens,
-                    stat.reasoning_output_tokens,
-                    stat.estimated_cost_usd,
-                    stat.created_at,
-                ),
-            )?;
-        if token_stat_error.is_none() {
+            )?
+            .execute((
+                request_log_id,
+                &stat.key_id,
+                &stat.account_id,
+                &stat.model,
+                stat.input_tokens,
+                stat.cached_input_tokens,
+                stat.output_tokens,
+                stat.total_tokens,
+                stat.reasoning_output_tokens,
+                stat.estimated_cost_usd,
+                stat.created_at,
+            ))?;
+        {
             if let Some(account_id) = stat
                 .account_id
                 .as_deref()
@@ -406,8 +458,7 @@ impl Storage {
             }
         }
 
-        tx.commit()?;
-        Ok((request_log_id, token_stat_error))
+        Ok(request_log_id)
     }
 
     /// 函数 `list_request_logs`

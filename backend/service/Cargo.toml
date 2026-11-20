@@ -16,6 +16,7 @@ sha2 = "0.10"
 ed25519-dalek = { version = "2.1", features = ["pkcs8"] }
 crypto_box = { version = "0.9", features = ["seal"] }
 tiny_http = "0.12"
+socket2 = "0.6"
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync"] }
 futures-util = "0.3"
