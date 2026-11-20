@@ -10,9 +10,11 @@ interface HostActivity {
   matchingProcesses:number;
 }
 interface Tools {voiceModel:boolean;computerEnabled:boolean;computer:{available:boolean;reason?:string};permission:string;localPlugins:Plugin[];trustedBot:boolean}
-const props = defineProps<{botId:string}>();
-const emit = defineEmits<{saved:[]}>();
+interface LocalAgents {providers:{provider:string;available:boolean}[];sessions:{peer:string;title:string;provider:string;updatedAt:number}[]}
+const props = defineProps<{botId:string;localPeer?:string}>();
+const emit = defineEmits<{saved:[];localChat:[peer:string]}>();
 const tools=ref<Tools>(), host=ref<HostActivity>(), error=ref(''), hostError=ref(''), busy=ref(false);
+const local=ref<LocalAgents>(), localError=ref(''), creating=ref(false);
 const name=ref(''), endpoint=ref(''), confirming=ref(false);
 const loading=ref(false), observing=ref(false), configError=ref('');
 let controller:AbortController|undefined;
@@ -32,11 +34,24 @@ async function observe(){
   controller?.abort();
   const request=new AbortController();controller=request;
   observing.value=true;
+  const discovery=api<LocalAgents>(`/bots/${enc(props.botId)}/local-agents`,{signal:request.signal})
+    .then(result=>{if(!request.signal.aborted){local.value=result;localError.value='';}})
+    .catch(e=>{if(!request.signal.aborted)localError.value=(e as Error).message;});
   try{
     const result=await api<HostActivity>(`/bots/${enc(props.botId)}/host-activity?name=%40agents`,{signal:request.signal});
     if(!request.signal.aborted){host.value=result;hostError.value='';}
   }catch(e){if(!request.signal.aborted)hostError.value=e instanceof ApiError && e.status===404 ? '当前服务尚未提供本机监控。' : (e as Error).message;}
-  finally{if(controller===request)observing.value=false;}
+  finally{await discovery;if(controller===request)observing.value=false;}
+}
+async function createSession(provider:string){
+  if(creating.value)return;
+  creating.value=true;localError.value='';
+  const id=props.botId;
+  try{
+    const result=await api<{peer:string}>(`/bots/${enc(id)}/local-agents`,{method:'POST',body:{provider}});
+    if(id===props.botId){emit('localChat',result.peer);void observe();}
+  }catch(e){if(id===props.botId)localError.value=(e as Error).message;}
+  finally{creating.value=false;}
 }
 async function save(body:Record<string,unknown>){
   if(busy.value)return;
@@ -56,7 +71,7 @@ async function add(){
   }
 }
 watch(()=>props.botId,()=>{
-  controller?.abort();tools.value=host.value=undefined;error.value=hostError.value='';confirming.value=false;void load();void observe();
+  controller?.abort();tools.value=host.value=local.value=undefined;error.value=hostError.value=localError.value='';confirming.value=false;void load();void observe();
 },{immediate:true});
 onBeforeUnmount(()=>controller?.abort());
 </script>
@@ -79,6 +94,8 @@ onBeforeUnmount(()=>controller?.abort());
     <section>
       <strong><Icon name="activity" :size="15" />本机任务与外部 Agent</strong>
       <div class="scan-row"><span role="status">{{ hostError || (!host ? '正在扫描本机进程与会话…' : '本机进程与近期会话') }}</span><button class="quiet-button" type="button" :disabled="observing" :aria-busy="observing" @click="observe">重新扫描</button></div>
+      <p v-if="localError" role="status">{{ localError }}</p>
+      <button v-if="localPeer" class="quiet-button" type="button" @click="emit('localChat','')">返回 Boost 对话</button>
         <ul class="providers">
           <li v-for="p in providers" :key="p.id">
             <details>
@@ -91,6 +108,15 @@ onBeforeUnmount(()=>controller?.abort());
                 </li>
               </ul>
               <p v-if="!processes(p.id).length && !activity(p.id)?.sessions?.length">没有可读取的近期会话或进程。</p>
+              <template v-if="local">
+                <button v-if="local.providers.some(row=>row.provider===p.id&&row.available)" class="quiet-button" type="button" :disabled="creating" @click="createSession(p.id)"><Icon name="plus" :size="14" />新建对话</button>
+                <p v-else>未检测到可启动的 CLI。</p>
+                <ul class="processes" v-if="local.sessions.some(row=>row.provider===p.id)">
+                  <li v-for="session in local.sessions.filter(row=>row.provider===p.id)" :key="session.peer">
+                    <button class="quiet-button" type="button" :aria-current="localPeer===session.peer?'page':undefined" @click="emit('localChat',session.peer)">{{ session.title }} · {{ new Date(session.updatedAt).toLocaleString() }}</button>
+                  </li>
+                </ul>
+              </template>
             </details>
           </li>
         </ul>

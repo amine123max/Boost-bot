@@ -29,6 +29,7 @@ export default defineComponent({
     models: { type: Array as PropType<string[]>, required: true },
     configure: Boolean,
     infoOpen: Boolean,
+    localSession: Boolean,
   },
   emits: ["edit", "collaborate", "menu", "info", "refresh"],
   setup(props, { emit }) {
@@ -46,8 +47,10 @@ export default defineComponent({
       const query = props.chat.draft.trim();
       if (props.group || commandsDismissed.value || !/^\/[a-z]*$/i.test(query)) return [];
       return [
-        ...(props.configure ? [{ command: '/task', label: '创建任务', description: '在本会话上方跟踪进展' }] : []),
-        { command: '/tasks', label: '列出任务', description: '查看当前智能体的任务' },
+        ...(props.localSession ? [{ command: '/new', label: '重置上下文', description: '下一条消息开启新的 CLI 会话' }] : [
+          ...(props.configure ? [{ command: '/task', label: '创建任务', description: '在本会话上方跟踪进展' }] : []),
+          { command: '/tasks', label: '列出任务', description: '查看当前智能体的任务' },
+        ]),
         { command: '/status', label: '查看状态', description: '显示当前会话状态' },
         { command: '/help', label: '查看帮助', description: '显示可用命令' },
       ].filter(item => item.command.startsWith(query.toLowerCase()));
@@ -351,7 +354,7 @@ export default defineComponent({
               }}{{ f.gone === true ? "（文件已移除）" : "" }}
             </button>
             </TurnTranscript>
-            <MessageBubble v-else :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="!group && m.role === 'user' && typeof m.id === 'number'" :edit-disabled="chat.submitting || chat.loading" :send-edit="text => chat.edit(m, text)" />
+            <MessageBubble v-else :text="m.content" :role="m.role" :created-at="m.createdAt" :editable="!group && !localSession && m.role === 'user' && typeof m.id === 'number'" :edit-disabled="chat.submitting || chat.loading" :send-edit="text => chat.edit(m, text)" />
           </div>
         </article>
         <template v-if="chat.live">
@@ -433,9 +436,9 @@ export default defineComponent({
             @click="$emit('collaborate')"
           >
             <Icon name="plus" /></button
-          ><BotPermissionControl v-if="bot && !group" :bot="bot" :configure="configure" :running="chat.running" @saved="$emit('refresh')" /><HelpTip
-            text="Enter 发送，Shift + Enter 换行。模型与账户由 Boost 统一管理。"
-          /><span class="grow" /><div v-if="!group" class="model-control"
+          ><BotPermissionControl v-if="bot && !group && !localSession" :bot="bot" :configure="configure" :running="chat.running" @saved="$emit('refresh')" /><HelpTip
+            :text="localSession ? 'Enter 发送，Shift + Enter 换行。本机 Agent 使用 CLI 的模型和账号设置。' : 'Enter 发送，Shift + Enter 换行。模型与账户由 Boost 统一管理。'"
+          /><span class="grow" /><span v-if="localSession" class="hint">{{ chat.localAgent ? ({ codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' })[chat.localAgent] : '本机 Agent' }}</span><div v-else-if="!group" class="model-control"
             ><ComposerModelMenu v-if="bot" :bot="bot" :chat="chat" :models="models" :configure="configure" @saved="$emit('refresh')" /></div
           ><span v-else class="hint">成员默认模型</span>
           <button

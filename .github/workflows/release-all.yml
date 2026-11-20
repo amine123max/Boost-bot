@@ -96,6 +96,8 @@ jobs:
           npm_config_python: ${{ steps.python.outputs.python-path }}
           BOOST_BOT_BUNDLE_VOICE: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: node scripts/prepare-boost-bot.mjs
+      - name: Verify local Bot Agent conversations
+        run: node scripts/probe-bot-local-agents.mjs
       - name: Verify desktop storage and updater regressions
         if: ${{ !inputs.portable_only }}
         run: |

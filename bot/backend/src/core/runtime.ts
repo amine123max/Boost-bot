@@ -9,6 +9,7 @@ import { eventText } from "./types.js";
 import { isPushChannel } from './types.js';
 import { acceptsImages, type ModelClient } from "../llm/client.js";
 import { TurnStopped, type TurnImage } from "../agent/host.js";
+import { clearLocalAgent, findLocalAgent, isLocalProvider, localAgentAllowed, localSelection, runLocalAgent, selectLocalAgent } from '../agent/local-cli.js';
 import { describeStep, fmtSecs, type ActivityStep } from "../agent/activity.js";
 import type { Store } from "../store/db.js";
 import { logger } from "../log.js";
@@ -264,6 +265,13 @@ export class BotRuntime {
   /** 应用退出前调用（App.stop）：之后失败的回合留下重启标记，由下次启动告诉用户 */
   shutdown(): void {
     this.closing = true;
+    for (const [id, runs] of this.inflight) {
+      if (!localSelection(this.opts.store, id)) continue;
+      for (const run of runs) {
+        run.interrupted = true;
+        run.abort.abort();
+      }
+    }
   }
 
   /**
@@ -481,11 +489,80 @@ export class BotRuntime {
     }
 
     if (text.startsWith("/")) {
-      const reply = await this.command(text, conv.id, conv.model, bot.defaultModel, bot.id);
+      const localCommand = /^\/agent(?:\s+(\S+))?$/i.exec(text);
+      if (localCommand) {
+        const owner = ev.conversation.kind === 'dm' && ev.channel !== 'web'
+          && this.opts.access?.owner(ev.account || bot.id, ev.channel)?.peerId === ev.conversation.id;
+        if (!owner || !localAgentAllowed(bot.origin) || process.env.BOOST_BOT_HOSTED === '1' && ev.channel === 'custom') {
+          await out.apply({ type: 'text', text: '本机 Agent 需要由已绑定的私聊主人操作。' });
+          return;
+        }
+        const choice = localCommand[1]?.toLowerCase();
+        if (choice === 'boost') {
+          clearLocalAgent(store, convId);
+          await out.apply({ type: 'text', text: '已切回 Boost 内置对话。' });
+        } else if (isLocalProvider(choice) && findLocalAgent(choice)) {
+          selectLocalAgent(store, convId, choice);
+          await out.apply({ type: 'text', text: `已为当前私聊开启 ${choice} 新会话。直接发送消息即可续聊。` });
+        } else {
+          await out.apply({ type: 'text', text: '用 /agent codex、/agent claude 或 /agent deepseek 开启本机新会话；/agent boost 切回。请先安装对应 CLI。' });
+        }
+        return;
+      }
+      const selected = localSelection(store, convId);
+      if (selected && /^\/new$/i.test(text)) {
+        if (!localAgentAllowed(bot.origin) || (ev.channel !== 'web' && (ev.conversation.kind !== 'dm'
+            || this.opts.access?.owner(ev.account || bot.id, ev.channel)?.peerId !== ev.conversation.id))) return;
+        selectLocalAgent(store, convId, selected.provider);
+        await out.apply({ type: 'text', text: '下一条消息将开启新的本机 Agent 会话，旧消息仍会保留。' });
+        return;
+      }
+      const reply = selected ? null : await this.command(text, conv.id, conv.model, bot.defaultModel, bot.id);
       if (reply !== null) {
         await out.apply({ type: "text", text: reply });
         return;
       }
+    }
+
+    const local = localSelection(store, convId);
+    if (local) {
+      const owner = ev.channel === 'web' || ev.conversation.kind === 'dm'
+        && this.opts.access?.owner(ev.account || bot.id, ev.channel)?.peerId === ev.conversation.id;
+      if (!owner || !localAgentAllowed(bot.origin)) {
+        await out.apply({ type: 'text', text: '⚠️ 本机 Agent 仅供此会话的授权操作者使用。' });
+        return;
+      }
+      const workspace = agent?.host(bot.id).workspace;
+      if (!workspace) {
+        await out.apply({ type: 'text', text: '⚠️ AGENT_UNAVAILABLE：当前服务未配置本机工作区。' });
+        return;
+      }
+      this.storeUser(run, convId, text);
+      run.userStored = true;
+      const said = new TurnSaid(out, ev.channel === 'web');
+      const step: ActivityStep = { id: crypto.randomUUID(), kind: 'model', title: local.provider, status: 'running', at: Date.now() };
+      await out.apply({ type: 'typing', on: true });
+      await out.apply({ type: 'stream.start' });
+      await out.apply({ type: 'activity', step: { ...step } });
+      try {
+        const result = await runLocalAgent({ ...local, store, conversationId: convId, workspace, text, signal, observer: said.observer });
+        const reply = said.reply(result.text, t('runtime.doneNoText'));
+        step.status = 'ok';
+        await out.apply({ type: 'activity', step: { ...step } });
+        store.addMessage(convId, 'assistant', reply.text, [step], { interim: reply.interim });
+        await out.apply({ type: 'stream.finish', text: reply.text });
+      } catch (error) {
+        if (this.closing) return;
+        const reply = signal.aborted ? stoppedText(Date.now() - run.since) : `⚠️ ${(error as Error).message}`;
+        step.status = 'error';
+        await out.apply({ type: 'activity', step: { ...step } });
+        store.addMessage(convId, 'assistant', reply, [step]);
+        await out.apply({ type: 'stream.finish', text: reply });
+      } finally {
+        await out.apply({ type: 'typing', on: false });
+      }
+      this.answered(convId, run);
+      return;
     }
 
     const model = await this.resolveModel(conv.model, bot.defaultModel, bot.id).catch(async (e: Error) => {
@@ -634,6 +711,11 @@ export class BotRuntime {
 
   /** /status 的内容：只读本地状态，立即返回 */
   statusText(botId: string, convId: string, convModel: string, botModel: string): string {
+    const local = localSelection(this.opts.store, convId);
+    if (local) {
+      const state = this.busySince(convId) ? '处理中' : local.session ? '可以续聊' : '等待首条消息';
+      return `${local.provider} · ${state}`;
+    }
     const m = convModel || botModel || this.opts.defaultModel() || t("runtime.autoModel");
     const a = this.opts.agent;
     const perm = a?.available ? a.settings(botId).permission : undefined;

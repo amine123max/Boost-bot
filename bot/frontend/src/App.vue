@@ -58,6 +58,7 @@ function readRoute(): Route {
         : "chat",
       id,
       openChat: new URLSearchParams(location.hash.split('?')[1] || '').get('chat') === '1',
+      localPeer: kind === 'chat' ? new URLSearchParams(location.hash.split('?')[1] || '').get('local') || undefined : undefined,
     };
   } catch {
     return { kind: "chat", id: "" };
@@ -178,6 +179,11 @@ function changedRoute() {
   route.value = readRoute();
   if (route.value.kind === 'settings') settingsBotId.value = new URLSearchParams(location.hash.split('?')[1] || '').get('bot') || settingsBotId.value;
   void loadPanel();
+}
+function openLocalChat(peer: string) {
+  if (!bot.value) return;
+  location.hash = '/chat/' + enc(bot.value.id) + (peer ? '?local=' + enc(peer) : '');
+  mobileOpen.value = false;
 }
 function openSettings(id?: string, section = 'agent') {
   if (section === 'channels') go('settings', 'channels');
@@ -626,6 +632,7 @@ onBeforeUnmount(() => {
           (route.kind === 'chat' && bot) || (route.kind === 'group' && group)
         "
         :chat="chat"
+        :local-session="!!route.localPeer"
         :bot="bot"
         :group="group"
         :bots="bots"
@@ -779,6 +786,8 @@ onBeforeUnmount(() => {
       :bots="bots"
       :configure="configure"
       :pending="chat.pending"
+      :local-peer="route.localPeer"
+      @local-chat="openLocalChat"
       @close="infoOpen = false"
       @edit="openSettings(bot.id)"
       @delete="deleteBot(bot)"

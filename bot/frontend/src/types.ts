@@ -122,6 +122,7 @@ export interface History {
   pending: Approval[];
   model?: string;
   conversationId?: string;
+  localAgent?: 'deepseek' | 'claude' | 'codex';
   live: LiveTurn | LiveTurn[] | null;
   group?: Group;
   queued?: QueuedMessage[];
@@ -172,6 +173,7 @@ export interface Route {
     | "conversation";
   id: string;
   openChat?: boolean;
+  localPeer?: string;
 }
 export interface StreamEvents {
   snapshot: LiveTurn;

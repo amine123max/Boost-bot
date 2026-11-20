@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { App } from '../app.js';
 import type { LiveTurn, LiveTurns } from './live.js';
 import { logger } from '../log.js';
+import { consoleConversation, splitConsoleScope } from './console-scope.js';
 const log = logger('web.message-queue');
 
 export class ConsoleMessageError extends Error {
@@ -44,7 +45,11 @@ export class ConsoleMessages {
   constructor(private options: Options, private groups?: GroupQueueOptions) {}
 
   private get prefix() { return this.groups ? PREFIX + 'group:' : PREFIX + 'bot:'; }
-  private exists(id: string) { return this.groups ? this.groups.exists(id) : !!this.options.app.store.getBot(id); }
+  private exists(id: string) {
+    if (this.groups) return this.groups.exists(id);
+    const [bot, peer] = splitConsoleScope(id);
+    return !!this.options.app.store.getBot(bot) && (peer === 'console' || !!this.options.app.store.getConversation(consoleConversation(id)));
+  }
 
   private entries(botId: string): QueuedMessage[] {
     const raw = this.options.app.store.getKV(this.prefix + botId);
@@ -54,7 +59,7 @@ export class ConsoleMessages {
     this.options.app.store.setKV(this.prefix + botId, JSON.stringify(entries));
     if (this.groups) this.groups.changed(botId);
     else {
-      const conversation = `${botId}:web:console`;
+      const conversation = consoleConversation(botId);
       this.options.app.chatHarness.announce(conversation);
     }
   }
@@ -92,7 +97,7 @@ export class ConsoleMessages {
   }
   private async drain(botId: string) {
     const { app, live, editing } = this.options;
-    const conv = `${botId}:web:console`;
+    const conv = consoleConversation(botId);
     while (!this.closed && this.exists(botId) && (this.groups || !editing.has(conv))) {
       if (this.groups) await this.groups.idle(botId);
       if (this.closed || !this.exists(botId)) return;
@@ -112,7 +117,8 @@ export class ConsoleMessages {
           const intercepted = this.options.intercept(botId, next.text);
           if (intercepted.handled) {
             if (intercepted.ack) {
-              app.store.ensureConversation(botId, 'web', 'console', '控制台');
+              const [bot, peer] = splitConsoleScope(botId);
+              app.store.ensureConversation(bot, 'web', peer, '控制台');
               app.store.addMessage(conv, 'user', next.text);
               app.store.addMessage(conv, 'assistant', intercepted.ack);
             }
@@ -135,7 +141,7 @@ export class ConsoleMessages {
 
   async change(botId: string, id: string, action: 'edit' | 'remove' | 'guide' | 'retry' | 'promote', input: Input) {
     const { app, live } = this.options;
-    const conv = `${botId}:web:console`;
+    const conv = consoleConversation(botId);
     const entries = this.entries(botId), row = entries.find(item => item.id === id);
     if (!row || !['queued', 'failed'].includes(row.state)) throw new ConsoleMessageError(409, '该消息已开始处理或不在队列中');
     if (action === 'guide') {
@@ -147,7 +153,7 @@ export class ConsoleMessages {
       row.state = 'guiding';
       this.save(botId, entries);
       let guided = false, uncertain = false;
-      try { guided = this.groups ? await this.groups.guide(botId, row.text) : await app.runtime.guideConversation(botId, conv, row.text); }
+      try { guided = this.groups ? await this.groups.guide(botId, row.text) : await app.runtime.guideConversation(splitConsoleScope(botId)[0], conv, row.text); }
       catch { uncertain = true; }
       finally {
         const current = this.entries(botId), updated = current.find(item => item.id === id);
@@ -196,7 +202,7 @@ export class ConsoleMessages {
     const key = `${botId}:${input.requestId}`;
     const hash = createHash('sha256').update(JSON.stringify([text, edit, input.expectedContent])).digest('hex');
     if (edit === undefined && (this.groups || text.toLowerCase() !== '/stop')) {
-      const conv = `${botId}:web:console`;
+      const conv = consoleConversation(botId);
       if (!this.groups && this.options.editing.has(conv)) throw new ConsoleMessageError(409, '会话正在更新，请稍后重试');
       const now = Date.now();
       const rows = this.entries(botId).filter(row => !['done', 'cancelled'].includes(row.state) || now - row.at < 10 * 60_000);
@@ -225,7 +231,7 @@ export class ConsoleMessages {
 
   private async accept(botId: string, text: string, edit?: number, expected?: string): Promise<Receipt> {
     const { app, live, editing } = this.options;
-    const conversationId = `${botId}:web:console`;
+    const conversationId = consoleConversation(botId);
     if (editing.has(conversationId)) throw new ConsoleMessageError(409, '会话正在更新，请稍后重试');
     if (edit !== undefined) {
       const original = app.store.getMessage(edit);

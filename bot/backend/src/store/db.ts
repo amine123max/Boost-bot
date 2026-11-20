@@ -787,6 +787,7 @@ export class Store {
       this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(String(c.id));
       this.deleteKV(`direct-context:${c.id}`);
       this.deleteKV(`conversation-titles:v1:${c.id}`);
+      this.deleteKV(`local-agent-session:${c.id}`);
     }
     this.db.prepare("DELETE FROM agent_segments WHERE conversation_id IN (SELECT id FROM conversations WHERE bot_id = ?)").run(id);
     this.db.prepare("DELETE FROM conversations WHERE bot_id = ?").run(id);

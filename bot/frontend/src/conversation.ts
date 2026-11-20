@@ -37,11 +37,12 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     model = ref(""),
     conversationId = ref(""),
     draft = ref("");
+  const localAgent = ref<History['localAgent']>();
   const queued = ref<QueuedMessage[]>([]), tasks = ref<Task[]>([]), queueBusy = ref('');
   const path = computed(() =>
     route.value.kind === "group"
       ? `/groups/${enc(route.value.id)}`
-      : `/bots/${enc(route.value.id)}/chat`,
+      : `/bots/${enc(route.value.id)}/${route.value.localPeer ? 'local-chat/' + enc(route.value.localPeer) : 'chat'}`,
   );
   let cursor: { turnId: string; seq: string } | undefined;
   const liveUrl = (endpoint: string, turnId?: string) =>
@@ -101,6 +102,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     });
     if (!data || ticket !== generation || request !== historyRequest) return null;
     messages.value = data.messages || [];
+    localAgent.value = data.localAgent;
     if (route.value.kind !== 'group' && Array.isArray(data.live)) {
       for (const turn of data.live) {
         if (!turn.userText || (turn.userMessageId && messages.value.some(message => message.id === turn.userMessageId))) continue;
@@ -360,7 +362,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       await api(
         route.value.kind === "group"
           ? `${path.value}/stop`
-          : `/conversations/${enc(conversationId.value || `${route.value.id}:web:console`)}/stop`,
+          : `/conversations/${enc(conversationId.value || `${route.value.id}:web:${route.value.localPeer || 'console'}`)}/stop`,
         { method: "POST", body: {} },
       );
       if (!controller && ticket === generation) await load(false);
@@ -409,7 +411,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     }
   }
   watch(
-    () => `${route.value.kind}/${route.value.id || ""}`,
+    () => `${route.value.kind}/${route.value.id || ""}/${route.value.localPeer || ""}`,
     (key, old) => {
       if (old) drafts.set(old, draft.value);
       draft.value = drafts.get(key) || "";
@@ -427,6 +429,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
       messages.value = [];
       model.value = "";
       conversationId.value = "";
+      localAgent.value = undefined;
       live.value = null;
       pending.value = [];
       queued.value = [];
@@ -474,6 +477,7 @@ export function useConversation(route: Ref<Route>, changed: () => void) {
     stopping,
     model,
     conversationId,
+    localAgent,
     draft,
     load,
     send,

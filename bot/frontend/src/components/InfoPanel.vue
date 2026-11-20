@@ -21,6 +21,7 @@ const props = defineProps<{
   bots: Bot[];
   configure: boolean;
   pending: Approval[];
+  localPeer?: string;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   task: [task: Task];
   tasks: [];
   saved: [];
+  localChat: [peer: string];
 }>();
 interface Conversation {
   id: string;
@@ -142,7 +144,7 @@ onBeforeUnmount(() => {
         <ChannelSettings :key="bot.id" :bots="bots" :scope-bot="bot.id" :account-list="accounts" embedded @changed="load" />
       </PanelSection>
       </template>
-      <HostToolsPane v-if="configure && tab==='tools'" :key="bot.id" :bot-id="bot.id" @saved="emit('saved')" />
+      <HostToolsPane v-if="configure && tab==='tools'" :key="bot.id" :bot-id="bot.id" :local-peer="localPeer" @local-chat="emit('localChat', $event)" @saved="emit('saved')" />
       <template v-if="tab==='history'">
       <BotMemory v-if="configure" :key="bot.id" :bot="bot" @saved="emit('saved')" />
       <div class="list-head">最近会话</div>
